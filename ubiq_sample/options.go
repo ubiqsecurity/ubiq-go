@@ -95,16 +95,16 @@ func getopts() parameters {
 		os.Exit(exitSuccess)
 	}
 
-	if (encrypt && decrypt) || (!encrypt && !decrypt) {
-		usage("encrypt / decrypt operation not specified")
+	if encrypt == decrypt {
+		usage("please specify one of encrypt or decrypt operations")
 	} else if encrypt {
 		params.mode = modeEncrypt
 	} else /* decrypt */ {
 		params.mode = modeDecrypt
 	}
 
-	if (simple && piecewise) || (!simple && !piecewise) {
-		usage("simple / piecewise method not specified")
+	if simple == piecewise {
+		usage("please specify one of simple or piecewise methods")
 	} else if simple {
 		params.method = methodSimple
 	} else /* piecewise */ {
