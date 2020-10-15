@@ -24,10 +24,10 @@ import (
 )
 
 // cipher holds pointers to different types of encryption schemes.
-// the idea is that only one of the pointers is valid at any given
-// time, and the encipher(), decipher(), and close() functions would have
-// code to handle the differences in operation between them, thus
-// abstracting away the different cipher modes.
+// only one of the pointers is valid at any given time; and the
+// encipher(), decipher(), and close() functions behave differently
+// to handle the differences in operation between them, abstracting
+// away the different cipher modes.
 type cipher struct {
 	aead   *aeadIf
 	block  *goCipher.BlockMode
