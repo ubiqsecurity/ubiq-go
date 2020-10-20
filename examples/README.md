@@ -30,7 +30,7 @@ SECRET_CRYPTO_ACCESS_KEY = ...
 Create a local directory and compile the example application
 
 ```sh
-$ git clone https://gitlab.com/ubiqsecurity/ubiq-go
+$ git clone https://gitlab.com/ubiqsecurity/ubiq-go.git
 $ cd ubiq-go/examples
 $ go build ubiq_sample.go
 ```
