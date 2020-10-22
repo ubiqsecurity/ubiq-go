@@ -10,9 +10,13 @@ See the [Go API docs](https://dev.ubiqsecurity.com/docs/api).
 
 Make sure Go is installed on your system.
 
+On Debian and Debian-like Linux systems:
 ```sh
 $ sudo apt install golang
 ```
+
+For MacOS, Windows, and other Linux sysetms, see the
+[Go installation page](https://golang.org/doc/install).
 
 ## Credentials file
 
