@@ -19,6 +19,7 @@ import (
 	"errors"
 	"github.com/go-ini/ini"
 	"os"
+	"os/user"
 	"path/filepath"
 	"strings"
 )
@@ -104,8 +105,9 @@ func loadCredentials(args ...string) (map[string]Credentials, error) {
 	if len(args) > 0 {
 		path = args[0]
 	} else {
-		path, err = os.UserHomeDir()
-		path = filepath.Join(path, ".ubiq", "credentials")
+		var u *user.User
+		u, _ = user.Current()
+		path = filepath.Join(u.HomeDir, ".ubiq", "credentials")
 	}
 
 	m := make(map[string]Credentials)
