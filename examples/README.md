@@ -36,8 +36,16 @@ Create a local directory and compile the example application
 ```sh
 $ git clone https://gitlab.com/ubiqsecurity/ubiq-go.git
 $ cd ubiq-go/examples
+$ go get
 $ go build ubiq_sample.go
 ```
+
+Older versions of Go may produce a message like the following:
+```
+go get: no install location for directory /path/to/ubiq-go/examples outside GOPATH
+	For more details see: 'go help gopath'
+```
+This can be safely ignored for the purpose of building the example.
 
 ## View Program Options
 
