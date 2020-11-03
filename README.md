@@ -115,6 +115,7 @@ for {
         ct = append(ct, t...)
 }
 t, _ := encryption.End()
+ct = append(ct, t...)
 ```
 
 #### Decrypt a large data element where data is loaded in chunks
@@ -141,6 +142,7 @@ for {
         pt = append(pt, t...)
 }
 t, _ := decryption.End()
+pt = append(pt, t...)
 ```
 
 [dashboard]:https://dashboard.ubiqsecurity.com/
