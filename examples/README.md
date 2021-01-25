@@ -15,7 +15,7 @@ On Debian and Debian-like Linux systems:
 $ sudo apt install golang
 ```
 
-For MacOS, Windows, and other Linux sysetms, see the
+For MacOS, Windows, and other Linux systems, see the
 [Go installation page](https://golang.org/doc/install).
 
 ## Credentials file
@@ -65,7 +65,7 @@ Encrypt or decrypt files using the Ubiq service
   -d, -decrypt            Decrypt the contents of the input file and write
                             the results to the output file
   -s, -simple             Use the simple encryption / decryption interfaces
-  -p, -pieceswise         Use the piecewise encryption / decryption interfaces
+  -p, -piecewise          Use the piecewise encryption / decryption interfaces
   -i INFILE, -in INFILE   Set input file name
   -o OUTFILE, -out OUTFILE
                           Set output file name

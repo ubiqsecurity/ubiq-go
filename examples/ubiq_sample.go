@@ -54,7 +54,7 @@ func usage(args ...string) {
 	fmt.Fprintf(os.Stderr, "  -d, -decrypt            Decrypt the contents of the input file and write\n")
 	fmt.Fprintf(os.Stderr, "                            the results to the output file\n")
 	fmt.Fprintf(os.Stderr, "  -s, -simple             Use the simple encryption / decryption interfaces\n")
-	fmt.Fprintf(os.Stderr, "  -p, -pieceswise         Use the piecewise encryption / decryption interfaces\n")
+	fmt.Fprintf(os.Stderr, "  -p, -piecewise          Use the piecewise encryption / decryption interfaces\n")
 	fmt.Fprintf(os.Stderr, "  -i INFILE, -in INFILE   Set input file name\n")
 	fmt.Fprintf(os.Stderr, "  -o OUTFILE, -out OUTFILE\n")
 	fmt.Fprintf(os.Stderr, "                          Set output file name\n")
