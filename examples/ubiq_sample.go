@@ -295,7 +295,7 @@ func _main(params parameters) error {
 		fmt.Fprintf(os.Stderr, "NOTE: This is only for demonstration purposes and is designed to work on memory\n")
 		fmt.Fprintf(os.Stderr, "      constrained devices.  Therefore, this sample application will switch to\n")
 		fmt.Fprintf(os.Stderr, "      the piecewise APIs for files larger than %u bytes in order to reduce\n", maxSimpleSize)
-		fmt.Fprintf(os.Stderr, "      excesive resource usages on resource constrained IoT devices\n")
+		fmt.Fprintf(os.Stderr, "      excessive resource usages on resource constrained IoT devices\n")
 		params.method = maxSimpleSize
 	}
 
