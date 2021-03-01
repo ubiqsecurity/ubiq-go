@@ -14,7 +14,7 @@ test:
     stage: test
     before_script:
         - apt -y update
-        - apt -y install golang
+        - apt -y install git golang
     script:
         - go test -v
         - go build examples/ubiq_sample.go
