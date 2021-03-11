@@ -8,7 +8,7 @@ import (
 func TestGetRequest(t *testing.T) {
 	var client httpClient
 
-	rsp, err := client.Get("https://dashboard.ubiqsecurity.com/")
+	rsp, err := client.Get("https://www.ubiqsecurity.com/")
 	if rsp != nil {
 		defer rsp.Body.Close()
 	}
