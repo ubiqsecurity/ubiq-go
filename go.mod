@@ -1,8 +1,15 @@
 module gitlab.com/ubiqsecurity/ubiq-go
 
-go 1.15
+go 1.18
 
 require (
-	github.com/go-ini/ini v1.61.0
-	github.com/youmark/pkcs8 v0.0.0-20200520070018-fad002e585ce
+	github.com/go-ini/ini v1.67.0
+	github.com/youmark/pkcs8 v0.0.0-20201027041543-1326539a0a0a
+	gitlab.com/ubiqsecurity/ubiq-fpe-go v0.0.0-20230601140135-04d38c981c56
+)
+
+require (
+	github.com/smartystreets/goconvey v1.8.0 // indirect
+	golang.org/x/crypto v0.9.0 // indirect
+	gopkg.in/ini.v1 v1.67.0 // indirect
 )
