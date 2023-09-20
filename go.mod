@@ -9,7 +9,6 @@ require (
 )
 
 require (
-	github.com/smartystreets/goconvey v1.8.0 // indirect
+	github.com/stretchr/testify v1.8.4 // indirect
 	golang.org/x/crypto v0.9.0 // indirect
-	gopkg.in/ini.v1 v1.67.0 // indirect
 )
