@@ -230,6 +230,10 @@ func (this *Decryption) Update(ciphertext []byte) ([]byte, error) {
 				}
 
 				if err == nil {
+					this.billing.addEvent(
+						this.client.papi, "", "",
+						BillingActionDecrypt,
+						1, 0)
 					// all is well, slice off the header
 					this.cipher = &c
 					this.key.uses++

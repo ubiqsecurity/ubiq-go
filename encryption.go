@@ -151,7 +151,12 @@ func NewEncryption(c Credentials, uses uint) (*Encryption, error) {
 			err = enc.init(ne, srsa)
 		}
 	}
-	if err != nil {
+	if err == nil {
+		enc.billing.addEvent(
+			enc.client.papi, "", "",
+			BillingActionEncrypt,
+			1, 0)
+	} else {
 		enc = Encryption{}
 	}
 

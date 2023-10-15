@@ -322,6 +322,11 @@ func (this *FPEncryption) Cipher(pt string, twk []byte) (
 		return
 	}
 
+	this.billing.addEvent(
+		this.papi, ffs.Name, "",
+		BillingActionEncrypt,
+		1, this.kn)
+
 	ctr = convertRadix(ctr, ffs.InputRuneSet, ffs.OutputRuneSet)
 	ctr = encodeKeyNumber(
 		ctr, ffs.OutputRuneSet, this.kn, ffs.NumEncodingBits)
@@ -378,6 +383,11 @@ func (this *FPDecryption) Cipher(ct string, twk []byte) (
 	if err != nil {
 		return
 	}
+
+	this.billing.addEvent(
+		this.papi, ffs.Name, "",
+		BillingActionDecrypt,
+		1, this.kn)
 
 	ptr, err = formatOutput(fmtr, ptr, ffs.PassthroughRuneSet)
 	return string(ptr), err
