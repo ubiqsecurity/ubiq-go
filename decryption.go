@@ -50,25 +50,6 @@ type Decryption struct {
 }
 
 func (this *Decryption) resetSession() error {
-	var err error
-
-	// if the was used at all, update the decryption
-	// counts at the server prior to destroying the session
-	if this.key.uses > 0 {
-		var rsp *http.Response
-
-		endp := this.host
-		endp += "/api/v0/decryption/key"
-		endp += "/" + this.key.fingerprint
-		endp += "/" + this.session
-
-		body, _ := json.Marshal(
-			updateDecryptionRequest{Uses: this.key.uses})
-		rsp, err = this.client.Patch(
-			endp, "application/json", bytes.NewReader(body))
-		rsp.Body.Close()
-	}
-
 	this.session = ""
 
 	this.key.raw = nil
@@ -81,7 +62,7 @@ func (this *Decryption) resetSession() error {
 
 	this.buf = nil
 
-	return err
+	return nil
 }
 
 // request that the server decrypt a data key associated with a cipher text.
