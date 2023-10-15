@@ -45,6 +45,8 @@ type Decryption struct {
 	cipher *cipher
 
 	buf []byte
+
+	billing *billingContext
 }
 
 func (this *Decryption) resetSession() error {
@@ -133,6 +135,9 @@ func NewDecryption(c Credentials) (*Decryption, error) {
 	dec.host, _ = c.host()
 
 	dec.srsa, _ = c.srsa()
+
+	dec.billing = &BILLING_CONTEXT
+	dec.billing.addBiller()
 
 	return &dec, nil
 }
@@ -304,6 +309,7 @@ func (this *Decryption) End() ([]byte, error) {
 // the server, and the object is reset regardless.
 func (this *Decryption) Close() error {
 	err := this.resetSession()
+	this.billing.remBiller()
 	*this = Decryption{}
 	return err
 }

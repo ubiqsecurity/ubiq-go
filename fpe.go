@@ -63,6 +63,8 @@ type fpeContext struct {
 	// number and algorithm are not set
 	kn   int
 	algo fpeAlgorithm
+
+	billing *billingContext
 }
 
 // Reusable object to preserve context across
@@ -286,7 +288,10 @@ func NewFPEncryption(c Credentials, ffs string) (*FPEncryption, error) {
 	if err == nil {
 		err = this.setAlgorithm(-1)
 	}
-
+	if err == nil {
+		this.billing = &BILLING_CONTEXT
+		this.billing.addBiller()
+	}
 	return (*FPEncryption)(this), err
 }
 
@@ -324,11 +329,19 @@ func (this *FPEncryption) Cipher(pt string, twk []byte) (
 	return string(ctr), err
 }
 
+func (this *FPEncryption) Close() {
+	this.billing.remBiller()
+}
+
 // Create a new format preserving decryption object. The returned object
 // can be reused to decrypt multiple ciphertexts using the format (and
 // algorithm and key) named by @ffs
 func NewFPDecryption(c Credentials, ffs string) (*FPDecryption, error) {
 	this, err := newFPEContext(c, ffs)
+	if err == nil {
+		this.billing = &BILLING_CONTEXT
+		this.billing.addBiller()
+	}
 	return (*FPDecryption)(this), err
 }
 
@@ -370,6 +383,10 @@ func (this *FPDecryption) Cipher(ct string, twk []byte) (
 	return string(ptr), err
 }
 
+func (this *FPDecryption) Close() {
+	this.billing.remBiller()
+}
+
 // FPEncrypt performs a format preserving encryption of a plaintext using
 // the supplied credentials and according to the format named by @ffs
 //
@@ -382,6 +399,7 @@ func FPEncrypt(c Credentials, ffs, pt string, twk []byte) (string, error) {
 
 	enc, err := NewFPEncryption(c, ffs)
 	if err == nil {
+		defer enc.Close()
 		ct, err = enc.Cipher(pt, twk)
 	}
 
@@ -403,6 +421,7 @@ func FPDecrypt(c Credentials, ffs, ct string, twk []byte) (string, error) {
 
 	dec, err := NewFPDecryption(c, ffs)
 	if err == nil {
+		defer dec.Close()
 		pt, err = dec.Cipher(ct, twk)
 	}
 

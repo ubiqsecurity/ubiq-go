@@ -59,6 +59,8 @@ type Encryption struct {
 
 	algo   algorithm
 	cipher *cipher
+
+	billing *billingContext
 }
 
 func unwrapDataKey(wdk, epk, srsa string) ([]byte, error) {
@@ -108,6 +110,11 @@ func (this *Encryption) init(rsp newEncryptionResponse, srsa string) error {
 	if err == nil {
 		this.algo, err =
 			getAlgorithmByName(rsp.SecurityModel.Algorithm)
+	}
+
+	if err == nil {
+		this.billing = &BILLING_CONTEXT
+		this.billing.addBiller()
 	}
 
 	return err
@@ -252,6 +259,7 @@ func (this *Encryption) Close() error {
 		rsp.Body.Close()
 	}
 
+	this.billing.remBiller()
 	*this = Encryption{}
 
 	return err

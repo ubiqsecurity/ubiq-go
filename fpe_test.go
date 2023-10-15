@@ -10,10 +10,11 @@ func TestGetFFS(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = NewFPEncryption(credentials, "ALPHANUM_SSN")
+	enc, err := NewFPEncryption(credentials, "ALPHANUM_SSN")
 	if err != nil {
 		t.Fatal(err)
 	}
+	enc.Close()
 }
 
 func testFPE(t *testing.T, ffs, pt string) {
