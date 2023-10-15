@@ -46,7 +46,7 @@ type Decryption struct {
 
 	buf []byte
 
-	billing *billingContext
+	billing billingContext
 }
 
 func (this *Decryption) resetSession() error {
@@ -136,8 +136,7 @@ func NewDecryption(c Credentials) (*Decryption, error) {
 
 	dec.srsa, _ = c.srsa()
 
-	dec.billing = &BILLING_CONTEXT
-	dec.billing.addBiller()
+	dec.billing = newBillingContext(dec.client, dec.host)
 
 	return &dec, nil
 }
@@ -230,7 +229,7 @@ func (this *Decryption) Update(ciphertext []byte) ([]byte, error) {
 				}
 
 				if err == nil {
-					this.billing.addEvent(
+					this.billing.AddEvent(
 						this.client.papi, "", "",
 						BillingActionDecrypt,
 						1, 0)
@@ -313,7 +312,7 @@ func (this *Decryption) End() ([]byte, error) {
 // the server, and the object is reset regardless.
 func (this *Decryption) Close() error {
 	err := this.resetSession()
-	this.billing.remBiller()
+	this.billing.Close()
 	*this = Decryption{}
 	return err
 }

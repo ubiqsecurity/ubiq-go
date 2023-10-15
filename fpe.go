@@ -64,7 +64,7 @@ type fpeContext struct {
 	kn   int
 	algo fpeAlgorithm
 
-	billing *billingContext
+	billing billingContext
 }
 
 // Reusable object to preserve context across
@@ -165,7 +165,7 @@ func getFFSInfo(client *httpClient, host, papi, name string) (ffs *ffsInfo, err 
 
 	var rsp *http.Response
 
-	rsp, err = client.Get(host + "ffs?" + query)
+	rsp, err = client.Get(host + "/api/v0/ffs?" + query)
 	if err != nil {
 		return nil, err
 	}
@@ -206,7 +206,7 @@ func getKey(client *httpClient, host, papi, srsa, name string, kn int) (
 		query += "&key_number=" + strconv.Itoa(kn)
 	}
 
-	rsp, err = client.Get(host + "fpe/key?" + query)
+	rsp, err = client.Get(host + "/api/v0/fpe/key?" + query)
 	if err != nil {
 		return
 	}
@@ -232,8 +232,6 @@ func newFPEContext(c Credentials, ffs string) (this *fpeContext, err error) {
 	this.client = newHttpClient(c)
 
 	this.host, _ = c.host()
-	this.host += "/api/v0/"
-
 	this.papi, _ = c.papi()
 	this.srsa, _ = c.srsa()
 
@@ -289,8 +287,7 @@ func NewFPEncryption(c Credentials, ffs string) (*FPEncryption, error) {
 		err = this.setAlgorithm(-1)
 	}
 	if err == nil {
-		this.billing = &BILLING_CONTEXT
-		this.billing.addBiller()
+		this.billing = newBillingContext(this.client, this.host)
 	}
 	return (*FPEncryption)(this), err
 }
@@ -322,7 +319,7 @@ func (this *FPEncryption) Cipher(pt string, twk []byte) (
 		return
 	}
 
-	this.billing.addEvent(
+	this.billing.AddEvent(
 		this.papi, ffs.Name, "",
 		BillingActionEncrypt,
 		1, this.kn)
@@ -335,7 +332,7 @@ func (this *FPEncryption) Cipher(pt string, twk []byte) (
 }
 
 func (this *FPEncryption) Close() {
-	this.billing.remBiller()
+	this.billing.Close()
 }
 
 // Create a new format preserving decryption object. The returned object
@@ -344,8 +341,7 @@ func (this *FPEncryption) Close() {
 func NewFPDecryption(c Credentials, ffs string) (*FPDecryption, error) {
 	this, err := newFPEContext(c, ffs)
 	if err == nil {
-		this.billing = &BILLING_CONTEXT
-		this.billing.addBiller()
+		this.billing = newBillingContext(this.client, this.host)
 	}
 	return (*FPDecryption)(this), err
 }
@@ -384,7 +380,7 @@ func (this *FPDecryption) Cipher(ct string, twk []byte) (
 		return
 	}
 
-	this.billing.addEvent(
+	this.billing.AddEvent(
 		this.papi, ffs.Name, "",
 		BillingActionDecrypt,
 		1, this.kn)
@@ -394,7 +390,7 @@ func (this *FPDecryption) Cipher(ct string, twk []byte) (
 }
 
 func (this *FPDecryption) Close() {
-	this.billing.remBiller()
+	this.billing.Close()
 }
 
 // FPEncrypt performs a format preserving encryption of a plaintext using

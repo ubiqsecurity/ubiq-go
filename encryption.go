@@ -60,7 +60,7 @@ type Encryption struct {
 	algo   algorithm
 	cipher *cipher
 
-	billing *billingContext
+	billing billingContext
 }
 
 func unwrapDataKey(wdk, epk, srsa string) ([]byte, error) {
@@ -112,11 +112,6 @@ func (this *Encryption) init(rsp newEncryptionResponse, srsa string) error {
 			getAlgorithmByName(rsp.SecurityModel.Algorithm)
 	}
 
-	if err == nil {
-		this.billing = &BILLING_CONTEXT
-		this.billing.addBiller()
-	}
-
 	return err
 }
 
@@ -152,10 +147,7 @@ func NewEncryption(c Credentials, uses uint) (*Encryption, error) {
 		}
 	}
 	if err == nil {
-		enc.billing.addEvent(
-			enc.client.papi, "", "",
-			BillingActionEncrypt,
-			1, 0)
+		enc.billing = newBillingContext(enc.client, enc.host)
 	} else {
 		enc = Encryption{}
 	}
@@ -181,6 +173,11 @@ func (this *Encryption) Begin() ([]byte, error) {
 	if this.key.uses.cur >= this.key.uses.max {
 		return nil, errors.New("maximum key uses exceeded")
 	}
+
+	this.billing.AddEvent(
+		this.client.papi, "", "",
+		BillingActionEncrypt,
+		1, 0)
 
 	h.version = 0
 	h.v0.flags = 0
@@ -264,7 +261,7 @@ func (this *Encryption) Close() error {
 		rsp.Body.Close()
 	}
 
-	this.billing.remBiller()
+	this.billing.Close()
 	*this = Encryption{}
 
 	return err

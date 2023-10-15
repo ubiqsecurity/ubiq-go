@@ -1,9 +1,9 @@
 package ubiq
 
 import (
+	"bytes"
 	"encoding/json"
 	"strconv"
-	"sync"
 	"time"
 )
 
@@ -42,15 +42,26 @@ type billingEventKey struct {
 }
 
 type billingContext struct {
-	lock sync.Mutex
+	client httpClient
+	host   string
 
-	billers int
-	events  chan billingEvent
+	events chan billingEvent
 }
 
-var BILLING_CONTEXT billingContext
+func newBillingContext(client httpClient, host string) billingContext {
+	ctx := billingContext{
+		client: client,
+		host:   host,
+		events: make(chan billingEvent),
+	}
 
-func sendBillingEvents(events *map[billingEventKey]billingEvent) {
+	go billingRoutine(ctx, 5, 2*time.Second)
+	return ctx
+}
+
+func sendBillingEvents(
+	client *httpClient, host string,
+	events *map[billingEventKey]billingEvent) {
 	if len(*events) > 0 {
 		var msg billingEventMessage
 		msg.Usage = make([]billingEvent, len(*events))
@@ -61,13 +72,17 @@ func sendBillingEvents(events *map[billingEventKey]billingEvent) {
 			i++
 		}
 
-		json.Marshal(msg)
+		raw, _ := json.Marshal(msg)
+		client.Post(
+			host+"/api/v3/tracking/events",
+			"application/json",
+			bytes.NewReader(raw))
 
 		*events = make(map[billingEventKey]billingEvent)
 	}
 }
 
-func billingRoutine(inEvents chan billingEvent,
+func billingRoutine(ctx billingContext,
 	minCount int, maxDelay time.Duration) {
 	var ok bool = true
 
@@ -81,7 +96,7 @@ func billingRoutine(inEvents chan billingEvent,
 		select {
 		case <-delay.C:
 			expired = true
-		case ev, ok = <-inEvents:
+		case ev, ok = <-ctx.events:
 			if ok {
 				ek := billingEventKey{
 					Action:        ev.Action,
@@ -102,7 +117,7 @@ func billingRoutine(inEvents chan billingEvent,
 		}
 
 		if len(events) >= minCount || expired {
-			sendBillingEvents(&events)
+			sendBillingEvents(&ctx.client, ctx.host, &events)
 
 			if !expired && !delay.Stop() {
 				// timer already expired,
@@ -114,36 +129,10 @@ func billingRoutine(inEvents chan billingEvent,
 	}
 
 	delay.Stop()
-	sendBillingEvents(&events)
+	sendBillingEvents(&ctx.client, ctx.host, &events)
 }
 
-func (self *billingContext) addBiller() {
-	self.lock.Lock()
-	defer self.lock.Unlock()
-
-	if self.billers == 0 {
-		self.events = make(chan billingEvent)
-		go billingRoutine(self.events, 5, 2*time.Second)
-	}
-
-	self.billers++
-}
-
-func (self *billingContext) remBiller() {
-	self.lock.Lock()
-	defer self.lock.Unlock()
-
-	self.billers--
-
-	if self.billers < 0 {
-		panic("number of billers is negative")
-	} else if self.billers == 0 {
-		close(self.events)
-		// billingRoutine stops automatically
-	}
-}
-
-func (self *billingContext) addEvent(
+func (self *billingContext) AddEvent(
 	papi, dsname, dsgroup string,
 	action BillingAction,
 	count, kn int) {
@@ -163,4 +152,8 @@ func (self *billingContext) addEvent(
 		ProductVersion: Version,
 		UserAgent:      "ubiq-go/" + Version,
 	}
+}
+
+func (self *billingContext) Close() {
+	close(self.events)
 }
