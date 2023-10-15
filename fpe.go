@@ -64,7 +64,7 @@ type fpeContext struct {
 	kn   int
 	algo fpeAlgorithm
 
-	billing billingContext
+	tracking trackingContext
 }
 
 // Reusable object to preserve context across
@@ -287,7 +287,7 @@ func NewFPEncryption(c Credentials, ffs string) (*FPEncryption, error) {
 		err = this.setAlgorithm(-1)
 	}
 	if err == nil {
-		this.billing = newBillingContext(this.client, this.host)
+		this.tracking = newTrackingContext(this.client, this.host)
 	}
 	return (*FPEncryption)(this), err
 }
@@ -319,9 +319,9 @@ func (this *FPEncryption) Cipher(pt string, twk []byte) (
 		return
 	}
 
-	this.billing.AddEvent(
+	this.tracking.AddEvent(
 		this.papi, ffs.Name, "",
-		BillingActionEncrypt,
+		TrackingActionEncrypt,
 		1, this.kn)
 
 	ctr = convertRadix(ctr, ffs.InputRuneSet, ffs.OutputRuneSet)
@@ -332,7 +332,7 @@ func (this *FPEncryption) Cipher(pt string, twk []byte) (
 }
 
 func (this *FPEncryption) Close() {
-	this.billing.Close()
+	this.tracking.Close()
 }
 
 // Create a new format preserving decryption object. The returned object
@@ -341,7 +341,7 @@ func (this *FPEncryption) Close() {
 func NewFPDecryption(c Credentials, ffs string) (*FPDecryption, error) {
 	this, err := newFPEContext(c, ffs)
 	if err == nil {
-		this.billing = newBillingContext(this.client, this.host)
+		this.tracking = newTrackingContext(this.client, this.host)
 	}
 	return (*FPDecryption)(this), err
 }
@@ -380,9 +380,9 @@ func (this *FPDecryption) Cipher(ct string, twk []byte) (
 		return
 	}
 
-	this.billing.AddEvent(
+	this.tracking.AddEvent(
 		this.papi, ffs.Name, "",
-		BillingActionDecrypt,
+		TrackingActionDecrypt,
 		1, this.kn)
 
 	ptr, err = formatOutput(fmtr, ptr, ffs.PassthroughRuneSet)
@@ -390,7 +390,7 @@ func (this *FPDecryption) Cipher(ct string, twk []byte) (
 }
 
 func (this *FPDecryption) Close() {
-	this.billing.Close()
+	this.tracking.Close()
 }
 
 // FPEncrypt performs a format preserving encryption of a plaintext using

@@ -46,7 +46,7 @@ type Decryption struct {
 
 	buf []byte
 
-	billing billingContext
+	tracking trackingContext
 }
 
 func (this *Decryption) resetSession() error {
@@ -136,7 +136,7 @@ func NewDecryption(c Credentials) (*Decryption, error) {
 
 	dec.srsa, _ = c.srsa()
 
-	dec.billing = newBillingContext(dec.client, dec.host)
+	dec.tracking = newTrackingContext(dec.client, dec.host)
 
 	return &dec, nil
 }
@@ -229,9 +229,9 @@ func (this *Decryption) Update(ciphertext []byte) ([]byte, error) {
 				}
 
 				if err == nil {
-					this.billing.AddEvent(
+					this.tracking.AddEvent(
 						this.client.papi, "", "",
-						BillingActionDecrypt,
+						TrackingActionDecrypt,
 						1, 0)
 					// all is well, slice off the header
 					this.cipher = &c
@@ -312,7 +312,7 @@ func (this *Decryption) End() ([]byte, error) {
 // the server, and the object is reset regardless.
 func (this *Decryption) Close() error {
 	err := this.resetSession()
-	this.billing.Close()
+	this.tracking.Close()
 	*this = Decryption{}
 	return err
 }

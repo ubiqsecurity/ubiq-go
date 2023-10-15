@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-type billingEvent struct {
+type trackingEvent struct {
 	Action         string `json:"action"`
 	ApiKey         string `json:"api_key"`
 	ApiVersion     string `json:"api_version"`
@@ -22,18 +22,18 @@ type billingEvent struct {
 	UserAgent      string `json:"user-agent"`
 }
 
-type billingEventMessage struct {
-	Usage []billingEvent `json:"usage"`
+type trackingEventMessage struct {
+	Usage []trackingEvent `json:"usage"`
 }
 
-type BillingAction string
+type TrackingAction string
 
 const (
-	BillingActionEncrypt BillingAction = "encrypt"
-	BillingActionDecrypt BillingAction = "decrypt"
+	TrackingActionEncrypt TrackingAction = "encrypt"
+	TrackingActionDecrypt TrackingAction = "decrypt"
 )
 
-type billingEventKey struct {
+type trackingEventKey struct {
 	Action        string
 	ApiKey        string
 	Datasets      string
@@ -41,30 +41,30 @@ type billingEventKey struct {
 	KeyNumber     string
 }
 
-type billingContext struct {
+type trackingContext struct {
 	client httpClient
 	host   string
 
-	events chan billingEvent
+	events chan trackingEvent
 }
 
-func newBillingContext(client httpClient, host string) billingContext {
-	ctx := billingContext{
+func newTrackingContext(client httpClient, host string) trackingContext {
+	ctx := trackingContext{
 		client: client,
 		host:   host,
-		events: make(chan billingEvent),
+		events: make(chan trackingEvent),
 	}
 
-	go billingRoutine(ctx, 5, 2*time.Second)
+	go trackingRoutine(ctx, 5, 2*time.Second)
 	return ctx
 }
 
-func sendBillingEvents(
+func sendTrackingEvents(
 	client *httpClient, host string,
-	events *map[billingEventKey]billingEvent) {
+	events *map[trackingEventKey]trackingEvent) {
 	if len(*events) > 0 {
-		var msg billingEventMessage
-		msg.Usage = make([]billingEvent, len(*events))
+		var msg trackingEventMessage
+		msg.Usage = make([]trackingEvent, len(*events))
 
 		i := 0
 		for _, v := range *events {
@@ -78,27 +78,27 @@ func sendBillingEvents(
 			"application/json",
 			bytes.NewReader(raw))
 
-		*events = make(map[billingEventKey]billingEvent)
+		*events = make(map[trackingEventKey]trackingEvent)
 	}
 }
 
-func billingRoutine(ctx billingContext,
+func trackingRoutine(ctx trackingContext,
 	minCount int, maxDelay time.Duration) {
 	var ok bool = true
 
 	delay := time.NewTimer(maxDelay)
-	events := make(map[billingEventKey]billingEvent)
+	events := make(map[trackingEventKey]trackingEvent)
 
 	for ok {
 		var expired bool = false
-		var ev billingEvent
+		var ev trackingEvent
 
 		select {
 		case <-delay.C:
 			expired = true
 		case ev, ok = <-ctx.events:
 			if ok {
-				ek := billingEventKey{
+				ek := trackingEventKey{
 					Action:        ev.Action,
 					ApiKey:        ev.ApiKey,
 					Datasets:      ev.Datasets,
@@ -117,7 +117,7 @@ func billingRoutine(ctx billingContext,
 		}
 
 		if len(events) >= minCount || expired {
-			sendBillingEvents(&ctx.client, ctx.host, &events)
+			sendTrackingEvents(&ctx.client, ctx.host, &events)
 
 			if !expired && !delay.Stop() {
 				// timer already expired,
@@ -129,16 +129,16 @@ func billingRoutine(ctx billingContext,
 	}
 
 	delay.Stop()
-	sendBillingEvents(&ctx.client, ctx.host, &events)
+	sendTrackingEvents(&ctx.client, ctx.host, &events)
 }
 
-func (self *billingContext) AddEvent(
+func (self *trackingContext) AddEvent(
 	papi, dsname, dsgroup string,
-	action BillingAction,
+	action TrackingAction,
 	count, kn int) {
 	var now string = time.Now().Format(time.RFC3339)
 
-	self.events <- billingEvent{
+	self.events <- trackingEvent{
 		Action:         string(action),
 		ApiKey:         papi,
 		ApiVersion:     "V3",
@@ -154,6 +154,6 @@ func (self *billingContext) AddEvent(
 	}
 }
 
-func (self *billingContext) Close() {
+func (self *trackingContext) Close() {
 	close(self.events)
 }
