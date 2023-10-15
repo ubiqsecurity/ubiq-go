@@ -46,6 +46,7 @@ type trackingContext struct {
 	host   string
 
 	events chan trackingEvent
+	done   chan struct{}
 }
 
 func newTrackingContext(client httpClient, host string) trackingContext {
@@ -53,6 +54,7 @@ func newTrackingContext(client httpClient, host string) trackingContext {
 		client: client,
 		host:   host,
 		events: make(chan trackingEvent),
+		done:   make(chan struct{}),
 	}
 
 	go trackingRoutine(ctx, 5, 2*time.Second)
@@ -130,6 +132,7 @@ func trackingRoutine(ctx trackingContext,
 
 	delay.Stop()
 	sendTrackingEvents(&ctx.client, ctx.host, &events)
+	close(ctx.done)
 }
 
 func (self *trackingContext) AddEvent(
@@ -156,4 +159,5 @@ func (self *trackingContext) AddEvent(
 
 func (self *trackingContext) Close() {
 	close(self.events)
+	<-self.done
 }
