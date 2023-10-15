@@ -1,6 +1,7 @@
 package ubiq
 
 import (
+	"encoding/json"
 	"strconv"
 	"sync"
 	"time"
@@ -19,6 +20,10 @@ type billingEvent struct {
 	Product        string `json:"product"`
 	ProductVersion string `json:"product_version"`
 	UserAgent      string `json:"user-agent"`
+}
+
+type billingEventMessage struct {
+	Usage []billingEvent `json:"usage"`
 }
 
 type BillingAction string
@@ -45,32 +50,71 @@ type billingContext struct {
 
 var BILLING_CONTEXT billingContext
 
-func billingRoutine(inEvents chan billingEvent) {
+func sendBillingEvents(events *map[billingEventKey]billingEvent) {
+	if len(*events) > 0 {
+		var msg billingEventMessage
+		msg.Usage = make([]billingEvent, len(*events))
+
+		i := 0
+		for _, v := range *events {
+			msg.Usage[i] = v
+			i++
+		}
+
+		json.Marshal(msg)
+
+		*events = make(map[billingEventKey]billingEvent)
+	}
+}
+
+func billingRoutine(inEvents chan billingEvent,
+	minCount int, maxDelay time.Duration) {
+	var ok bool = true
+
+	delay := time.NewTimer(maxDelay)
 	events := make(map[billingEventKey]billingEvent)
 
-	for {
-		ev, ok := <-inEvents
-		if !ok {
-			// channel empty and closed
-			break
+	for ok {
+		var expired bool = false
+		var ev billingEvent
+
+		select {
+		case <-delay.C:
+			expired = true
+		case ev, ok = <-inEvents:
+			if ok {
+				ek := billingEventKey{
+					Action:        ev.Action,
+					ApiKey:        ev.ApiKey,
+					Datasets:      ev.Datasets,
+					DatasetGroups: ev.DatasetGroups,
+					KeyNumber:     ev.KeyNumber,
+				}
+
+				if ex, found := events[ek]; found {
+					ex, ev = ev, ex
+
+					ev.Count += ex.Count
+					ev.LastCallAt = ex.LastCallAt
+				}
+				events[ek] = ev
+			}
 		}
 
-		ek := billingEventKey{
-			Action:        ev.Action,
-			ApiKey:        ev.ApiKey,
-			Datasets:      ev.Datasets,
-			DatasetGroups: ev.DatasetGroups,
-			KeyNumber:     ev.KeyNumber,
-		}
+		if len(events) >= minCount || expired {
+			sendBillingEvents(&events)
 
-		if ex, ok := events[ek]; ok {
-			ex, ev = ev, ex
-
-			ev.Count += ex.Count
-			ev.LastCallAt = ex.LastCallAt
+			if !expired && !delay.Stop() {
+				// timer already expired,
+				// drain the channel
+				<-delay.C
+			}
+			delay.Reset(maxDelay)
 		}
-		events[ek] = ev
 	}
+
+	delay.Stop()
+	sendBillingEvents(&events)
 }
 
 func (self *billingContext) addBiller() {
@@ -79,7 +123,7 @@ func (self *billingContext) addBiller() {
 
 	if self.billers == 0 {
 		self.events = make(chan billingEvent)
-		go billingRoutine(self.events)
+		go billingRoutine(self.events, 5, 2*time.Second)
 	}
 
 	self.billers++
