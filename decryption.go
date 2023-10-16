@@ -212,7 +212,7 @@ func (this *Decryption) Update(ciphertext []byte) ([]byte, error) {
 				if err == nil {
 					this.tracking.AddEvent(
 						this.client.papi, "", "",
-						TrackingActionDecrypt,
+						trackingActionDecrypt,
 						1, 0)
 					// all is well, slice off the header
 					this.cipher = &c

@@ -26,11 +26,11 @@ type trackingEventMessage struct {
 	Usage []*trackingEvent `json:"usage"`
 }
 
-type TrackingAction string
+type trackingAction string
 
 const (
-	TrackingActionEncrypt TrackingAction = "encrypt"
-	TrackingActionDecrypt TrackingAction = "decrypt"
+	trackingActionEncrypt trackingAction = "encrypt"
+	trackingActionDecrypt trackingAction = "decrypt"
 )
 
 type trackingEventKey struct {
@@ -136,7 +136,7 @@ func trackingRoutine(ctx trackingContext,
 
 func (self *trackingContext) AddEvent(
 	papi, dsname, dsgroup string,
-	action TrackingAction,
+	action trackingAction,
 	count, kn int) {
 	var now string = time.Now().Format(time.RFC3339)
 

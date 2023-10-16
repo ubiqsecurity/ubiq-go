@@ -321,7 +321,7 @@ func (this *FPEncryption) Cipher(pt string, twk []byte) (
 
 	this.tracking.AddEvent(
 		this.papi, ffs.Name, "",
-		TrackingActionEncrypt,
+		trackingActionEncrypt,
 		1, this.kn)
 
 	ctr = convertRadix(ctr, ffs.InputRuneSet, ffs.OutputRuneSet)
@@ -382,7 +382,7 @@ func (this *FPDecryption) Cipher(ct string, twk []byte) (
 
 	this.tracking.AddEvent(
 		this.papi, ffs.Name, "",
-		TrackingActionDecrypt,
+		trackingActionDecrypt,
 		1, this.kn)
 
 	ptr, err = formatOutput(fmtr, ptr, ffs.PassthroughRuneSet)

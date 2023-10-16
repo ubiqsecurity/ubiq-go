@@ -173,7 +173,7 @@ func (this *Encryption) Begin() ([]byte, error) {
 
 	this.tracking.AddEvent(
 		this.client.papi, "", "",
-		TrackingActionEncrypt,
+		trackingActionEncrypt,
 		1, 0)
 
 	h.version = 0
