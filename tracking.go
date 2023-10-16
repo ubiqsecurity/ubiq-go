@@ -18,12 +18,10 @@ import (
 // stored event is incremented.
 //
 
-//
 // the information about a particular event. this structure
 // is stored locally until sent to the server and also serves
 // as the structure for the message sent to the server via
 // the json annotations
-//
 type trackingEvent struct {
 	Action         string `json:"action"`
 	ApiKey         string `json:"api_key"`
@@ -39,10 +37,8 @@ type trackingEvent struct {
 	UserAgent      string `json:"user-agent"`
 }
 
-//
 // the message sent to the server is an array of
 // events under the "usage" name/label
-//
 type trackingEventMessage struct {
 	Usage []*trackingEvent `json:"usage"`
 }
@@ -54,10 +50,8 @@ const (
 	trackingActionDecrypt trackingAction = "decrypt"
 )
 
-//
 // key used to look up locally stored events
 // for matching purposes
-//
 type trackingEventKey struct {
 	Action        string
 	ApiKey        string
@@ -66,11 +60,9 @@ type trackingEventKey struct {
 	KeyNumber     string
 }
 
-//
 // the trackingContext contains the communication channel(s)
 // between the code generating tracking events and the background
 // goroutine sending events to the server.
-//
 type trackingContext struct {
 	//
 	// only the goroutine uses the client
@@ -87,7 +79,7 @@ type trackingContext struct {
 	// this channel is only used by the background
 	// routine to signal completion/exit
 	//
-	done   chan struct{}
+	done chan struct{}
 }
 
 func newTrackingContext(client httpClient, host string) trackingContext {
@@ -102,11 +94,9 @@ func newTrackingContext(client httpClient, host string) trackingContext {
 	return ctx
 }
 
-//
 // serialize the map and send that serialization to the
 // designated host via the supplied client. the map is
 // cleared by this function
-//
 func sendTrackingEvents(
 	client *httpClient, host string,
 	events *map[trackingEventKey]*trackingEvent) {
@@ -132,12 +122,10 @@ func sendTrackingEvents(
 	}
 }
 
-//
 // the background routine that periodically sends captured
 // events to the server. events are sent when a minimum of
 // @minCount has been stored or @maxDelay time has passed
 // since the last sent update
-//
 func trackingRoutine(ctx trackingContext,
 	minCount int, maxDelay time.Duration) {
 	var ok bool = true
