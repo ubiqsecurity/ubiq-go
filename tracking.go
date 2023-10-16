@@ -45,7 +45,7 @@ type trackingContext struct {
 	client httpClient
 	host   string
 
-	events chan trackingEvent
+	events chan *trackingEvent
 	done   chan struct{}
 }
 
@@ -53,7 +53,7 @@ func newTrackingContext(client httpClient, host string) trackingContext {
 	ctx := trackingContext{
 		client: client,
 		host:   host,
-		events: make(chan trackingEvent),
+		events: make(chan *trackingEvent),
 		done:   make(chan struct{}),
 	}
 
@@ -93,7 +93,7 @@ func trackingRoutine(ctx trackingContext,
 
 	for ok {
 		var expired bool = false
-		var ev trackingEvent
+		var ev *trackingEvent
 
 		select {
 		case <-delay.C:
@@ -112,8 +112,7 @@ func trackingRoutine(ctx trackingContext,
 					ex.Count += ev.Count
 					ex.LastCallAt = ev.LastCallAt
 				} else {
-					ev2 := ev
-					events[ek] = &ev2
+					events[ek] = ev
 				}
 			}
 		}
@@ -141,7 +140,7 @@ func (self *trackingContext) AddEvent(
 	count, kn int) {
 	var now string = time.Now().Format(time.RFC3339)
 
-	self.events <- trackingEvent{
+	self.events <- &trackingEvent{
 		Action:         string(action),
 		ApiKey:         papi,
 		ApiVersion:     "V3",
