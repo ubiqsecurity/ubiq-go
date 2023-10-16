@@ -23,7 +23,7 @@ type trackingEvent struct {
 }
 
 type trackingEventMessage struct {
-	Usage []trackingEvent `json:"usage"`
+	Usage []*trackingEvent `json:"usage"`
 }
 
 type TrackingAction string
@@ -63,10 +63,10 @@ func newTrackingContext(client httpClient, host string) trackingContext {
 
 func sendTrackingEvents(
 	client *httpClient, host string,
-	events *map[trackingEventKey]trackingEvent) {
+	events *map[trackingEventKey]*trackingEvent) {
 	if len(*events) > 0 {
 		var msg trackingEventMessage
-		msg.Usage = make([]trackingEvent, len(*events))
+		msg.Usage = make([]*trackingEvent, len(*events))
 
 		i := 0
 		for _, v := range *events {
@@ -80,7 +80,7 @@ func sendTrackingEvents(
 			"application/json",
 			bytes.NewReader(raw))
 
-		*events = make(map[trackingEventKey]trackingEvent)
+		*events = make(map[trackingEventKey]*trackingEvent)
 	}
 }
 
@@ -89,7 +89,7 @@ func trackingRoutine(ctx trackingContext,
 	var ok bool = true
 
 	delay := time.NewTimer(maxDelay)
-	events := make(map[trackingEventKey]trackingEvent)
+	events := make(map[trackingEventKey]*trackingEvent)
 
 	for ok {
 		var expired bool = false
@@ -109,12 +109,12 @@ func trackingRoutine(ctx trackingContext,
 				}
 
 				if ex, found := events[ek]; found {
-					ex, ev = ev, ex
-
-					ev.Count += ex.Count
-					ev.LastCallAt = ex.LastCallAt
+					ex.Count += ev.Count
+					ex.LastCallAt = ev.LastCallAt
+				} else {
+					ev2 := ev
+					events[ek] = &ev2
 				}
-				events[ek] = ev
 			}
 		}
 
