@@ -1,7 +1,11 @@
 package ubiq
 
 import (
+	"encoding/json"
+	"io/ioutil"
+	"os"
 	"testing"
+	"time"
 )
 
 func TestGetFFS(t *testing.T) {
@@ -49,4 +53,87 @@ func TestFPESSN(t *testing.T) {
 }
 func TestFPEUTF8(t *testing.T) {
 	testFPE(t, "UTF8_STRING", "abcdefghijklmnopqrstuvwxyzこんにちは世界")
+}
+
+type FPETestRecord struct {
+	Ciphertext string `json:"ciphertext"`
+	Plaintext  string `json:"plaintext"`
+	Dataset    string `json:"dataset"`
+}
+
+type FPEOperations struct {
+	enc *FPEncryption
+	dec *FPDecryption
+}
+
+type FPEPerformanceCounter struct {
+	Count int
+	Duration struct {
+		Encrypt time.Duration
+		Decrypt time.Duration
+	}
+}
+
+func TestFPE1M(t *testing.T) {
+	file, err := os.Open("1m.json")
+	if err != nil {
+		t.Skip(err)
+	}
+	defer file.Close()
+
+	raw, err := ioutil.ReadAll(file)
+	if err != nil {
+		t.Skip(err)
+	}
+
+	var records []FPETestRecord
+	err = json.Unmarshal([]byte(raw), &records)
+	if err != nil {
+		t.Skip(err)
+	}
+
+	creds, err := NewCredentials()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var ops map[string]FPEOperations = make(map[string]FPEOperations)
+	for i, _ := range records {
+		rec := &records[i]
+
+		op, ok := ops[rec.Dataset]
+		if !ok {
+			op.enc, err = NewFPEncryption(creds, rec.Dataset)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer op.enc.Close()
+
+			op.dec, err = NewFPDecryption(creds, rec.Dataset)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer op.dec.Close()
+
+			ops[rec.Dataset] = op
+		}
+
+		ct, err := op.enc.Cipher(rec.Plaintext, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if ct != rec.Ciphertext {
+			t.Fatalf("encryption(%v): %v != %v",
+				i, ct, rec.Ciphertext)
+		}
+
+		pt, err := op.dec.Cipher(rec.Ciphertext, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if pt != rec.Plaintext {
+			t.Fatalf("decryption(%v): %v != %v",
+				i, pt, rec.Plaintext)
+		}
+	}
 }
