@@ -84,8 +84,9 @@ func TestTooManyEncryption(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// no longer enforcing maximum number of uses
 	_, err = encryption.Begin()
-	if err == nil {
+	if err != nil {
 		t.Fatal(err)
 	}
 }

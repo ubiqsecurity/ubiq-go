@@ -45,28 +45,11 @@ type Decryption struct {
 	cipher *cipher
 
 	buf []byte
+
+	tracking trackingContext
 }
 
 func (this *Decryption) resetSession() error {
-	var err error
-
-	// if the was used at all, update the decryption
-	// counts at the server prior to destroying the session
-	if this.key.uses > 0 {
-		var rsp *http.Response
-
-		endp := this.host
-		endp += "/api/v0/decryption/key"
-		endp += "/" + this.key.fingerprint
-		endp += "/" + this.session
-
-		body, _ := json.Marshal(
-			updateDecryptionRequest{Uses: this.key.uses})
-		rsp, err = this.client.Patch(
-			endp, "application/json", bytes.NewReader(body))
-		rsp.Body.Close()
-	}
-
 	this.session = ""
 
 	this.key.raw = nil
@@ -79,7 +62,7 @@ func (this *Decryption) resetSession() error {
 
 	this.buf = nil
 
-	return err
+	return nil
 }
 
 // request that the server decrypt a data key associated with a cipher text.
@@ -133,6 +116,8 @@ func NewDecryption(c Credentials) (*Decryption, error) {
 	dec.host, _ = c.host()
 
 	dec.srsa, _ = c.srsa()
+
+	dec.tracking = newTrackingContext(dec.client, dec.host)
 
 	return &dec, nil
 }
@@ -225,6 +210,10 @@ func (this *Decryption) Update(ciphertext []byte) ([]byte, error) {
 				}
 
 				if err == nil {
+					this.tracking.AddEvent(
+						this.client.papi, "", "",
+						trackingActionDecrypt,
+						1, 0)
 					// all is well, slice off the header
 					this.cipher = &c
 					this.key.uses++
@@ -304,6 +293,7 @@ func (this *Decryption) End() ([]byte, error) {
 // the server, and the object is reset regardless.
 func (this *Decryption) Close() error {
 	err := this.resetSession()
+	this.tracking.Close()
 	*this = Decryption{}
 	return err
 }

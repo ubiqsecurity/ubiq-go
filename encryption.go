@@ -59,6 +59,8 @@ type Encryption struct {
 
 	algo   algorithm
 	cipher *cipher
+
+	tracking trackingContext
 }
 
 func unwrapDataKey(wdk, epk, srsa string) ([]byte, error) {
@@ -144,7 +146,9 @@ func NewEncryption(c Credentials, uses uint) (*Encryption, error) {
 			err = enc.init(ne, srsa)
 		}
 	}
-	if err != nil {
+	if err == nil {
+		enc.tracking = newTrackingContext(enc.client, enc.host)
+	} else {
 		enc = Encryption{}
 	}
 
@@ -166,9 +170,11 @@ func (this *Encryption) Begin() ([]byte, error) {
 	if this.cipher != nil {
 		return nil, errors.New("encryption already in progress")
 	}
-	if this.key.uses.cur >= this.key.uses.max {
-		return nil, errors.New("maximum key uses exceeded")
-	}
+
+	this.tracking.AddEvent(
+		this.client.papi, "", "",
+		trackingActionEncrypt,
+		1, 0)
 
 	h.version = 0
 	h.v0.flags = 0
@@ -230,31 +236,10 @@ func (this *Encryption) End() ([]byte, error) {
 // An error returned by this function is a result of a miscommunication with
 // the server, and the object is reset regardless.
 func (this *Encryption) Close() error {
-	var err error
-
-	// the patch command is only necessary if the key was
-	// used fewer times than requested
-	if this.key.uses.cur < this.key.uses.max {
-		var rsp *http.Response
-
-		body, _ := json.Marshal(
-			updateEncryptionRequest{
-				Requested: this.key.uses.max,
-				Actual:    this.key.uses.cur})
-
-		endp := this.host
-		endp += "/api/v0/encryption/key"
-		endp += "/" + this.key.fingerprint
-		endp += "/" + this.session
-
-		rsp, err = this.client.Patch(
-			endp, "application/json", bytes.NewBuffer(body))
-		rsp.Body.Close()
-	}
-
+	this.tracking.Close()
 	*this = Encryption{}
 
-	return err
+	return nil
 }
 
 // Encrypt encrypts a single plain text message using a new key

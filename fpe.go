@@ -63,6 +63,8 @@ type fpeContext struct {
 	// number and algorithm are not set
 	kn   int
 	algo fpeAlgorithm
+
+	tracking trackingContext
 }
 
 // Reusable object to preserve context across
@@ -163,7 +165,7 @@ func getFFSInfo(client *httpClient, host, papi, name string) (ffs *ffsInfo, err 
 
 	var rsp *http.Response
 
-	rsp, err = client.Get(host + "ffs?" + query)
+	rsp, err = client.Get(host + "/api/v0/ffs?" + query)
 	if err != nil {
 		return nil, err
 	}
@@ -204,7 +206,7 @@ func getKey(client *httpClient, host, papi, srsa, name string, kn int) (
 		query += "&key_number=" + strconv.Itoa(kn)
 	}
 
-	rsp, err = client.Get(host + "fpe/key?" + query)
+	rsp, err = client.Get(host + "/api/v0/fpe/key?" + query)
 	if err != nil {
 		return
 	}
@@ -230,8 +232,6 @@ func newFPEContext(c Credentials, ffs string) (this *fpeContext, err error) {
 	this.client = newHttpClient(c)
 
 	this.host, _ = c.host()
-	this.host += "/api/v0/"
-
 	this.papi, _ = c.papi()
 	this.srsa, _ = c.srsa()
 
@@ -286,7 +286,9 @@ func NewFPEncryption(c Credentials, ffs string) (*FPEncryption, error) {
 	if err == nil {
 		err = this.setAlgorithm(-1)
 	}
-
+	if err == nil {
+		this.tracking = newTrackingContext(this.client, this.host)
+	}
 	return (*FPEncryption)(this), err
 }
 
@@ -317,6 +319,11 @@ func (this *FPEncryption) Cipher(pt string, twk []byte) (
 		return
 	}
 
+	this.tracking.AddEvent(
+		this.papi, ffs.Name, "",
+		trackingActionEncrypt,
+		1, this.kn)
+
 	ctr = convertRadix(ctr, ffs.InputRuneSet, ffs.OutputRuneSet)
 	ctr = encodeKeyNumber(
 		ctr, ffs.OutputRuneSet, this.kn, ffs.NumEncodingBits)
@@ -324,11 +331,18 @@ func (this *FPEncryption) Cipher(pt string, twk []byte) (
 	return string(ctr), err
 }
 
+func (this *FPEncryption) Close() {
+	this.tracking.Close()
+}
+
 // Create a new format preserving decryption object. The returned object
 // can be reused to decrypt multiple ciphertexts using the format (and
 // algorithm and key) named by @ffs
 func NewFPDecryption(c Credentials, ffs string) (*FPDecryption, error) {
 	this, err := newFPEContext(c, ffs)
+	if err == nil {
+		this.tracking = newTrackingContext(this.client, this.host)
+	}
 	return (*FPDecryption)(this), err
 }
 
@@ -366,8 +380,17 @@ func (this *FPDecryption) Cipher(ct string, twk []byte) (
 		return
 	}
 
+	this.tracking.AddEvent(
+		this.papi, ffs.Name, "",
+		trackingActionDecrypt,
+		1, this.kn)
+
 	ptr, err = formatOutput(fmtr, ptr, ffs.PassthroughRuneSet)
 	return string(ptr), err
+}
+
+func (this *FPDecryption) Close() {
+	this.tracking.Close()
 }
 
 // FPEncrypt performs a format preserving encryption of a plaintext using
@@ -382,6 +405,7 @@ func FPEncrypt(c Credentials, ffs, pt string, twk []byte) (string, error) {
 
 	enc, err := NewFPEncryption(c, ffs)
 	if err == nil {
+		defer enc.Close()
 		ct, err = enc.Cipher(pt, twk)
 	}
 
@@ -403,6 +427,7 @@ func FPDecrypt(c Credentials, ffs, ct string, twk []byte) (string, error) {
 
 	dec, err := NewFPDecryption(c, ffs)
 	if err == nil {
+		defer dec.Close()
 		pt, err = dec.Cipher(ct, twk)
 	}
 
