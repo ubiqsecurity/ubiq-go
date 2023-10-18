@@ -85,21 +85,18 @@ func convertRadix(inp []rune, ics, ocs *algo.Alphabet) []rune {
 
 // remove passthrough characters from the input and preserve the format
 // so the output can be reformatted after encryption/decryption
-func formatInput(inp []rune, pth, icr, ocr *algo.Alphabet) (fmtr, out []rune, err error) {
+func formatInput(inp []rune, pth, icr *algo.Alphabet, ocr0 rune) (fmtr, out []rune, err error) {
 	fmtr = make([]rune, 0, len(inp))
 	out = make([]rune, 0, len(inp))
 
 	for _, c := range inp {
-		if pth.PosOf(c) >= 0 {
+		if icr.PosOf(c) >= 0 {
+			fmtr = append(fmtr, ocr0)
+			out = append(out, c)
+		} else if pth.PosOf(c) >= 0 {
 			fmtr = append(fmtr, c)
 		} else {
-			fmtr = append(fmtr, ocr.ValAt(0))
-
-			if icr.PosOf(c) >= 0 {
-				out = append(out, c)
-			} else {
-				err = errors.New("invalid input character")
-			}
+			err = errors.New("invalid input character")
 		}
 	}
 
@@ -107,15 +104,15 @@ func formatInput(inp []rune, pth, icr, ocr *algo.Alphabet) (fmtr, out []rune, er
 }
 
 // reinsert passthrough characters into output
-func formatOutput(fmtr, inp []rune, pth *algo.Alphabet) (out []rune, err error) {
+func formatOutput(fmtr, inp []rune, ocr0 rune) (out []rune, err error) {
 	out = make([]rune, 0, len(fmtr))
 
 	for _, c := range fmtr {
-		if pth.PosOf(c) >= 0 {
-			out = append(out, c)
-		} else {
+		if c == ocr0 {
 			out = append(out, inp[0])
 			inp = inp[1:]
+		} else {
+			out = append(out, c)
 		}
 	}
 
@@ -296,7 +293,7 @@ func (this *FPEncryption) Cipher(pt string, twk []byte) (
 		[]rune(pt),
 		&ffs.PassthroughAlphabet,
 		&ffs.InputAlphabet,
-		&ffs.OutputAlphabet)
+		ffs.OutputAlphabet.ValAt(0))
 	if err != nil {
 		return
 	}
@@ -319,7 +316,7 @@ func (this *FPEncryption) Cipher(pt string, twk []byte) (
 	ctr = convertRadix(ctr, &ffs.InputAlphabet, &ffs.OutputAlphabet)
 	ctr = encodeKeyNumber(
 		ctr, &ffs.OutputAlphabet, this.kn, ffs.NumEncodingBits)
-	ctr, err = formatOutput(fmtr, ctr, &ffs.PassthroughAlphabet)
+	ctr, err = formatOutput(fmtr, ctr, ffs.OutputAlphabet.ValAt(0))
 	return string(ctr), err
 }
 
@@ -354,7 +351,7 @@ func (this *FPDecryption) Cipher(ct string, twk []byte) (
 		[]rune(ct),
 		&ffs.PassthroughAlphabet,
 		&ffs.OutputAlphabet,
-		&ffs.InputAlphabet)
+		ffs.InputAlphabet.ValAt(0))
 	if err != nil {
 		return
 	}
@@ -379,7 +376,7 @@ func (this *FPDecryption) Cipher(ct string, twk []byte) (
 		trackingActionDecrypt,
 		1, this.kn)
 
-	ptr, err = formatOutput(fmtr, ptr, &ffs.PassthroughAlphabet)
+	ptr, err = formatOutput(fmtr, ptr, ffs.InputAlphabet.ValAt(0))
 	return string(ptr), err
 }
 
