@@ -137,7 +137,7 @@ func decodeKeyNumber(inp []rune, ocs *algo.Alphabet, sft int) ([]rune, int) {
 	c := ocs.PosOf(inp[0])
 	n := c >> sft
 
-	inp[0] = ocs.ValAt(c-(n<<sft))
+	inp[0] = ocs.ValAt(c - (n << sft))
 	return inp, n
 }
 
