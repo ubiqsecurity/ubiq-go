@@ -6,8 +6,8 @@ github.com/stretchr/testify v1.8.4 h1:CcVxjf3Q8PM0mHUKJCdn+eZZtm5yQwehR5yeSVQQcU
 github.com/stretchr/testify v1.8.4/go.mod h1:sz/lmYIOXD/1dqDmKjjqLyZ2RngseejIcXlSw2iwfAo=
 github.com/youmark/pkcs8 v0.0.0-20201027041543-1326539a0a0a h1:fZHgsYlfvtyqToslyjUt3VOPF4J7aK/3MPcK7xp3PDk=
 github.com/youmark/pkcs8 v0.0.0-20201027041543-1326539a0a0a/go.mod h1:ul22v+Nro/R083muKhosV54bj5niojjWZvU8xrevuH4=
-gitlab.com/ubiqsecurity/ubiq-fpe-go v0.0.0-20231018143332-f6a92940d841 h1:KLGPvnDN71wm6BqkbjXBs/0+I1Gl62zACbVzQBUbo6U=
-gitlab.com/ubiqsecurity/ubiq-fpe-go v0.0.0-20231018143332-f6a92940d841/go.mod h1:XiIs3QwuPF3dc1lg+XbNKgdMpx1/MikiJcwaPpYBSBg=
+gitlab.com/ubiqsecurity/ubiq-fpe-go v0.0.0-20231018212503-d001bafc02a8 h1:4QvzqThaXQ+cb/ctTZt+rysNmEFp2hF2nRAgd2S92rs=
+gitlab.com/ubiqsecurity/ubiq-fpe-go v0.0.0-20231018212503-d001bafc02a8/go.mod h1:XiIs3QwuPF3dc1lg+XbNKgdMpx1/MikiJcwaPpYBSBg=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
 golang.org/x/crypto v0.0.0-20200302210943-78000ba7a073/go.mod h1:LzIPMQfyMNhhGPhUkYOs5KpL4U8rLKemX1yGLhDgUto=
 golang.org/x/crypto v0.9.0 h1:LF6fAI+IutBocDJ2OT0Q1g8plpYljMZ4+lty+dsqw3g=
