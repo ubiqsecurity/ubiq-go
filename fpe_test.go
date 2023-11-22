@@ -55,6 +55,45 @@ func TestFPEUTF8(t *testing.T) {
 	testFPE(t, "UTF8_STRING", "abcdefghijklmnopqrstuvwxyzこんにちは世界")
 }
 
+func testFPEForSearch(t *testing.T, ffs, pt string) {
+	c, err := NewCredentials()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ct, err := FPEncryptForSearch(c, ffs, pt, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i := range ct {
+		rt, err := FPDecrypt(c, ffs, ct[i], nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if pt != rt {
+			t.Fatalf(
+				"bad recovered plaintext: \"%s\" vs. \"%s\"",
+				pt, rt)
+		}
+	}
+}
+
+func TestFPEAlnumSSNForSearch(t *testing.T) {
+	testFPEForSearch(t, "ALPHANUM_SSN", "123-45-6789")
+}
+func TestFPEBirthdateForSearch(t *testing.T) {
+	testFPEForSearch(t, "BIRTH_DATE", "04-20-1969")
+}
+func TestFPESSNForSearch(t *testing.T) {
+	testFPEForSearch(t, "SSN", "987-65-4321")
+}
+func TestFPEUTF8ForSearch(t *testing.T) {
+	testFPEForSearch(
+		t, "UTF8_STRING", "abcdefghijklmnopqrstuvwxyzこんにちは世界")
+}
+
 type FPETestRecord struct {
 	Ciphertext string `json:"ciphertext"`
 	Plaintext  string `json:"plaintext"`
@@ -67,7 +106,7 @@ type FPEOperations struct {
 }
 
 type FPEPerformanceCounter struct {
-	Count int
+	Count    int
 	Duration struct {
 		Encrypt time.Duration
 		Decrypt time.Duration

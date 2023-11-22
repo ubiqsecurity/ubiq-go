@@ -32,6 +32,14 @@ type ffsInfo struct {
 	TweakSource             string `json:"tweak_source"`
 }
 
+type defKeys struct {
+	CurrentKeyNum       int      `json:"current_key_number"`
+	EncryptedPrivateKey string   `json:"encrypted_private_key"`
+	FFS                 ffsInfo  `json:"ffs"`
+	EncryptedDataKeys   []string `json:"keys"`
+	Retrieved           float32  `json:"retrieved"`
+}
+
 // this interface was created so that it could be placed into
 // the fpeContext so that fpeContext could be used in both encryption
 // and decryption operations
@@ -65,6 +73,11 @@ type fpeContext struct {
 	algo fpeAlgorithm
 
 	tracking trackingContext
+}
+
+type fpeKey struct {
+	num int
+	key []byte
 }
 
 // Reusable object to preserve context across
@@ -191,7 +204,7 @@ func getFFSInfo(client *httpClient, host, papi, name string) (ffs *ffsInfo, err 
 
 // retrieve the key from the server
 func getKey(client *httpClient, host, papi, srsa, name string, kn int) (
-	key []byte, num int, err error) {
+	key fpeKey, err error) {
 	var query = "ffs_name=" + url.QueryEscape(name) + "&" +
 		"papi=" + url.QueryEscape(papi)
 
@@ -219,8 +232,39 @@ func getKey(client *httpClient, host, papi, srsa, name string, kn int) (
 	}
 
 	if err == nil {
-		num, _ = strconv.Atoi(obj.Num)
-		key, err = unwrapDataKey(obj.WDK, obj.EPK, srsa)
+		key.num, _ = strconv.Atoi(obj.Num)
+		key.key, err = unwrapDataKey(obj.WDK, obj.EPK, srsa)
+	}
+
+	return
+}
+
+func getAllKeys(client *httpClient, host, papi, srsa, name string) (
+	keys []fpeKey, err error) {
+	var query = "ffs_name=" + url.QueryEscape(name) + "&" +
+		"papi=" + url.QueryEscape(papi)
+
+	var rsp *http.Response
+
+	rsp, err = client.Get(host + "/api/v0/fpe/def_keys?" + query)
+	if err != nil {
+		return
+	}
+	defer rsp.Body.Close()
+
+	js := make(map[string]defKeys)
+	json.NewDecoder(rsp.Body).Decode(&js)
+
+	keys = make([]fpeKey, len(js[name].EncryptedDataKeys))
+	for i, _ := range js[name].EncryptedDataKeys {
+		keys[i].num = i
+		keys[i].key, err = unwrapDataKey(
+			js[name].EncryptedDataKeys[i],
+			js[name].EncryptedPrivateKey,
+			srsa)
+		if err != nil {
+			return
+		}
 	}
 
 	return
@@ -242,28 +286,10 @@ func newFPEContext(c Credentials, ffs string) (this *fpeContext, err error) {
 	return
 }
 
-// retrieve algorithm and key information from the server
-//
-// for encryption this can be done right away as the key number is
-// unknown. for decryption, it can't be done until the ciphertext
-// has been presented and the key number decoded from it
-func (this *fpeContext) setAlgorithm(kn int) (err error) {
-	var key, twk []byte
-
-	twk, err = base64.StdEncoding.DecodeString(this.ffs.Tweak)
-	if err != nil {
-		return
-	}
-
-	key, kn, err = getKey(&this.client,
-		this.host, this.papi, this.srsa,
-		this.ffs.Name, kn)
-	if err != nil {
-		return
-	}
-
+func (this *fpeContext) getAlgorithm(key, twk []byte) (
+	alg fpeAlgorithm, err error) {
 	if this.ffs.Algorithm == "FF1" {
-		this.algo, err = algo.NewFF1(
+		alg, err = algo.NewFF1(
 			key, twk,
 			this.ffs.TweakLengthMin, this.ffs.TweakLengthMax,
 			len(this.ffs.InputRuneSet), this.ffs.InputCharacterSet)
@@ -271,8 +297,34 @@ func (this *fpeContext) setAlgorithm(kn int) (err error) {
 		err = errors.New("unsupported algorithm: " + this.ffs.Algorithm)
 	}
 
+	return
+}
+
+// retrieve algorithm and key information from the server
+//
+// for encryption this can be done right away as the key number is
+// unknown. for decryption, it can't be done until the ciphertext
+// has been presented and the key number decoded from it
+func (this *fpeContext) setAlgorithm(kn int) (err error) {
+	var twk []byte
+	var key fpeKey
+
+	twk, err = base64.StdEncoding.DecodeString(this.ffs.Tweak)
+	if err != nil {
+		return
+	}
+
+	key, err = getKey(&this.client,
+		this.host, this.papi, this.srsa,
+		this.ffs.Name, kn)
+	if err != nil {
+		return
+	}
+
+	this.algo, err = this.getAlgorithm(key.key, twk)
+
 	if err == nil {
-		this.kn = kn
+		this.kn = key.num
 	}
 
 	return
@@ -329,6 +381,63 @@ func (this *FPEncryption) Cipher(pt string, twk []byte) (
 		ctr, ffs.OutputRuneSet, this.kn, ffs.NumEncodingBits)
 	ctr, err = formatOutput(fmtr, ctr, ffs.PassthroughRuneSet)
 	return string(ctr), err
+}
+
+func (this *FPEncryption) CipherForSearch(pt string, twk []byte) (
+	ct []string, err error) {
+	var ffs *ffsInfo = this.ffs
+	var fmtr, ptr, ctr []rune
+
+	deftwk, err := base64.StdEncoding.DecodeString(this.ffs.Tweak)
+	if err != nil {
+		return
+	}
+
+	keys, err := getAllKeys(
+		&this.client, this.host, this.papi, this.srsa, this.ffs.Name)
+	if err != nil {
+		return
+	}
+
+	fmtr, ptr, err = formatInput(
+		[]rune(pt),
+		ffs.PassthroughRuneSet, ffs.InputRuneSet, ffs.OutputRuneSet)
+	if err != nil {
+		return
+	}
+	if len(ptr) < ffs.InputLengthMin || len(ptr) > ffs.InputLengthMax {
+		err = errors.New("input length out of bounds")
+		return
+	}
+
+	ct = make([]string, len(keys))
+	for i, _ := range keys {
+		var alg fpeAlgorithm
+
+		alg, err = ((*fpeContext)(this)).getAlgorithm(
+			keys[i].key, deftwk)
+		ctr, err = alg.EncryptRunes(ptr, twk)
+		if err != nil {
+			return
+		}
+
+		this.tracking.AddEvent(
+			this.papi, ffs.Name, "",
+			trackingActionEncrypt,
+			1, this.kn)
+
+		ctr = convertRadix(ctr, ffs.InputRuneSet, ffs.OutputRuneSet)
+		ctr = encodeKeyNumber(
+			ctr, ffs.OutputRuneSet, this.kn, ffs.NumEncodingBits)
+		ctr, err = formatOutput(fmtr, ctr, ffs.PassthroughRuneSet)
+		if err != nil {
+			return
+		}
+
+		ct[i] = string(ctr)
+	}
+
+	return
 }
 
 func (this *FPEncryption) Close() {
@@ -407,6 +516,19 @@ func FPEncrypt(c Credentials, ffs, pt string, twk []byte) (string, error) {
 	if err == nil {
 		defer enc.Close()
 		ct, err = enc.Cipher(pt, twk)
+	}
+
+	return ct, err
+}
+
+func FPEncryptForSearch(c Credentials, ffs, pt string, twk []byte) (
+	[]string, error) {
+	var ct []string
+
+	enc, err := NewFPEncryption(c, ffs)
+	if err == nil {
+		defer enc.Close()
+		ct, err = enc.CipherForSearch(pt, twk)
 	}
 
 	return ct, err
