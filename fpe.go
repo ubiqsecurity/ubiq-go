@@ -254,13 +254,16 @@ func (this *fpeContext) getAllKeys() (keys []fpeKey, err error) {
 	js := make(map[string]defKeys)
 	json.NewDecoder(rsp.Body).Decode(&js)
 
+	pk, err := decryptPrivateKey(js[name].EncryptedPrivateKey, this.srsa)
+	if err != nil {
+		return
+	}
+
 	keys = make([]fpeKey, len(js[name].EncryptedDataKeys))
 	for i, _ := range js[name].EncryptedDataKeys {
 		keys[i].num = i
-		keys[i].key, err = unwrapDataKey(
-			js[name].EncryptedDataKeys[i],
-			js[name].EncryptedPrivateKey,
-			this.srsa)
+		keys[i].key, err = decryptDataKey(
+			js[name].EncryptedDataKeys[i], pk)
 		if err != nil {
 			return
 		}
