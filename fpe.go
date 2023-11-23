@@ -423,11 +423,11 @@ func (this *FPEncryption) CipherForSearch(pt string, twk []byte) (
 		this.tracking.AddEvent(
 			this.papi, ffs.Name, "",
 			trackingActionEncrypt,
-			1, this.kn)
+			1, i)
 
 		ctr = convertRadix(ctr, ffs.InputRuneSet, ffs.OutputRuneSet)
 		ctr = encodeKeyNumber(
-			ctr, ffs.OutputRuneSet, this.kn, ffs.NumEncodingBits)
+			ctr, ffs.OutputRuneSet, i, ffs.NumEncodingBits)
 		ctr, err = formatOutput(fmtr, ctr, ffs.PassthroughRuneSet)
 		if err != nil {
 			return
