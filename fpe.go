@@ -154,6 +154,142 @@ func flushFFS(papi, name *string) {
 	}
 }
 
+var keyCache map[string](*map[string](*map[int]*fpeKey))
+
+func fetchKey(client *httpClient, host, papi, srsa, name string, n int) (
+	fpeKey, error) {
+	var ok bool
+	var err error
+
+	if keyCache == nil {
+		keyCache = make(map[string](*map[string](*map[int]*fpeKey)))
+	}
+	if _, ok = keyCache[papi]; !ok {
+		m := make(map[string](*map[int]*fpeKey))
+		keyCache[papi] = &m
+	}
+	if _, ok = (*keyCache[papi])[name]; !ok {
+		m := make(map[int]*fpeKey)
+		(*keyCache[papi])[name] = &m
+	}
+
+	if _, ok = (*(*keyCache[papi])[name])[n]; !ok {
+		var query = "ffs_name=" + url.QueryEscape(name) + "&" +
+			"papi=" + url.QueryEscape(papi)
+
+		var key fpeKey
+		var rsp *http.Response
+		var obj struct {
+			EPK string `json:"encrypted_private_key"`
+			WDK string `json:"wrapped_data_key"`
+			Num string `json:"key_number"`
+		}
+
+		if n >= 0 {
+			query += "&key_number=" + strconv.Itoa(n)
+		}
+
+		rsp, err = client.Get(host + "/api/v0/fpe/key?" + query)
+		if err != nil {
+			return fpeKey{}, err
+		}
+		defer rsp.Body.Close()
+
+		if rsp.StatusCode == http.StatusOK {
+			err = json.NewDecoder(rsp.Body).Decode(&obj)
+		} else {
+			err = errors.New("unexpected response: " + rsp.Status)
+		}
+		if err != nil {
+			return fpeKey{}, err
+		}
+
+		key.num, _ = strconv.Atoi(obj.Num)
+		key.key, err = unwrapDataKey(obj.WDK, obj.EPK, srsa)
+
+		(*(*keyCache[papi])[name])[key.num] = &key
+		if n < 0 {
+			(*(*keyCache[papi])[name])[-1] = &key
+		}
+	}
+
+	return *(*(*keyCache[papi])[name])[n], nil
+}
+
+func fetchAllKeys(client *httpClient, host, papi, srsa, name string) (
+	keys []fpeKey, err error) {
+	var query = "ffs_name=" + url.QueryEscape(name) + "&" +
+		"papi=" + url.QueryEscape(papi)
+
+	var rsp *http.Response
+	var ok bool
+
+	rsp, err = client.Get(host + "/api/v0/fpe/def_keys?" + query)
+	if err != nil {
+		return nil, err
+	}
+	defer rsp.Body.Close()
+
+	js := make(map[string]defKeys)
+	json.NewDecoder(rsp.Body).Decode(&js)
+
+	pk, err := decryptPrivateKey(js[name].EncryptedPrivateKey, srsa)
+	if err != nil {
+		return nil, err
+	}
+
+	if keyCache == nil {
+		keyCache = make(map[string](*map[string](*map[int]*fpeKey)))
+	}
+	if _, ok = keyCache[papi]; !ok {
+		m := make(map[string](*map[int]*fpeKey))
+		keyCache[papi] = &m
+	}
+	if _, ok = (*keyCache[papi])[name]; !ok {
+		m := make(map[int]*fpeKey)
+		(*keyCache[papi])[name] = &m
+	}
+
+	keys = make([]fpeKey, len(js[name].EncryptedDataKeys))
+	for i := range js[name].EncryptedDataKeys {
+		if _, ok := (*(*keyCache[papi])[name])[i]; !ok {
+			var key fpeKey
+
+			key.num = i
+			key.key, err = decryptDataKey(
+				js[name].EncryptedDataKeys[i], pk)
+			if err != nil {
+				return nil, err
+			}
+
+			(*(*keyCache[papi])[name])[i] = &key
+		}
+
+		keys[i] = *(*(*keyCache[papi])[name])[i]
+	}
+
+	return keys, nil
+}
+
+func flushKey(papi, name *string, n int) {
+	if keyCache == nil {
+		keyCache = make(map[string](*map[string](*map[int]*fpeKey)))
+	}
+	if papi == nil {
+		keyCache = make(map[string](*map[string](*map[int]*fpeKey)))
+	} else if _, ok := keyCache[*papi]; ok {
+		if name == nil {
+			delete(keyCache, *papi)
+		} else if _, ok := (*keyCache[*papi])[*name]; ok {
+			if n < 0 {
+				delete(*keyCache[*papi], *name)
+			} else if _, ok := (*(*keyCache[*papi])[*name])[n]; ok {
+				delete(*(*keyCache[*papi])[*name], n)
+			}
+		}
+	}
+}
+
 // find the first occurrence of a rune in an array/slice
 //
 // i hate the inefficiency of this function, especially given
@@ -244,72 +380,15 @@ func (this *fpeContext) getFFSInfo(name string) (ffs ffsInfo, err error) {
 
 // retrieve the key from the server
 func (this *fpeContext) getKey(kn int) (key fpeKey, err error) {
-	var query = "ffs_name=" + url.QueryEscape(this.ffs.Name) + "&" +
-		"papi=" + url.QueryEscape(this.papi)
-
-	var rsp *http.Response
-	var obj struct {
-		EPK string `json:"encrypted_private_key"`
-		WDK string `json:"wrapped_data_key"`
-		Num string `json:"key_number"`
-	}
-
-	if kn >= 0 {
-		query += "&key_number=" + strconv.Itoa(kn)
-	}
-
-	rsp, err = this.client.Get(this.host + "/api/v0/fpe/key?" + query)
-	if err != nil {
-		return
-	}
-	defer rsp.Body.Close()
-
-	if rsp.StatusCode == http.StatusOK {
-		err = json.NewDecoder(rsp.Body).Decode(&obj)
-	} else {
-		err = errors.New("unexpected response: " + rsp.Status)
-	}
-
-	if err == nil {
-		key.num, _ = strconv.Atoi(obj.Num)
-		key.key, err = unwrapDataKey(obj.WDK, obj.EPK, this.srsa)
-	}
-
-	return
+	return fetchKey(&this.client,
+		this.host, this.papi, this.srsa,
+		this.ffs.Name, kn)
 }
 
 func (this *fpeContext) getAllKeys() (keys []fpeKey, err error) {
-	var name = this.ffs.Name
-	var query = "ffs_name=" + url.QueryEscape(name) + "&" +
-		"papi=" + url.QueryEscape(this.papi)
-
-	var rsp *http.Response
-
-	rsp, err = this.client.Get(this.host + "/api/v0/fpe/def_keys?" + query)
-	if err != nil {
-		return
-	}
-	defer rsp.Body.Close()
-
-	js := make(map[string]defKeys)
-	json.NewDecoder(rsp.Body).Decode(&js)
-
-	pk, err := decryptPrivateKey(js[name].EncryptedPrivateKey, this.srsa)
-	if err != nil {
-		return
-	}
-
-	keys = make([]fpeKey, len(js[name].EncryptedDataKeys))
-	for i := range js[name].EncryptedDataKeys {
-		keys[i].num = i
-		keys[i].key, err = decryptDataKey(
-			js[name].EncryptedDataKeys[i], pk)
-		if err != nil {
-			return
-		}
-	}
-
-	return
+	return fetchAllKeys(&this.client,
+		this.host, this.papi, this.srsa,
+		this.ffs.Name)
 }
 
 func newFPEContext(c Credentials, ffs string) (this *fpeContext, err error) {
