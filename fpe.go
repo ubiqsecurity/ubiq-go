@@ -383,6 +383,11 @@ func (this *FPEncryption) Cipher(pt string, twk []byte) (
 	return string(ctr), err
 }
 
+// Encrypt a plaintext string using algorithm, format
+// preserving parameters, and all keys defined by the
+// encryption object.
+//
+// @twk may be nil, in which case, the default will be used
 func (this *FPEncryption) CipherForSearch(pt string, twk []byte) (
 	ct []string, err error) {
 	var ffs *ffsInfo = this.ffs
@@ -520,6 +525,14 @@ func FPEncrypt(c Credentials, ffs, pt string, twk []byte) (string, error) {
 	return ct, err
 }
 
+// FPEncrypt performs a format preserving encryption of a plaintext using
+// the supplied credentials and according to the format named by @ffs, using
+// all keys associated with that format
+//
+// @twk may be nil, in which case, the default will be used
+//
+// Upon success, error is nil, and the ciphertexts are returned. If an
+// error occurs, it will be indicated by the error return value.
 func FPEncryptForSearch(c Credentials, ffs, pt string, twk []byte) (
 	[]string, error) {
 	var ct []string
