@@ -172,13 +172,13 @@ func decodeKeyNumber(inp, ocs []rune, sft int) ([]rune, int) {
 }
 
 // retrieve the format information from the server
-func getFFSInfo(client *httpClient, host, papi, name string) (ffs *ffsInfo, err error) {
+func (this *fpeContext) getFFSInfo(name string) (ffs *ffsInfo, err error) {
 	var query = "ffs_name=" + url.QueryEscape(name) + "&" +
-		"papi=" + url.QueryEscape(papi)
+		"papi=" + url.QueryEscape(this.papi)
 
 	var rsp *http.Response
 
-	rsp, err = client.Get(host + "/api/v0/ffs?" + query)
+	rsp, err = this.client.Get(this.host + "/api/v0/ffs?" + query)
 	if err != nil {
 		return nil, err
 	}
@@ -203,10 +203,9 @@ func getFFSInfo(client *httpClient, host, papi, name string) (ffs *ffsInfo, err 
 }
 
 // retrieve the key from the server
-func getKey(client *httpClient, host, papi, srsa, name string, kn int) (
-	key fpeKey, err error) {
-	var query = "ffs_name=" + url.QueryEscape(name) + "&" +
-		"papi=" + url.QueryEscape(papi)
+func (this *fpeContext) getKey(kn int) (key fpeKey, err error) {
+	var query = "ffs_name=" + url.QueryEscape(this.ffs.Name) + "&" +
+		"papi=" + url.QueryEscape(this.papi)
 
 	var rsp *http.Response
 	var obj struct {
@@ -219,7 +218,7 @@ func getKey(client *httpClient, host, papi, srsa, name string, kn int) (
 		query += "&key_number=" + strconv.Itoa(kn)
 	}
 
-	rsp, err = client.Get(host + "/api/v0/fpe/key?" + query)
+	rsp, err = this.client.Get(this.host + "/api/v0/fpe/key?" + query)
 	if err != nil {
 		return
 	}
@@ -233,20 +232,20 @@ func getKey(client *httpClient, host, papi, srsa, name string, kn int) (
 
 	if err == nil {
 		key.num, _ = strconv.Atoi(obj.Num)
-		key.key, err = unwrapDataKey(obj.WDK, obj.EPK, srsa)
+		key.key, err = unwrapDataKey(obj.WDK, obj.EPK, this.srsa)
 	}
 
 	return
 }
 
-func getAllKeys(client *httpClient, host, papi, srsa, name string) (
-	keys []fpeKey, err error) {
+func (this *fpeContext) getAllKeys() (keys []fpeKey, err error) {
+	var name = this.ffs.Name
 	var query = "ffs_name=" + url.QueryEscape(name) + "&" +
-		"papi=" + url.QueryEscape(papi)
+		"papi=" + url.QueryEscape(this.papi)
 
 	var rsp *http.Response
 
-	rsp, err = client.Get(host + "/api/v0/fpe/def_keys?" + query)
+	rsp, err = this.client.Get(this.host + "/api/v0/fpe/def_keys?" + query)
 	if err != nil {
 		return
 	}
@@ -261,7 +260,7 @@ func getAllKeys(client *httpClient, host, papi, srsa, name string) (
 		keys[i].key, err = unwrapDataKey(
 			js[name].EncryptedDataKeys[i],
 			js[name].EncryptedPrivateKey,
-			srsa)
+			this.srsa)
 		if err != nil {
 			return
 		}
@@ -281,7 +280,7 @@ func newFPEContext(c Credentials, ffs string) (this *fpeContext, err error) {
 
 	this.kn = -1
 
-	this.ffs, err = getFFSInfo(&this.client, this.host, this.papi, ffs)
+	this.ffs, err = this.getFFSInfo(ffs)
 
 	return
 }
@@ -314,9 +313,7 @@ func (this *fpeContext) setAlgorithm(kn int) (err error) {
 		return
 	}
 
-	key, err = getKey(&this.client,
-		this.host, this.papi, this.srsa,
-		this.ffs.Name, kn)
+	key, err = this.getKey(kn)
 	if err != nil {
 		return
 	}
@@ -393,8 +390,7 @@ func (this *FPEncryption) CipherForSearch(pt string, twk []byte) (
 		return
 	}
 
-	keys, err := getAllKeys(
-		&this.client, this.host, this.papi, this.srsa, this.ffs.Name)
+	keys, err := ((*fpeContext)(this)).getAllKeys()
 	if err != nil {
 		return
 	}
