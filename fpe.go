@@ -64,7 +64,7 @@ type fpeContext struct {
 	host, papi, srsa string
 
 	// information about the format of the data
-	ffs *ffsInfo
+	ffs ffsInfo
 
 	// the key number and algorithm
 	// a key number of -1 indicates that the key
@@ -87,6 +87,72 @@ type FPEncryption fpeContext
 // Reusable object to preserve context across
 // multiple decryptions using the same format
 type FPDecryption fpeContext
+
+var ffsCache map[string]*map[string]*ffsInfo
+
+func fetchFFS(client *httpClient, host, papi, name string) (ffsInfo, error) {
+	var err error
+	var ok bool
+
+	if ffsCache == nil {
+		ffsCache = make(map[string]*map[string]*ffsInfo)
+	}
+
+	if _, ok = ffsCache[papi]; !ok {
+		m := make(map[string]*ffsInfo)
+		ffsCache[papi] = &m
+	}
+
+	if _, ok = (*ffsCache[papi])[name]; !ok {
+		var query = "ffs_name=" + url.QueryEscape(name) + "&" +
+			"papi=" + url.QueryEscape(papi)
+
+		var rsp *http.Response
+		var ffs *ffsInfo
+
+		rsp, err = client.Get(host + "/api/v0/ffs?" + query)
+		if err != nil {
+			return ffsInfo{}, err
+		}
+		defer rsp.Body.Close()
+
+		if rsp.StatusCode == http.StatusOK {
+			ffs = new(ffsInfo)
+			err = json.NewDecoder(rsp.Body).Decode(ffs)
+		} else {
+			err = errors.New("unexpected response: " + rsp.Status)
+		}
+		if err != nil {
+			return ffsInfo{}, err
+		}
+
+		// convert the character string to arrays of runes
+		// to enable unicode handling
+		ffs.PassthroughRuneSet = []rune(ffs.PassthroughCharacterSet)
+		ffs.OutputRuneSet = []rune(ffs.OutputCharacterSet)
+		ffs.InputRuneSet = []rune(ffs.InputCharacterSet)
+
+		(*ffsCache[papi])[name] = ffs
+	}
+
+	return *(*ffsCache[papi])[name], nil
+}
+
+func flushFFS(papi, name *string) {
+	if ffsCache == nil {
+		ffsCache = make(map[string]*map[string]*ffsInfo)
+	}
+
+	if papi == nil {
+		ffsCache = make(map[string]*map[string]*ffsInfo)
+	} else if m, ok := ffsCache[*papi]; ok {
+		if name == nil {
+			delete(ffsCache, *papi)
+		} else if _, ok := (*m)[*name]; ok {
+			delete(*m, *name)
+		}
+	}
+}
 
 // find the first occurrence of a rune in an array/slice
 //
@@ -172,34 +238,8 @@ func decodeKeyNumber(inp, ocs []rune, sft int) ([]rune, int) {
 }
 
 // retrieve the format information from the server
-func (this *fpeContext) getFFSInfo(name string) (ffs *ffsInfo, err error) {
-	var query = "ffs_name=" + url.QueryEscape(name) + "&" +
-		"papi=" + url.QueryEscape(this.papi)
-
-	var rsp *http.Response
-
-	rsp, err = this.client.Get(this.host + "/api/v0/ffs?" + query)
-	if err != nil {
-		return nil, err
-	}
-	defer rsp.Body.Close()
-
-	if rsp.StatusCode == http.StatusOK {
-		ffs = new(ffsInfo)
-		err = json.NewDecoder(rsp.Body).Decode(ffs)
-	} else {
-		err = errors.New("unexpected response: " + rsp.Status)
-	}
-
-	if err == nil {
-		// convert the character string to arrays of runes
-		// to enable unicode handling
-		ffs.PassthroughRuneSet = []rune(ffs.PassthroughCharacterSet)
-		ffs.OutputRuneSet = []rune(ffs.OutputCharacterSet)
-		ffs.InputRuneSet = []rune(ffs.InputCharacterSet)
-	}
-
-	return ffs, err
+func (this *fpeContext) getFFSInfo(name string) (ffs ffsInfo, err error) {
+	return fetchFFS(&this.client, this.host, this.papi, name)
 }
 
 // retrieve the key from the server
@@ -260,7 +300,7 @@ func (this *fpeContext) getAllKeys() (keys []fpeKey, err error) {
 	}
 
 	keys = make([]fpeKey, len(js[name].EncryptedDataKeys))
-	for i, _ := range js[name].EncryptedDataKeys {
+	for i := range js[name].EncryptedDataKeys {
 		keys[i].num = i
 		keys[i].key, err = decryptDataKey(
 			js[name].EncryptedDataKeys[i], pk)
@@ -350,7 +390,7 @@ func NewFPEncryption(c Credentials, ffs string) (*FPEncryption, error) {
 // @twk may be nil, in which case, the default will be used
 func (this *FPEncryption) Cipher(pt string, twk []byte) (
 	ct string, err error) {
-	var ffs *ffsInfo = this.ffs
+	var ffs *ffsInfo = &this.ffs
 
 	var fmtr, ptr, ctr []rune
 
@@ -390,7 +430,7 @@ func (this *FPEncryption) Cipher(pt string, twk []byte) (
 // @twk may be nil, in which case, the default will be used
 func (this *FPEncryption) CipherForSearch(pt string, twk []byte) (
 	ct []string, err error) {
-	var ffs *ffsInfo = this.ffs
+	var ffs *ffsInfo = &this.ffs
 	var fmtr, ptr, ctr []rune
 
 	deftwk, err := base64.StdEncoding.DecodeString(this.ffs.Tweak)
@@ -415,7 +455,7 @@ func (this *FPEncryption) CipherForSearch(pt string, twk []byte) (
 	}
 
 	ct = make([]string, len(keys))
-	for i, _ := range keys {
+	for i := range keys {
 		var alg fpeAlgorithm
 
 		alg, err = ((*fpeContext)(this)).getAlgorithm(
@@ -466,7 +506,7 @@ func NewFPDecryption(c Credentials, ffs string) (*FPDecryption, error) {
 // the tweak must match the one used during encryption of the plaintext
 func (this *FPDecryption) Cipher(ct string, twk []byte) (
 	pt string, err error) {
-	var ffs *ffsInfo = this.ffs
+	var ffs *ffsInfo = &this.ffs
 
 	var fmtr, ctr []rune
 	var kn int
