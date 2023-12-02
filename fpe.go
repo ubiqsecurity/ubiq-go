@@ -88,6 +88,10 @@ type FPEncryption fpeContext
 // multiple decryptions using the same format
 type FPDecryption fpeContext
 
+// ffsCache is indexed first by the public api key and then
+// by the format name. objects in the map(s) are stored as
+// pointers to reduce the expense of fetching them, and also
+// so that they can be updated in place.
 var ffsCache map[string]*map[string]*ffsInfo
 
 func fetchFFS(client *httpClient, host, papi, name string) (ffsInfo, error) {
@@ -154,6 +158,10 @@ func flushFFS(papi, name *string) {
 	}
 }
 
+// keyCache is indexed by public api, then by the format name,
+// and finally by the key number. items in the map are pointers
+// to allow updating in place and more efficient fetching (e.g.
+// pointers instead of copies of the objects)
 var keyCache map[string](*map[string](*map[int]*fpeKey))
 
 func fetchKey(client *httpClient, host, papi, srsa, name string, n int) (
