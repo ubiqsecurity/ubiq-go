@@ -507,6 +507,7 @@ func (this *FPEncryption) Cipher(pt string, twk []byte) (
 	ctr = encodeKeyNumber(
 		ctr, ffs.OutputRuneSet, this.kn, ffs.NumEncodingBits)
 	ctr, err = formatOutput(fmtr, ctr, ffs.PassthroughRuneSet)
+
 	return string(ctr), err
 }
 
@@ -542,12 +543,15 @@ func (this *FPEncryption) CipherForSearch(pt string, twk []byte) (
 	}
 
 	ct = make([]string, len(keys))
+	_ptr := make([]rune, len(ptr))
 	for i := range keys {
 		var alg fpeAlgorithm
 
 		alg, err = ((*fpeContext)(this)).getAlgorithm(
 			keys[i].key, deftwk)
-		ctr, err = alg.EncryptRunes(ptr, twk)
+
+		copy(_ptr, ptr)
+		ctr, err = alg.EncryptRunes(_ptr, twk)
 		if err != nil {
 			return
 		}
