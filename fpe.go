@@ -416,7 +416,7 @@ func (this *FPEncryption) CipherForSearch(pt string, twk []byte) (
 	}
 
 	ct = make([]string, len(keys))
-	_ptr := make([]rune, len(ptr))	
+	_ptr := make([]rune, len(ptr))
 	for i, _ := range keys {
 		var alg fpeAlgorithm
 
