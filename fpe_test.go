@@ -54,6 +54,11 @@ func TestFPESSN(t *testing.T) {
 func TestFPEUTF8(t *testing.T) {
 	testFPE(t, "UTF8_STRING", "abcdefghijklmnopqrstuvwxyzこんにちは世界")
 }
+func TestFPEUTF8Complex(t *testing.T) {
+	testFPE(t,
+		"UTF8_STRING_COMPLEX",
+		"ÑÒÓķĸĹϺϻϼϽϾÔÕϿは世界abcdefghijklmnopqrstuvwxyzこんにちÊʑʒʓËÌÍÎÏðñòóôĵĶʔʕ")
+}
 
 func testFPEForSearchLocal(t *testing.T, ffs, pt string) {
 	c, err := NewCredentials()
@@ -92,6 +97,12 @@ func TestFPESSNForSearchLocal(t *testing.T) {
 func TestFPEUTF8ForSearchLocal(t *testing.T) {
 	testFPEForSearchLocal(
 		t, "UTF8_STRING", "abcdefghijklmnopqrstuvwxyzこんにちは世界")
+}
+func TestFPEUTF8ComplexForSearchLocal(t *testing.T) {
+	testFPEForSearchLocal(
+		t,
+		"UTF8_STRING_COMPLEX",
+		"ÑÒÓķĸĹϺϻϼϽϾÔÕϿは世界abcdefghijklmnopqrstuvwxyzこんにちÊʑʒʓËÌÍÎÏðñòóôĵĶʔʕ")
 }
 
 func testFPEForSearchRemote(t *testing.T, ffs, pt, expected_ct string) {
@@ -152,7 +163,7 @@ func TestFPESSNForSearchRemote(t *testing.T) {
 		"-0-1-2-3-4-5-6-7-8-9-",
 		"-0-0-0-0-1-I-L-8-j-D-")
 }
-func TestFPEUTF8ForSearchRemote(t *testing.T) {
+func TestFPEUTF8ComplexForSearchRemote(t *testing.T) {
 	testFPEForSearchRemote(
 		t,
 		"UTF8_STRING_COMPLEX",
