@@ -32,6 +32,14 @@ type ffsInfo struct {
 	TweakSource             string `json:"tweak_source"`
 }
 
+type defKeys struct {
+	CurrentKeyNum       int      `json:"current_key_number"`
+	EncryptedPrivateKey string   `json:"encrypted_private_key"`
+	FFS                 ffsInfo  `json:"ffs"`
+	EncryptedDataKeys   []string `json:"keys"`
+	Retrieved           float32  `json:"retrieved"`
+}
+
 // this interface was created so that it could be placed into
 // the fpeContext so that fpeContext could be used in both encryption
 // and decryption operations
@@ -56,7 +64,7 @@ type fpeContext struct {
 	host, papi, srsa string
 
 	// information about the format of the data
-	ffs *ffsInfo
+	ffs ffsInfo
 
 	// the key number and algorithm
 	// a key number of -1 indicates that the key
@@ -67,6 +75,11 @@ type fpeContext struct {
 	tracking trackingContext
 }
 
+type fpeKey struct {
+	num int
+	key []byte
+}
+
 // Reusable object to preserve context across
 // multiple encryptions using the same format
 type FPEncryption fpeContext
@@ -74,6 +87,216 @@ type FPEncryption fpeContext
 // Reusable object to preserve context across
 // multiple decryptions using the same format
 type FPDecryption fpeContext
+
+// ffsCache is indexed first by the public api key and then
+// by the format name. objects in the map(s) are stored as
+// pointers to reduce the expense of fetching them, and also
+// so that they can be updated in place.
+var ffsCache map[string]*map[string]*ffsInfo
+
+func fetchFFS(client *httpClient, host, papi, name string) (ffsInfo, error) {
+	var err error
+	var ok bool
+
+	if ffsCache == nil {
+		ffsCache = make(map[string]*map[string]*ffsInfo)
+	}
+
+	if _, ok = ffsCache[papi]; !ok {
+		m := make(map[string]*ffsInfo)
+		ffsCache[papi] = &m
+	}
+
+	if _, ok = (*ffsCache[papi])[name]; !ok {
+		var query = "ffs_name=" + url.QueryEscape(name) + "&" +
+			"papi=" + url.QueryEscape(papi)
+
+		var rsp *http.Response
+		var ffs *ffsInfo
+
+		rsp, err = client.Get(host + "/api/v0/ffs?" + query)
+		if err != nil {
+			return ffsInfo{}, err
+		}
+		defer rsp.Body.Close()
+
+		if rsp.StatusCode == http.StatusOK {
+			ffs = new(ffsInfo)
+			err = json.NewDecoder(rsp.Body).Decode(ffs)
+		} else {
+			err = errors.New("unexpected response: " + rsp.Status)
+		}
+		if err != nil {
+			return ffsInfo{}, err
+		}
+
+		// convert the character string to arrays of runes
+		// to enable unicode handling
+		ffs.PassthroughRuneSet = []rune(ffs.PassthroughCharacterSet)
+		ffs.OutputRuneSet = []rune(ffs.OutputCharacterSet)
+		ffs.InputRuneSet = []rune(ffs.InputCharacterSet)
+
+		(*ffsCache[papi])[name] = ffs
+	}
+
+	return *(*ffsCache[papi])[name], nil
+}
+
+func flushFFS(papi, name *string) {
+	if ffsCache == nil {
+		ffsCache = make(map[string]*map[string]*ffsInfo)
+	}
+
+	if papi == nil {
+		ffsCache = make(map[string]*map[string]*ffsInfo)
+	} else if m, ok := ffsCache[*papi]; ok {
+		if name == nil {
+			delete(ffsCache, *papi)
+		} else if _, ok := (*m)[*name]; ok {
+			delete(*m, *name)
+		}
+	}
+}
+
+// keyCache is indexed by public api, then by the format name,
+// and finally by the key number. items in the map are pointers
+// to allow updating in place and more efficient fetching (e.g.
+// pointers instead of copies of the objects)
+var keyCache map[string](*map[string](*map[int]*fpeKey))
+
+func fetchKey(client *httpClient, host, papi, srsa, name string, n int) (
+	fpeKey, error) {
+	var ok bool
+	var err error
+
+	if keyCache == nil {
+		keyCache = make(map[string](*map[string](*map[int]*fpeKey)))
+	}
+	if _, ok = keyCache[papi]; !ok {
+		m := make(map[string](*map[int]*fpeKey))
+		keyCache[papi] = &m
+	}
+	if _, ok = (*keyCache[papi])[name]; !ok {
+		m := make(map[int]*fpeKey)
+		(*keyCache[papi])[name] = &m
+	}
+
+	if _, ok = (*(*keyCache[papi])[name])[n]; !ok {
+		var query = "ffs_name=" + url.QueryEscape(name) + "&" +
+			"papi=" + url.QueryEscape(papi)
+
+		var key fpeKey
+		var rsp *http.Response
+		var obj struct {
+			EPK string `json:"encrypted_private_key"`
+			WDK string `json:"wrapped_data_key"`
+			Num string `json:"key_number"`
+		}
+
+		if n >= 0 {
+			query += "&key_number=" + strconv.Itoa(n)
+		}
+
+		rsp, err = client.Get(host + "/api/v0/fpe/key?" + query)
+		if err != nil {
+			return fpeKey{}, err
+		}
+		defer rsp.Body.Close()
+
+		if rsp.StatusCode == http.StatusOK {
+			err = json.NewDecoder(rsp.Body).Decode(&obj)
+		} else {
+			err = errors.New("unexpected response: " + rsp.Status)
+		}
+		if err != nil {
+			return fpeKey{}, err
+		}
+
+		key.num, _ = strconv.Atoi(obj.Num)
+		key.key, err = unwrapDataKey(obj.WDK, obj.EPK, srsa)
+
+		(*(*keyCache[papi])[name])[key.num] = &key
+		if n < 0 {
+			(*(*keyCache[papi])[name])[-1] = &key
+		}
+	}
+
+	return *(*(*keyCache[papi])[name])[n], nil
+}
+
+func fetchAllKeys(client *httpClient, host, papi, srsa, name string) (
+	keys []fpeKey, err error) {
+	var query = "ffs_name=" + url.QueryEscape(name) + "&" +
+		"papi=" + url.QueryEscape(papi)
+
+	var rsp *http.Response
+	var ok bool
+
+	rsp, err = client.Get(host + "/api/v0/fpe/def_keys?" + query)
+	if err != nil {
+		return nil, err
+	}
+	defer rsp.Body.Close()
+
+	js := make(map[string]defKeys)
+	json.NewDecoder(rsp.Body).Decode(&js)
+
+	pk, err := decryptPrivateKey(js[name].EncryptedPrivateKey, srsa)
+	if err != nil {
+		return nil, err
+	}
+
+	if keyCache == nil {
+		keyCache = make(map[string](*map[string](*map[int]*fpeKey)))
+	}
+	if _, ok = keyCache[papi]; !ok {
+		m := make(map[string](*map[int]*fpeKey))
+		keyCache[papi] = &m
+	}
+	if _, ok = (*keyCache[papi])[name]; !ok {
+		m := make(map[int]*fpeKey)
+		(*keyCache[papi])[name] = &m
+	}
+
+	keys = make([]fpeKey, len(js[name].EncryptedDataKeys))
+	for i := range js[name].EncryptedDataKeys {
+		if _, ok := (*(*keyCache[papi])[name])[i]; !ok {
+			var key fpeKey
+
+			key.num = i
+			key.key, err = decryptDataKey(
+				js[name].EncryptedDataKeys[i], pk)
+			if err != nil {
+				return nil, err
+			}
+
+			(*(*keyCache[papi])[name])[i] = &key
+		}
+
+		keys[i] = *(*(*keyCache[papi])[name])[i]
+	}
+
+	return keys, nil
+}
+
+func flushKey(papi, name *string, n int) {
+	if keyCache == nil {
+		keyCache = make(map[string](*map[string](*map[int]*fpeKey)))
+	}
+	if papi == nil {
+		keyCache = make(map[string](*map[string](*map[int]*fpeKey)))
+	} else if _, ok := keyCache[*papi]; ok {
+		if name == nil {
+			delete(keyCache, *papi)
+		} else if _, ok := (*keyCache[*papi])[*name]; ok {
+			if n < 0 {
+				delete(*keyCache[*papi], *name)
+			} else if _, ok := (*(*keyCache[*papi])[*name])[n]; ok {
+				delete(*(*keyCache[*papi])[*name], n)
+			}
+		}
+	}
+}
 
 // find the first occurrence of a rune in an array/slice
 //
@@ -159,71 +382,21 @@ func decodeKeyNumber(inp, ocs []rune, sft int) ([]rune, int) {
 }
 
 // retrieve the format information from the server
-func getFFSInfo(client *httpClient, host, papi, name string) (ffs *ffsInfo, err error) {
-	var query = "ffs_name=" + url.QueryEscape(name) + "&" +
-		"papi=" + url.QueryEscape(papi)
-
-	var rsp *http.Response
-
-	rsp, err = client.Get(host + "/api/v0/ffs?" + query)
-	if err != nil {
-		return nil, err
-	}
-	defer rsp.Body.Close()
-
-	if rsp.StatusCode == http.StatusOK {
-		ffs = new(ffsInfo)
-		err = json.NewDecoder(rsp.Body).Decode(ffs)
-	} else {
-		err = errors.New("unexpected response: " + rsp.Status)
-	}
-
-	if err == nil {
-		// convert the character string to arrays of runes
-		// to enable unicode handling
-		ffs.PassthroughRuneSet = []rune(ffs.PassthroughCharacterSet)
-		ffs.OutputRuneSet = []rune(ffs.OutputCharacterSet)
-		ffs.InputRuneSet = []rune(ffs.InputCharacterSet)
-	}
-
-	return ffs, err
+func (this *fpeContext) getFFSInfo(name string) (ffs ffsInfo, err error) {
+	return fetchFFS(&this.client, this.host, this.papi, name)
 }
 
 // retrieve the key from the server
-func getKey(client *httpClient, host, papi, srsa, name string, kn int) (
-	key []byte, num int, err error) {
-	var query = "ffs_name=" + url.QueryEscape(name) + "&" +
-		"papi=" + url.QueryEscape(papi)
+func (this *fpeContext) getKey(kn int) (key fpeKey, err error) {
+	return fetchKey(&this.client,
+		this.host, this.papi, this.srsa,
+		this.ffs.Name, kn)
+}
 
-	var rsp *http.Response
-	var obj struct {
-		EPK string `json:"encrypted_private_key"`
-		WDK string `json:"wrapped_data_key"`
-		Num string `json:"key_number"`
-	}
-
-	if kn >= 0 {
-		query += "&key_number=" + strconv.Itoa(kn)
-	}
-
-	rsp, err = client.Get(host + "/api/v0/fpe/key?" + query)
-	if err != nil {
-		return
-	}
-	defer rsp.Body.Close()
-
-	if rsp.StatusCode == http.StatusOK {
-		err = json.NewDecoder(rsp.Body).Decode(&obj)
-	} else {
-		err = errors.New("unexpected response: " + rsp.Status)
-	}
-
-	if err == nil {
-		num, _ = strconv.Atoi(obj.Num)
-		key, err = unwrapDataKey(obj.WDK, obj.EPK, srsa)
-	}
-
-	return
+func (this *fpeContext) getAllKeys() (keys []fpeKey, err error) {
+	return fetchAllKeys(&this.client,
+		this.host, this.papi, this.srsa,
+		this.ffs.Name)
 }
 
 func newFPEContext(c Credentials, ffs string) (this *fpeContext, err error) {
@@ -237,7 +410,21 @@ func newFPEContext(c Credentials, ffs string) (this *fpeContext, err error) {
 
 	this.kn = -1
 
-	this.ffs, err = getFFSInfo(&this.client, this.host, this.papi, ffs)
+	this.ffs, err = this.getFFSInfo(ffs)
+
+	return
+}
+
+func (this *fpeContext) getAlgorithm(key, twk []byte) (
+	alg fpeAlgorithm, err error) {
+	if this.ffs.Algorithm == "FF1" {
+		alg, err = algo.NewFF1(
+			key, twk,
+			this.ffs.TweakLengthMin, this.ffs.TweakLengthMax,
+			len(this.ffs.InputRuneSet), this.ffs.InputCharacterSet)
+	} else {
+		err = errors.New("unsupported algorithm: " + this.ffs.Algorithm)
+	}
 
 	return
 }
@@ -248,31 +435,23 @@ func newFPEContext(c Credentials, ffs string) (this *fpeContext, err error) {
 // unknown. for decryption, it can't be done until the ciphertext
 // has been presented and the key number decoded from it
 func (this *fpeContext) setAlgorithm(kn int) (err error) {
-	var key, twk []byte
+	var twk []byte
+	var key fpeKey
 
 	twk, err = base64.StdEncoding.DecodeString(this.ffs.Tweak)
 	if err != nil {
 		return
 	}
 
-	key, kn, err = getKey(&this.client,
-		this.host, this.papi, this.srsa,
-		this.ffs.Name, kn)
+	key, err = this.getKey(kn)
 	if err != nil {
 		return
 	}
 
-	if this.ffs.Algorithm == "FF1" {
-		this.algo, err = algo.NewFF1(
-			key, twk,
-			this.ffs.TweakLengthMin, this.ffs.TweakLengthMax,
-			len(this.ffs.InputRuneSet), this.ffs.InputCharacterSet)
-	} else {
-		err = errors.New("unsupported algorithm: " + this.ffs.Algorithm)
-	}
+	this.algo, err = this.getAlgorithm(key.key, twk)
 
 	if err == nil {
-		this.kn = kn
+		this.kn = key.num
 	}
 
 	return
@@ -298,7 +477,7 @@ func NewFPEncryption(c Credentials, ffs string) (*FPEncryption, error) {
 // @twk may be nil, in which case, the default will be used
 func (this *FPEncryption) Cipher(pt string, twk []byte) (
 	ct string, err error) {
-	var ffs *ffsInfo = this.ffs
+	var ffs *ffsInfo = &this.ffs
 
 	var fmtr, ptr, ctr []rune
 
@@ -328,7 +507,72 @@ func (this *FPEncryption) Cipher(pt string, twk []byte) (
 	ctr = encodeKeyNumber(
 		ctr, ffs.OutputRuneSet, this.kn, ffs.NumEncodingBits)
 	ctr, err = formatOutput(fmtr, ctr, ffs.PassthroughRuneSet)
+
 	return string(ctr), err
+}
+
+// Encrypt a plaintext string using algorithm, format
+// preserving parameters, and all keys defined by the
+// encryption object.
+//
+// @twk may be nil, in which case, the default will be used
+func (this *FPEncryption) CipherForSearch(pt string, twk []byte) (
+	ct []string, err error) {
+	var ffs *ffsInfo = &this.ffs
+	var fmtr, ptr, ctr []rune
+
+	deftwk, err := base64.StdEncoding.DecodeString(this.ffs.Tweak)
+	if err != nil {
+		return
+	}
+
+	keys, err := ((*fpeContext)(this)).getAllKeys()
+	if err != nil {
+		return
+	}
+
+	fmtr, ptr, err = formatInput(
+		[]rune(pt),
+		ffs.PassthroughRuneSet, ffs.InputRuneSet, ffs.OutputRuneSet)
+	if err != nil {
+		return
+	}
+	if len(ptr) < ffs.InputLengthMin || len(ptr) > ffs.InputLengthMax {
+		err = errors.New("input length out of bounds")
+		return
+	}
+
+	ct = make([]string, len(keys))
+	_ptr := make([]rune, len(ptr))
+	for i := range keys {
+		var alg fpeAlgorithm
+
+		alg, err = ((*fpeContext)(this)).getAlgorithm(
+			keys[i].key, deftwk)
+
+		copy(_ptr, ptr)
+		ctr, err = alg.EncryptRunes(_ptr, twk)
+		if err != nil {
+			return
+		}
+
+		this.tracking.AddEvent(
+			this.papi, ffs.Name, "",
+			trackingActionEncrypt,
+			1, i)
+
+		ctr = convertRadix(ctr, ffs.InputRuneSet, ffs.OutputRuneSet)
+		ctr = encodeKeyNumber(
+			ctr, ffs.OutputRuneSet, i, ffs.NumEncodingBits)
+		ctr, err = formatOutput(fmtr, ctr, ffs.PassthroughRuneSet)
+		if err != nil {
+			return
+		}
+
+		ct[i] = string(ctr)
+	}
+
+	return
 }
 
 func (this *FPEncryption) Close() {
@@ -353,7 +597,7 @@ func NewFPDecryption(c Credentials, ffs string) (*FPDecryption, error) {
 // the tweak must match the one used during encryption of the plaintext
 func (this *FPDecryption) Cipher(ct string, twk []byte) (
 	pt string, err error) {
-	var ffs *ffsInfo = this.ffs
+	var ffs *ffsInfo = &this.ffs
 
 	var fmtr, ctr []rune
 	var kn int
@@ -407,6 +651,27 @@ func FPEncrypt(c Credentials, ffs, pt string, twk []byte) (string, error) {
 	if err == nil {
 		defer enc.Close()
 		ct, err = enc.Cipher(pt, twk)
+	}
+
+	return ct, err
+}
+
+// FPEncrypt performs a format preserving encryption of a plaintext using
+// the supplied credentials and according to the format named by @ffs, using
+// all keys associated with that format
+//
+// @twk may be nil, in which case, the default will be used
+//
+// Upon success, error is nil, and the ciphertexts are returned. If an
+// error occurs, it will be indicated by the error return value.
+func FPEncryptForSearch(c Credentials, ffs, pt string, twk []byte) (
+	[]string, error) {
+	var ct []string
+
+	enc, err := NewFPEncryption(c, ffs)
+	if err == nil {
+		defer enc.Close()
+		ct, err = enc.CipherForSearch(pt, twk)
 	}
 
 	return ct, err
