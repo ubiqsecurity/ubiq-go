@@ -63,11 +63,7 @@ type Encryption struct {
 	tracking trackingContext
 }
 
-func unwrapDataKey(wdk, epk, srsa string) ([]byte, error) {
-	var err error
-	var pk *rsa.PrivateKey
-	var dk []byte
-
+func decryptPrivateKey(epk, srsa string) (pk *rsa.PrivateKey, err error) {
 	block, rem := pem.Decode([]byte(epk))
 	if len(rem) == 0 {
 		pk, err = pkcs8.ParsePKCS8PrivateKeyRSA(
@@ -76,17 +72,25 @@ func unwrapDataKey(wdk, epk, srsa string) ([]byte, error) {
 		err = errors.New("unrecognized key format")
 	}
 
-	if err == nil {
-		var wdkbytes []byte
+	return
+}
 
-		wdkbytes, err = base64.StdEncoding.DecodeString(wdk)
-		if err == nil {
-			dk, err = rsa.DecryptOAEP(
-				sha1.New(), nil, pk, wdkbytes, nil)
-		}
+func decryptDataKey(wdk string, pk *rsa.PrivateKey) ([]byte, error) {
+	wdkbytes, err := base64.StdEncoding.DecodeString(wdk)
+	if err != nil {
+		return nil, err
 	}
 
-	return dk, err
+	return rsa.DecryptOAEP(sha1.New(), nil, pk, wdkbytes, nil)
+}
+
+func unwrapDataKey(wdk, epk, srsa string) ([]byte, error) {
+	pk, err := decryptPrivateKey(epk, srsa)
+	if err != nil {
+		return nil, err
+	}
+
+	return decryptDataKey(wdk, pk)
 }
 
 // init initializes the Encryption object using the encryption response
