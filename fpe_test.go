@@ -2,8 +2,10 @@ package ubiq
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"os"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -177,17 +179,19 @@ type FPETestRecord struct {
 	Dataset    string `json:"dataset"`
 }
 
-type FPEOperations struct {
-	enc *FPEncryption
-	dec *FPDecryption
-}
-
 type FPEPerformanceCounter struct {
 	Count    int
 	Duration struct {
 		Encrypt time.Duration
 		Decrypt time.Duration
 	}
+}
+
+type FPEOperations struct {
+	enc *FPEncryption
+	dec *FPDecryption
+
+	perf FPEPerformanceCounter
 }
 
 func TestFPE1M(t *testing.T) {
@@ -213,27 +217,31 @@ func TestFPE1M(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var ops map[string]FPEOperations = make(map[string]FPEOperations)
+	var ops map[string]*FPEOperations = make(map[string]*FPEOperations)
 	for i, _ := range records {
 		rec := &records[i]
 
 		op, ok := ops[rec.Dataset]
 		if !ok {
-			op.enc, err = NewFPEncryption(creds, rec.Dataset)
+			var _op FPEOperations
+
+			_op.enc, err = NewFPEncryption(creds, rec.Dataset)
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer op.enc.Close()
+			defer _op.enc.Close()
 
-			op.dec, err = NewFPDecryption(creds, rec.Dataset)
+			_op.dec, err = NewFPDecryption(creds, rec.Dataset)
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer op.dec.Close()
+			defer _op.dec.Close()
 
-			ops[rec.Dataset] = op
+			ops[rec.Dataset] = &_op
+			op = &_op
 		}
 
+		beg := time.Now()
 		ct, err := op.enc.Cipher(rec.Plaintext, nil)
 		if err != nil {
 			t.Fatal(err)
@@ -242,7 +250,9 @@ func TestFPE1M(t *testing.T) {
 			t.Fatalf("encryption(%v): %v != %v",
 				i, ct, rec.Ciphertext)
 		}
+		op.perf.Duration.Encrypt += time.Since(beg)
 
+		beg = time.Now()
 		pt, err := op.dec.Cipher(rec.Ciphertext, nil)
 		if err != nil {
 			t.Fatal(err)
@@ -251,5 +261,18 @@ func TestFPE1M(t *testing.T) {
 			t.Fatalf("decryption(%v): %v != %v",
 				i, pt, rec.Plaintext)
 		}
+		op.perf.Duration.Decrypt += time.Since(beg)
+
+		op.perf.Count++
+	}
+
+	for dset, op := range ops {
+		fmt.Println(dset + ": " + strconv.Itoa(op.perf.Count))
+		fmt.Printf("\tencrypt: %v / per\n",
+			time.Duration(int64(op.perf.Duration.Encrypt)/
+				int64(op.perf.Count)))
+		fmt.Printf("\tdecrypt: %v / per\n",
+			time.Duration(int64(op.perf.Duration.Decrypt)/
+				int64(op.perf.Count)))
 	}
 }
