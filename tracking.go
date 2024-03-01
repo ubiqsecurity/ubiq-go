@@ -97,9 +97,7 @@ func newTrackingContext(client httpClient, host string) trackingContext {
 // serialize the map and send that serialization to the
 // designated host via the supplied client. the map is
 // cleared by this function
-func sendTrackingEvents(
-	client *httpClient, host string,
-	events *map[trackingEventKey]*trackingEvent) {
+func sendTrackingEvents(client *httpClient, host string, events *map[trackingEventKey]*trackingEvent) {
 	if len(*events) > 0 {
 		var msg trackingEventMessage
 		msg.Usage = make([]*trackingEvent, len(*events))
@@ -126,8 +124,7 @@ func sendTrackingEvents(
 // events to the server. events are sent when a minimum of
 // @minCount has been stored or @maxDelay time has passed
 // since the last sent update
-func trackingRoutine(ctx trackingContext,
-	minCount int, maxDelay time.Duration) {
+func trackingRoutine(ctx trackingContext, minCount int, maxDelay time.Duration) {
 	var ok bool = true
 
 	delay := time.NewTimer(maxDelay)
@@ -193,10 +190,7 @@ func trackingRoutine(ctx trackingContext,
 	close(ctx.done)
 }
 
-func (self *trackingContext) AddEvent(
-	papi, dsname, dsgroup string,
-	action trackingAction,
-	count, kn int) {
+func (tc *trackingContext) AddEvent(papi, dsname, dsgroup string, action trackingAction, count, kn int) {
 	var now string = time.Now().Format(time.RFC3339)
 
 	//
@@ -205,7 +199,7 @@ func (self *trackingContext) AddEvent(
 	// this pointer will end up in the map used
 	// by the background routine
 	//
-	self.events <- &trackingEvent{
+	tc.events <- &trackingEvent{
 		Action:         string(action),
 		ApiKey:         papi,
 		ApiVersion:     "V3",
@@ -221,9 +215,9 @@ func (self *trackingContext) AddEvent(
 	}
 }
 
-func (self *trackingContext) Close() {
+func (tc *trackingContext) Close() {
 	// tell the background routine to exit
-	close(self.events)
+	close(tc.events)
 	// wait for the background routine to exit
-	<-self.done
+	<-tc.done
 }

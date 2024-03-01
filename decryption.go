@@ -49,18 +49,18 @@ type Decryption struct {
 	tracking trackingContext
 }
 
-func (this *Decryption) resetSession() error {
-	this.session = ""
+func (d *Decryption) resetSession() error {
+	d.session = ""
 
-	this.key.raw = nil
-	this.key.enc = nil
-	this.key.fingerprint = ""
-	this.key.uses = 0
+	d.key.raw = nil
+	d.key.enc = nil
+	d.key.fingerprint = ""
+	d.key.uses = 0
 
-	this.algo = algorithm{}
-	this.cipher = nil
+	d.algo = algorithm{}
+	d.cipher = nil
 
-	this.buf = nil
+	d.buf = nil
 
 	return nil
 }
@@ -68,16 +68,17 @@ func (this *Decryption) resetSession() error {
 // request that the server decrypt a data key associated with a cipher text.
 // this opens a new "session", meaning that the key can be reused if
 // the next cipher text decrypted uses the same data key
-func (this *Decryption) newSession(edk []byte, algo int) error {
+func (d *Decryption) newSession(edk []byte, algo int) error {
 	var rsp *http.Response
 	var err error
 
-	endp := this.host
+	endp := d.host
 	endp += "/api/v0/decryption/key"
 
 	body, _ := json.Marshal(newDecryptionRequest{
-		EDK: base64.StdEncoding.EncodeToString(edk)})
-	rsp, err = this.client.Post(
+		EDK: base64.StdEncoding.EncodeToString(edk),
+	})
+	rsp, err = d.client.Post(
 		endp, "application/json", bytes.NewReader(body))
 	if rsp != nil {
 		defer rsp.Body.Close()
@@ -88,15 +89,15 @@ func (this *Decryption) newSession(edk []byte, algo int) error {
 
 			err = json.NewDecoder(rsp.Body).Decode(&nd)
 			if err == nil {
-				this.key.raw, err = unwrapDataKey(
-					nd.WDK, nd.EPK, this.srsa)
+				d.key.raw, err = unwrapDataKey(
+					nd.WDK, nd.EPK, d.srsa)
 			}
 			if err == nil {
-				this.session = nd.EncryptionSession
-				this.key.fingerprint = nd.KeyFingerprint
-				this.key.enc = edk
-				this.key.uses = 0
-				this.algo, err = getAlgorithmById(algo)
+				d.session = nd.EncryptionSession
+				d.key.fingerprint = nd.KeyFingerprint
+				d.key.enc = edk
+				d.key.uses = 0
+				d.algo, err = getAlgorithmById(algo)
 			}
 		} else {
 			err = errors.New(
@@ -130,10 +131,10 @@ func NewDecryption(c Credentials) (*Decryption, error) {
 // error is nil upon success. No data is returned by this call; however,
 // a slice is returned to maintain the same function signature as the
 // corresponding Encryption call.
-func (this *Decryption) Begin() ([]byte, error) {
+func (d *Decryption) Begin() ([]byte, error) {
 	var err error
 
-	if this.cipher != nil {
+	if d.cipher != nil {
 		err = errors.New("decryption already in progress")
 	}
 
@@ -151,25 +152,25 @@ func (this *Decryption) Begin() ([]byte, error) {
 //
 // Note that even though plain text may be returned by this function, it
 // should not be trusted until End() has returned successfully.
-func (this *Decryption) Update(ciphertext []byte) ([]byte, error) {
+func (d *Decryption) Update(ciphertext []byte) ([]byte, error) {
 	var plaintext []byte
 	var err error
 
 	// incoming data goes into the internal buffer.
 	// data is sliced off the front as it is used/decrypted.
-	this.buf = append(this.buf, ciphertext...)
+	d.buf = append(d.buf, ciphertext...)
 
 	// cipher is nil until we have a complete, valid header
 	// that can be decoded to obtain the key, iv, and algorithm
-	if this.cipher == nil {
-		hdrlen := headerValid(this.buf)
+	if d.cipher == nil {
+		hdrlen := headerValid(d.buf)
 
 		if hdrlen < 0 {
 			// header is invalid and can't be parsed/recovered
 			err = errors.New("invalid encryption header")
 		} else if hdrlen > 0 {
 			// header is valid and contains `hdrlen` bytes
-			hdr := newHeader(this.buf)
+			hdr := newHeader(d.buf)
 			if hdr.version != 0 {
 				err = errors.New(
 					"unsupported encryption header")
@@ -178,15 +179,15 @@ func (this *Decryption) Update(ciphertext []byte) ([]byte, error) {
 			if err == nil {
 				// if a session exists, but it has a different
 				// key, get rid of it
-				if len(this.session) > 0 &&
+				if len(d.session) > 0 &&
 					!bytes.Equal(
-						this.key.enc, hdr.v0.key) {
-					this.resetSession()
+						d.key.enc, hdr.v0.key) {
+					d.resetSession()
 				}
 
 				// if no session exists, create a new one
-				if len(this.session) == 0 {
-					err = this.newSession(
+				if len(d.session) == 0 {
+					err = d.newSession(
 						hdr.v0.key, int(hdr.v0.algo))
 				}
 			}
@@ -201,23 +202,23 @@ func (this *Decryption) Update(ciphertext []byte) ([]byte, error) {
 				// header is authenticated, pass it to the
 				// cipher creation function
 				if (hdr.v0.flags & headerV0FlagAAD) != 0 {
-					c, err = this.algo.newCipher(
-						this.key.raw, hdr.v0.iv,
-						this.buf[:hdrlen])
+					c, err = d.algo.newCipher(
+						d.key.raw, hdr.v0.iv,
+						d.buf[:hdrlen])
 				} else {
-					c, err = this.algo.newCipher(
-						this.key.raw, hdr.v0.iv)
+					c, err = d.algo.newCipher(
+						d.key.raw, hdr.v0.iv)
 				}
 
 				if err == nil {
-					this.tracking.AddEvent(
-						this.client.papi, "", "",
+					d.tracking.AddEvent(
+						d.client.papi, "", "",
 						trackingActionDecrypt,
 						1, 0)
 					// all is well, slice off the header
-					this.cipher = &c
-					this.key.uses++
-					this.buf = this.buf[hdrlen:]
+					d.cipher = &c
+					d.key.uses++
+					d.buf = d.buf[hdrlen:]
 				}
 			}
 		}
@@ -226,17 +227,17 @@ func (this *Decryption) Update(ciphertext []byte) ([]byte, error) {
 		//   more data is necessary
 	}
 
-	if this.cipher != nil {
+	if d.cipher != nil {
 		// determine how much data is in the buffer,
 		// being careful to always leave enough data in
 		// the buffer to act as the authentication tag
-		sz := len(this.buf) - this.algo.len.tag
+		sz := len(d.buf) - d.algo.len.tag
 		if sz > 0 {
 			// decrypt whatever data is not part of the
 			// data reserved for the tag, and slice it
 			// off the internal buffer
-			plaintext = this.cipher.decipher(this.buf[:sz])
-			this.buf = this.buf[sz:]
+			plaintext = d.cipher.decipher(d.buf[:sz])
+			d.buf = d.buf[sz:]
 		}
 	}
 
@@ -250,12 +251,12 @@ func (this *Decryption) Update(ciphertext []byte) ([]byte, error) {
 // error is nil upon success and the byte slice may or may not contain
 // any remaining plain text. If error is non-nil, any previously decrypted
 // plain text should be discarded.
-func (this *Decryption) End() ([]byte, error) {
+func (d *Decryption) End() ([]byte, error) {
 	var res []byte
 	var err error
 
-	if this.cipher != nil {
-		sz := len(this.buf) - this.algo.len.tag
+	if d.cipher != nil {
+		sz := len(d.buf) - d.algo.len.tag
 
 		if sz > 0 {
 			// once the cipher has been created, the Update
@@ -273,16 +274,16 @@ func (this *Decryption) End() ([]byte, error) {
 			// number of bytes in the buffer is equal to
 			// the size of the tag
 
-			if this.algo.len.tag == 0 {
+			if d.algo.len.tag == 0 {
 				// pass nil to indicate no tag
-				res, err = this.cipher.close(nil)
+				res, err = d.cipher.close(nil)
 			} else {
-				res, err = this.cipher.close(this.buf)
+				res, err = d.cipher.close(d.buf)
 			}
 		}
 
-		this.cipher = nil
-		this.buf = nil
+		d.cipher = nil
+		d.buf = nil
 	}
 
 	return res, err
@@ -291,10 +292,10 @@ func (this *Decryption) End() ([]byte, error) {
 // Close cleans up the Decryption object and resets it to its default values.
 // An error returned by this function is a result of a miscommunication with
 // the server, and the object is reset regardless.
-func (this *Decryption) Close() error {
-	err := this.resetSession()
-	this.tracking.Close()
-	*this = Decryption{}
+func (d *Decryption) Close() error {
+	err := d.resetSession()
+	d.tracking.Close()
+	*d = Decryption{}
 	return err
 }
 

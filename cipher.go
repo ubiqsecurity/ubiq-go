@@ -19,18 +19,18 @@ type cipher struct {
 	stream *goCipher.Stream
 }
 
-func (this cipher) encipher(plaintext []byte) []byte {
+func (c cipher) encipher(plaintext []byte) []byte {
 	var res []byte
-	if this.aead != nil {
-		res = (*this.aead).EncryptUpdate(plaintext)
+	if c.aead != nil {
+		res = (*c.aead).EncryptUpdate(plaintext)
 	}
 	return res
 }
 
-func (this cipher) decipher(ciphertext []byte) []byte {
+func (c cipher) decipher(ciphertext []byte) []byte {
 	var res []byte
-	if this.aead != nil {
-		res = (*this.aead).DecryptUpdate(ciphertext)
+	if c.aead != nil {
+		res = (*c.aead).DecryptUpdate(ciphertext)
 	}
 	return res
 }
@@ -43,24 +43,24 @@ func (this cipher) decipher(ciphertext []byte) []byte {
 // the algorithm does not support authentication, then the
 // argument must be present but will be ignored. callers should
 // pass nil in this situation.
-func (this *cipher) close(args ...[]byte) ([]byte, error) {
+func (c *cipher) close(args ...[]byte) ([]byte, error) {
 	var res []byte
 	var err error
 
-	if this.aead != nil {
+	if c.aead != nil {
 		if len(args) == 0 {
 			var tag []byte
-			res, tag = (*this.aead).EncryptEnd()
+			res, tag = (*c.aead).EncryptEnd()
 			res = append(res, tag...)
 		} else {
 			var ok bool
-			res, ok = (*this.aead).DecryptEnd(args[0])
+			res, ok = (*c.aead).DecryptEnd(args[0])
 			if !ok {
 				err = errors.New("authentication failed")
 			}
 		}
 
-		this.aead = nil
+		c.aead = nil
 	}
 
 	return res, err
@@ -120,26 +120,34 @@ type algorithm struct {
 
 func supportedAlgorithms() *[]algorithm {
 	return &[]algorithm{
-		{id: 0, name: "aes-256-gcm",
+		{
+			id: 0, name: "aes-256-gcm",
 			newCipher: func(key, iv []byte, args ...[]byte) (
-				cipher, error) {
+				cipher, error,
+			) {
 				return newAesGcm(key, iv, 32, args...)
 			},
 			aad: true,
 			len: algorithmLengths{
 				key: 32,
 				iv:  gcmStandardNonceSize,
-				tag: gcmTagSize}},
-		{id: 1, name: "aes-128-gcm",
+				tag: gcmTagSize,
+			},
+		},
+		{
+			id: 1, name: "aes-128-gcm",
 			newCipher: func(key, iv []byte, args ...[]byte) (
-				cipher, error) {
+				cipher, error,
+			) {
 				return newAesGcm(key, iv, 16, args...)
 			},
 			aad: true,
 			len: algorithmLengths{
 				key: 16,
 				iv:  gcmStandardNonceSize,
-				tag: gcmTagSize}},
+				tag: gcmTagSize,
+			},
+		},
 	}
 }
 

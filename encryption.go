@@ -9,8 +9,9 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"errors"
-	"github.com/youmark/pkcs8"
 	"net/http"
+
+	"github.com/youmark/pkcs8"
 )
 
 type newEncryptionResponse struct {
@@ -96,24 +97,23 @@ func unwrapDataKey(wdk, epk, srsa string) ([]byte, error) {
 // init initializes the Encryption object using the encryption response
 // received from the server containing the wrapped data key, algorithm,
 // session, etc.
-func (this *Encryption) init(rsp newEncryptionResponse, srsa string) error {
+func (e *Encryption) init(rsp newEncryptionResponse, srsa string) error {
 	var err error
 
-	this.session = rsp.EncryptionSession
-	this.fragment = rsp.SecurityModel.Fragmentation
+	e.session = rsp.EncryptionSession
+	e.fragment = rsp.SecurityModel.Fragmentation
 
-	this.key.fingerprint = rsp.KeyFingerprint
-	this.key.uses.max = uint(rsp.MaxUses)
-	this.key.uses.cur = 0
+	e.key.fingerprint = rsp.KeyFingerprint
+	e.key.uses.max = uint(rsp.MaxUses)
+	e.key.uses.cur = 0
 
-	this.key.enc, err = base64.StdEncoding.DecodeString(rsp.EDK)
+	e.key.enc, err = base64.StdEncoding.DecodeString(rsp.EDK)
 	if err == nil {
-		this.key.raw, err = unwrapDataKey(rsp.WDK, rsp.EPK, srsa)
+		e.key.raw, err = unwrapDataKey(rsp.WDK, rsp.EPK, srsa)
 	}
 
 	if err == nil {
-		this.algo, err =
-			getAlgorithmByName(rsp.SecurityModel.Algorithm)
+		e.algo, err = getAlgorithmByName(rsp.SecurityModel.Algorithm)
 	}
 
 	return err
@@ -166,30 +166,30 @@ func NewEncryption(c Credentials, uses uint) (*Encryption, error) {
 //
 // error is nil upon success. Information about the encryption is
 // returned on success and must be treated as part of the cipher text
-func (this *Encryption) Begin() ([]byte, error) {
+func (e *Encryption) Begin() ([]byte, error) {
 	var hdr []byte
 	var h header
 	var err error
 
-	if this.cipher != nil {
+	if e.cipher != nil {
 		return nil, errors.New("encryption already in progress")
 	}
 
-	this.tracking.AddEvent(
-		this.client.papi, "", "",
+	e.tracking.AddEvent(
+		e.client.papi, "", "",
 		trackingActionEncrypt,
 		1, 0)
 
 	h.version = 0
 	h.v0.flags = 0
-	if this.algo.aad {
+	if e.algo.aad {
 		// if the algorithm supports additional authenticated
 		// data, then authenticate the header
 		h.v0.flags |= headerV0FlagAAD
 	}
-	h.v0.algo = uint8(this.algo.id)
-	h.v0.iv = make([]byte, this.algo.len.iv)
-	h.v0.key = this.key.enc
+	h.v0.algo = uint8(e.algo.id)
+	h.v0.iv = make([]byte, e.algo.len.iv)
+	h.v0.key = e.key.enc
 
 	_, err = rand.Read(h.v0.iv)
 	if err == nil {
@@ -197,16 +197,16 @@ func (this *Encryption) Begin() ([]byte, error) {
 
 		hdr = h.serialize()
 
-		if this.algo.aad {
-			c, err = this.algo.newCipher(
-				this.key.raw, h.v0.iv, hdr)
+		if e.algo.aad {
+			c, err = e.algo.newCipher(
+				e.key.raw, h.v0.iv, hdr)
 		} else {
-			c, err = this.algo.newCipher(
-				this.key.raw, h.v0.iv)
+			c, err = e.algo.newCipher(
+				e.key.raw, h.v0.iv)
 		}
 		if err == nil {
-			this.cipher = &c
-			this.key.uses.cur++
+			e.cipher = &c
+			e.key.uses.cur++
 		}
 	}
 
@@ -219,8 +219,8 @@ func (this *Encryption) Begin() ([]byte, error) {
 // not return any data.
 //
 // error is nil on success and the slice may or may not contain cipher text.
-func (this *Encryption) Update(plaintext []byte) ([]byte, error) {
-	return this.cipher.encipher(plaintext), nil
+func (e *Encryption) Update(plaintext []byte) ([]byte, error) {
+	return e.cipher.encipher(plaintext), nil
 }
 
 // End completes the encryption of a plain text message. For certain
@@ -230,18 +230,18 @@ func (this *Encryption) Update(plaintext []byte) ([]byte, error) {
 // error is nil upon success and the byte slice may or may not contain
 // any remaining plain text. If error is non-nil, any previously decrypted
 // plain text should be discarded.
-func (this *Encryption) End() ([]byte, error) {
-	res, err := this.cipher.close()
-	this.cipher = nil
+func (e *Encryption) End() ([]byte, error) {
+	res, err := e.cipher.close()
+	e.cipher = nil
 	return res, err
 }
 
 // Close cleans up the Encryption object and resets it to its default values.
 // An error returned by this function is a result of a miscommunication with
 // the server, and the object is reset regardless.
-func (this *Encryption) Close() error {
-	this.tracking.Close()
-	*this = Encryption{}
+func (e *Encryption) Close() error {
+	e.tracking.Close()
+	*e = Encryption{}
 
 	return nil
 }
