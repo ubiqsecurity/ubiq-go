@@ -214,6 +214,9 @@ func fetchKey(client *httpClient, host, papi, srsa, name string, n int) (
 
 		key.num, _ = strconv.Atoi(obj.Num)
 		key.key, err = unwrapDataKey(obj.WDK, obj.EPK, srsa)
+		if err != nil {
+			return fpeKey{}, err
+		}
 
 		(*(*keyCache[papi])[name])[key.num] = &key
 		if n < 0 {
