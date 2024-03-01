@@ -550,8 +550,10 @@ func (this *FPEncryption) CipherForSearch(pt string, twk []byte) (
 	for i := range keys {
 		var alg fpeAlgorithm
 
-		alg, err = ((*fpeContext)(this)).getAlgorithm(
-			keys[i].key, deftwk)
+		alg, err = ((*fpeContext)(this)).getAlgorithm(keys[i].key, deftwk)
+		if err != nil {
+			return
+		}
 
 		copy(_ptr, ptr)
 		ctr, err = alg.EncryptRunes(_ptr, twk)
