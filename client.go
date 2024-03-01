@@ -32,32 +32,29 @@ func newHttpClient(c Credentials) httpClient {
 	return httpClient{papi: papi, sapi: sapi}
 }
 
-func (this *httpClient) Get(url string) (*http.Response, error) {
+func (h *httpClient) Get(url string) (*http.Response, error) {
 	var req *http.Request
 	var rsp *http.Response
 	var err error
 
 	req, err = http.NewRequest("GET", url, nil)
 	if err == nil {
-		rsp, err = this.Do(req)
+		rsp, err = h.Do(req)
 	}
 	return rsp, err
 }
 
-func (this *httpClient) Post(
-	url, contentType string, body io.Reader) (
+func (h *httpClient) Post(url, contentType string, body io.Reader) (
 	*http.Response, error) {
-	return this.upload("POST", url, contentType, body)
+	return h.upload("POST", url, contentType, body)
 }
 
-func (this *httpClient) Patch(
-	url, contentType string, body io.Reader) (
+func (h *httpClient) Patch(url, contentType string, body io.Reader) (
 	*http.Response, error) {
-	return this.upload("PATCH", url, contentType, body)
+	return h.upload("PATCH", url, contentType, body)
 }
 
-func (this *httpClient) upload(
-	method, url, contentType string, body io.Reader) (
+func (h *httpClient) upload(method, url, contentType string, body io.Reader) (
 	*http.Response, error) {
 	var req *http.Request
 	var rsp *http.Response
@@ -66,14 +63,14 @@ func (this *httpClient) upload(
 	req, err = http.NewRequest(method, url, body)
 	if err == nil {
 		req.Header.Set("Content-Type", contentType)
-		rsp, err = this.Do(req)
+		rsp, err = h.Do(req)
 	}
 	return rsp, err
 }
 
 // Do wraps Go's http.Client.Do function but implements the signature
 // scheme v0 described here: https://gitlab.com/ubiqsecurity/ubiq-api
-func (this *httpClient) Do(req *http.Request) (*http.Response, error) {
+func (h *httpClient) Do(req *http.Request) (*http.Response, error) {
 	now := time.Now()
 
 	req.Host = req.URL.Host
@@ -122,7 +119,7 @@ func (this *httpClient) Do(req *http.Request) (*http.Response, error) {
 		"SHA-512="+base64.StdEncoding.EncodeToString(sum))
 
 	headers := []string{}
-	dig = hmac.New(sha512.New, []byte(this.sapi))
+	dig = hmac.New(sha512.New, []byte(h.sapi))
 	for _, h := range []string{
 		"(created)",
 		"(request-target)",
@@ -144,7 +141,7 @@ func (this *httpClient) Do(req *http.Request) (*http.Response, error) {
 
 	req.Header.Set(
 		"Signature",
-		"keyId=\""+this.papi+"\""+
+		"keyId=\""+h.papi+"\""+
 			", algorithm=\"hmac-sha512\""+
 			", created="+req.Header.Get("(created)")+
 			", headers=\""+
@@ -157,5 +154,5 @@ func (this *httpClient) Do(req *http.Request) (*http.Response, error) {
 	req.Header.Del("(request-target)")
 	req.Header.Del("(created)")
 
-	return this.client.Do(req)
+	return h.client.Do(req)
 }
