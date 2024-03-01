@@ -6,7 +6,6 @@ import (
 	"crypto/sha512"
 	"encoding/base64"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"strconv"
 	"strings"
@@ -97,7 +96,7 @@ func (h *httpClient) Do(req *http.Request) (*http.Response, error) {
 	dig := sha512.New()
 	if req.Body != nil {
 		tee := io.TeeReader(req.Body, dig)
-		body, _ := ioutil.ReadAll(tee)
+		body, _ := io.ReadAll(tee)
 		req.Body.Close()
 
 		if len(req.Header.Get("Content-Type")) == 0 {
@@ -111,7 +110,7 @@ func (h *httpClient) Do(req *http.Request) (*http.Response, error) {
 			"Content-Length",
 			strconv.FormatInt(req.ContentLength, 10))
 
-		req.Body = ioutil.NopCloser(bytes.NewBuffer(body))
+		req.Body = io.NopCloser(bytes.NewBuffer(body))
 	}
 	sum := dig.Sum(nil)
 	req.Header.Set(
