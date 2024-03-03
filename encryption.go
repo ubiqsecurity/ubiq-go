@@ -9,8 +9,10 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"errors"
-	"github.com/youmark/pkcs8"
+	"io"
 	"net/http"
+
+	"github.com/youmark/pkcs8"
 )
 
 type newEncryptionResponse struct {
@@ -112,8 +114,7 @@ func (e *Encryption) init(rsp newEncryptionResponse, srsa string) error {
 	}
 
 	if err == nil {
-		e.algo, err =
-			getAlgorithmByName(rsp.SecurityModel.Algorithm)
+		e.algo, err = getAlgorithmByName(rsp.SecurityModel.Algorithm)
 	}
 
 	return err
@@ -131,18 +132,20 @@ func NewEncryption(c Credentials, uses uint) (*Encryption, error) {
 	endp := enc.host + "/api/v0/encryption/key"
 
 	body, _ := json.Marshal(newEncryptionRequest{Uses: uses})
-	rsp, err := enc.client.Post(
-		endp, "application/json", bytes.NewReader(body))
+	rsp, err := enc.client.Post(endp, "application/json", bytes.NewReader(body))
+
 	if rsp != nil {
 		defer rsp.Body.Close()
 	}
+
 	if err == nil {
 		var ne newEncryptionResponse
 
 		if rsp.StatusCode == http.StatusCreated {
 			err = json.NewDecoder(rsp.Body).Decode(&ne)
 		} else {
-			err = errors.New("unexpected response: " + rsp.Status)
+			errMsg, _ := io.ReadAll(rsp.Body)
+			err = errors.New("unexpected response: " + string(errMsg))
 		}
 
 		if err == nil {
@@ -150,6 +153,7 @@ func NewEncryption(c Credentials, uses uint) (*Encryption, error) {
 			err = enc.init(ne, srsa)
 		}
 	}
+
 	if err == nil {
 		enc.tracking = newTrackingContext(enc.client, enc.host)
 	} else {
