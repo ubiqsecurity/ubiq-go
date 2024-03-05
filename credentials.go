@@ -37,32 +37,32 @@ func newCredentials() Credentials {
 	return Credentials{params: make(map[string]string)}
 }
 
-func (this Credentials) papi() (string, bool) {
-	val, ok := this.params[credentialsPapiId]
+func (c Credentials) papi() (string, bool) {
+	val, ok := c.params[credentialsPapiId]
 	return val, ok
 }
 
-func (this Credentials) sapi() (string, bool) {
-	val, ok := this.params[credentialsSapiId]
+func (c Credentials) sapi() (string, bool) {
+	val, ok := c.params[credentialsSapiId]
 	return val, ok
 }
 
-func (this Credentials) srsa() (string, bool) {
-	val, ok := this.params[credentialsSrsaId]
+func (c Credentials) srsa() (string, bool) {
+	val, ok := c.params[credentialsSrsaId]
 	return val, ok
 }
 
-func (this Credentials) host() (string, bool) {
-	val, ok := this.params[credentialsHostId]
+func (c Credentials) host() (string, bool) {
+	val, ok := c.params[credentialsHostId]
 	return val, ok
 }
 
 // viable indicates that the Credentials are not valid but
 // will be with only the addition of the host
-func (this Credentials) viable() bool {
-	if _, ok := this.papi(); ok {
-		if _, ok := this.sapi(); ok {
-			if _, ok := this.srsa(); ok {
+func (c Credentials) viable() bool {
+	if _, ok := c.papi(); ok {
+		if _, ok := c.sapi(); ok {
+			if _, ok := c.srsa(); ok {
 				return true
 			}
 		}
@@ -75,9 +75,9 @@ func (this Credentials) viable() bool {
 // present. whether the credentials contain a valid server or
 // whether the credentials form a valid set at the server
 // is undefined.
-func (this Credentials) valid() bool {
-	_, ok := this.host()
-	return this.viable() && ok
+func (c Credentials) valid() bool {
+	_, ok := c.host()
+	return c.viable() && ok
 }
 
 // loadCredentials loads all (sets of) Credentials from a file. if
@@ -130,21 +130,21 @@ func loadCredentials(args ...string) (map[string]Credentials, error) {
 
 // merge populates missing fields in the current credentials
 // with those fields from the `other` credentials
-func (this *Credentials) merge(other Credentials) {
-	if _, ok := this.papi(); !ok {
-		this.params[credentialsPapiId] =
+func (c *Credentials) merge(other Credentials) {
+	if _, ok := c.papi(); !ok {
+		c.params[credentialsPapiId] =
 			other.params[credentialsPapiId]
 	}
-	if _, ok := this.sapi(); !ok {
-		this.params[credentialsSapiId] =
+	if _, ok := c.sapi(); !ok {
+		c.params[credentialsSapiId] =
 			other.params[credentialsSapiId]
 	}
-	if _, ok := this.srsa(); !ok {
-		this.params[credentialsSrsaId] =
+	if _, ok := c.srsa(); !ok {
+		c.params[credentialsSrsaId] =
 			other.params[credentialsSrsaId]
 	}
-	if _, ok := this.host(); !ok {
-		this.params[credentialsHostId] =
+	if _, ok := c.host(); !ok {
+		c.params[credentialsHostId] =
 			other.params[credentialsHostId]
 	}
 }
@@ -153,16 +153,16 @@ func (this *Credentials) merge(other Credentials) {
 // credentials by adding the host field if necessary. this is
 // done by passing the individual fields of the given
 // credentials to the set() function.
-func (this *Credentials) finalize() error {
+func (c *Credentials) finalize() error {
 	var err error
 
 	err = errors.New("credentials not found")
-	if this.viable() {
-		err = this.set(
-			this.params[credentialsPapiId],
-			this.params[credentialsSapiId],
-			this.params[credentialsSrsaId],
-			this.params[credentialsHostId])
+	if c.viable() {
+		err = c.set(
+			c.params[credentialsPapiId],
+			c.params[credentialsSapiId],
+			c.params[credentialsSrsaId],
+			c.params[credentialsHostId])
 	}
 
 	return err
@@ -171,24 +171,24 @@ func (this *Credentials) finalize() error {
 // init encompasses the default behavior of trying to get credentials
 // fields from the environment and then supplementing the missing fields
 // with those from the default profile in the default file.
-func (this *Credentials) init() error {
+func (c *Credentials) init() error {
 	if val, ok := os.LookupEnv(credentialsPapiEnvId); ok {
-		this.params[credentialsPapiId] = val
+		c.params[credentialsPapiId] = val
 	}
 	if val, ok := os.LookupEnv(credentialsSapiEnvId); ok {
-		this.params[credentialsSapiId] = val
+		c.params[credentialsSapiId] = val
 	}
 	if val, ok := os.LookupEnv(credentialsSrsaEnvId); ok {
-		this.params[credentialsSrsaId] = val
+		c.params[credentialsSrsaId] = val
 	}
 	if val, ok := os.LookupEnv(credentialsHostEnvId); ok {
-		this.params[credentialsHostId] = val
+		c.params[credentialsHostId] = val
 	}
 
 	m, _ := loadCredentials()
-	this.merge(m[credentialsDefaultProfileId])
+	c.merge(m[credentialsDefaultProfileId])
 
-	return this.finalize()
+	return c.finalize()
 }
 
 // load loads the specified profile from the specified file
@@ -197,7 +197,7 @@ func (this *Credentials) init() error {
 // from which to load the credentials. if it is not given or is empty,
 // the default file is read. the second argument is the profile. if it
 // is not given or is empty, the `default` profile is used if present.
-func (this *Credentials) load(args ...string) error {
+func (c *Credentials) load(args ...string) error {
 	var m map[string]Credentials
 
 	if len(args) > 0 && len(args[0]) > 0 {
@@ -207,24 +207,24 @@ func (this *Credentials) load(args ...string) error {
 	}
 
 	if len(args) > 1 && len(args[1]) > 1 {
-		*this = m[args[1]]
+		*c = m[args[1]]
 	}
 
 	if c, ok := m[credentialsDefaultProfileId]; ok {
-		this.merge(c)
+		c.merge(c)
 	}
 
-	if _, ok := this.host(); !ok {
+	if _, ok := c.host(); !ok {
 		val, ok := os.LookupEnv(credentialsHostEnvId)
 		if ok {
-			this.params[credentialsHostId] = val
+			c.params[credentialsHostId] = val
 		}
 	}
 
-	return this.finalize()
+	return c.finalize()
 }
 
-func (this *Credentials) set(papi, sapi, srsa string, args ...string) error {
+func (c *Credentials) set(papi, sapi, srsa string, args ...string) error {
 	host := credentialsDefaultHost
 	if len(args) > 0 && len(args[0]) > 0 {
 		host = args[0]
@@ -235,10 +235,10 @@ func (this *Credentials) set(papi, sapi, srsa string, args ...string) error {
 		host = "https://" + host
 	}
 
-	this.params[credentialsPapiId] = papi
-	this.params[credentialsSapiId] = sapi
-	this.params[credentialsSrsaId] = srsa
-	this.params[credentialsHostId] = host
+	c.params[credentialsPapiId] = papi
+	c.params[credentialsSapiId] = sapi
+	c.params[credentialsSrsaId] = srsa
+	c.params[credentialsHostId] = host
 
 	return nil
 }

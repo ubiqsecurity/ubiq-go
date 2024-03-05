@@ -84,23 +84,23 @@ func newHeader(buf []byte) header {
 	return h
 }
 
-func (this header) serialize() []byte {
+func (h header) serialize() []byte {
 	var hdr []byte
 
-	switch this.version {
+	switch h.version {
 	case 0:
 		// 1 byte for each of version, flags, algo, and ivlength
 		// 2 bytes for key length
 		hdr = make([]byte, 6)
 
-		hdr[0] = this.version
-		hdr[1] = this.v0.flags
-		hdr[2] = this.v0.algo
-		hdr[3] = uint8(len(this.v0.iv))
-		binary.BigEndian.PutUint16(hdr[4:], uint16(len(this.v0.key)))
+		hdr[0] = h.version
+		hdr[1] = h.v0.flags
+		hdr[2] = h.v0.algo
+		hdr[3] = uint8(len(h.v0.iv))
+		binary.BigEndian.PutUint16(hdr[4:], uint16(len(h.v0.key)))
 
-		hdr = append(hdr, this.v0.iv...)
-		hdr = append(hdr, this.v0.key...)
+		hdr = append(hdr, h.v0.iv...)
+		hdr = append(hdr, h.v0.key...)
 	}
 
 	return hdr

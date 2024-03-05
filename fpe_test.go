@@ -2,7 +2,7 @@ package ubiq
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"os"
 	"testing"
 	"time"
@@ -197,7 +197,7 @@ func TestFPE1M(t *testing.T) {
 	}
 	defer file.Close()
 
-	raw, err := ioutil.ReadAll(file)
+	raw, err := io.ReadAll(file)
 	if err != nil {
 		t.Skip(err)
 	}

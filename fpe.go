@@ -214,6 +214,9 @@ func fetchKey(client *httpClient, host, papi, srsa, name string, n int) (
 
 		key.num, _ = strconv.Atoi(obj.Num)
 		key.key, err = unwrapDataKey(obj.WDK, obj.EPK, srsa)
+		if err != nil {
+			return fpeKey{}, err
+		}
 
 		(*(*keyCache[papi])[name])[key.num] = &key
 		if n < 0 {
@@ -382,48 +385,48 @@ func decodeKeyNumber(inp, ocs []rune, sft int) ([]rune, int) {
 }
 
 // retrieve the format information from the server
-func (this *fpeContext) getFFSInfo(name string) (ffs ffsInfo, err error) {
-	return fetchFFS(&this.client, this.host, this.papi, name)
+func (fc *fpeContext) getFFSInfo(name string) (ffs ffsInfo, err error) {
+	return fetchFFS(&fc.client, fc.host, fc.papi, name)
 }
 
 // retrieve the key from the server
-func (this *fpeContext) getKey(kn int) (key fpeKey, err error) {
-	return fetchKey(&this.client,
-		this.host, this.papi, this.srsa,
-		this.ffs.Name, kn)
+func (fc *fpeContext) getKey(kn int) (key fpeKey, err error) {
+	return fetchKey(&fc.client,
+		fc.host, fc.papi, fc.srsa,
+		fc.ffs.Name, kn)
 }
 
-func (this *fpeContext) getAllKeys() (keys []fpeKey, err error) {
-	return fetchAllKeys(&this.client,
-		this.host, this.papi, this.srsa,
-		this.ffs.Name)
+func (fc *fpeContext) getAllKeys() (keys []fpeKey, err error) {
+	return fetchAllKeys(&fc.client,
+		fc.host, fc.papi, fc.srsa,
+		fc.ffs.Name)
 }
 
-func newFPEContext(c Credentials, ffs string) (this *fpeContext, err error) {
-	this = new(fpeContext)
+func newFPEContext(c Credentials, ffs string) (fc *fpeContext, err error) {
+	fc = new(fpeContext)
 
-	this.client = newHttpClient(c)
+	fc.client = newHttpClient(c)
 
-	this.host, _ = c.host()
-	this.papi, _ = c.papi()
-	this.srsa, _ = c.srsa()
+	fc.host, _ = c.host()
+	fc.papi, _ = c.papi()
+	fc.srsa, _ = c.srsa()
 
-	this.kn = -1
+	fc.kn = -1
 
-	this.ffs, err = this.getFFSInfo(ffs)
+	fc.ffs, err = fc.getFFSInfo(ffs)
 
 	return
 }
 
-func (this *fpeContext) getAlgorithm(key, twk []byte) (
+func (fc *fpeContext) getAlgorithm(key, twk []byte) (
 	alg fpeAlgorithm, err error) {
-	if this.ffs.Algorithm == "FF1" {
+	if fc.ffs.Algorithm == "FF1" {
 		alg, err = algo.NewFF1(
 			key, twk,
-			this.ffs.TweakLengthMin, this.ffs.TweakLengthMax,
-			len(this.ffs.InputRuneSet), this.ffs.InputCharacterSet)
+			fc.ffs.TweakLengthMin, fc.ffs.TweakLengthMax,
+			len(fc.ffs.InputRuneSet), fc.ffs.InputCharacterSet)
 	} else {
-		err = errors.New("unsupported algorithm: " + this.ffs.Algorithm)
+		err = errors.New("unsupported algorithm: " + fc.ffs.Algorithm)
 	}
 
 	return
@@ -434,24 +437,24 @@ func (this *fpeContext) getAlgorithm(key, twk []byte) (
 // for encryption this can be done right away as the key number is
 // unknown. for decryption, it can't be done until the ciphertext
 // has been presented and the key number decoded from it
-func (this *fpeContext) setAlgorithm(kn int) (err error) {
+func (fc *fpeContext) setAlgorithm(kn int) (err error) {
 	var twk []byte
 	var key fpeKey
 
-	twk, err = base64.StdEncoding.DecodeString(this.ffs.Tweak)
+	twk, err = base64.StdEncoding.DecodeString(fc.ffs.Tweak)
 	if err != nil {
 		return
 	}
 
-	key, err = this.getKey(kn)
+	key, err = fc.getKey(kn)
 	if err != nil {
 		return
 	}
 
-	this.algo, err = this.getAlgorithm(key.key, twk)
+	fc.algo, err = fc.getAlgorithm(key.key, twk)
 
 	if err == nil {
-		this.kn = key.num
+		fc.kn = key.num
 	}
 
 	return
@@ -461,23 +464,23 @@ func (this *fpeContext) setAlgorithm(kn int) (err error) {
 // can be reused to encrypt multiple plaintexts using the format (and
 // algorithm and key) named by @ffs
 func NewFPEncryption(c Credentials, ffs string) (*FPEncryption, error) {
-	this, err := newFPEContext(c, ffs)
+	fc, err := newFPEContext(c, ffs)
 	if err == nil {
-		err = this.setAlgorithm(-1)
+		err = fc.setAlgorithm(-1)
 	}
 	if err == nil {
-		this.tracking = newTrackingContext(this.client, this.host)
+		fc.tracking = newTrackingContext(fc.client, fc.host)
 	}
-	return (*FPEncryption)(this), err
+	return (*FPEncryption)(fc), err
 }
 
 // Encrypt a plaintext string using the key, algorithm, and format
 // preserving parameters defined by the encryption object.
 //
 // @twk may be nil, in which case, the default will be used
-func (this *FPEncryption) Cipher(pt string, twk []byte) (
+func (fe *FPEncryption) Cipher(pt string, twk []byte) (
 	ct string, err error) {
-	var ffs *ffsInfo = &this.ffs
+	var ffs *ffsInfo = &fe.ffs
 
 	var fmtr, ptr, ctr []rune
 
@@ -493,19 +496,19 @@ func (this *FPEncryption) Cipher(pt string, twk []byte) (
 		return
 	}
 
-	ctr, err = this.algo.EncryptRunes(ptr, twk)
+	ctr, err = fe.algo.EncryptRunes(ptr, twk)
 	if err != nil {
 		return
 	}
 
-	this.tracking.AddEvent(
-		this.papi, ffs.Name, "",
+	fe.tracking.AddEvent(
+		fe.papi, ffs.Name, "",
 		trackingActionEncrypt,
-		1, this.kn)
+		1, fe.kn)
 
 	ctr = convertRadix(ctr, ffs.InputRuneSet, ffs.OutputRuneSet)
 	ctr = encodeKeyNumber(
-		ctr, ffs.OutputRuneSet, this.kn, ffs.NumEncodingBits)
+		ctr, ffs.OutputRuneSet, fe.kn, ffs.NumEncodingBits)
 	ctr, err = formatOutput(fmtr, ctr, ffs.PassthroughRuneSet)
 
 	return string(ctr), err
@@ -516,24 +519,22 @@ func (this *FPEncryption) Cipher(pt string, twk []byte) (
 // encryption object.
 //
 // @twk may be nil, in which case, the default will be used
-func (this *FPEncryption) CipherForSearch(pt string, twk []byte) (
+func (fe *FPEncryption) CipherForSearch(pt string, twk []byte) (
 	ct []string, err error) {
-	var ffs *ffsInfo = &this.ffs
+	var ffs *ffsInfo = &fe.ffs
 	var fmtr, ptr, ctr []rune
 
-	deftwk, err := base64.StdEncoding.DecodeString(this.ffs.Tweak)
+	deftwk, err := base64.StdEncoding.DecodeString(fe.ffs.Tweak)
 	if err != nil {
 		return
 	}
 
-	keys, err := ((*fpeContext)(this)).getAllKeys()
+	keys, err := ((*fpeContext)(fe)).getAllKeys()
 	if err != nil {
 		return
 	}
 
-	fmtr, ptr, err = formatInput(
-		[]rune(pt),
-		ffs.PassthroughRuneSet, ffs.InputRuneSet, ffs.OutputRuneSet)
+	fmtr, ptr, err = formatInput([]rune(pt), ffs.PassthroughRuneSet, ffs.InputRuneSet, ffs.OutputRuneSet)
 	if err != nil {
 		return
 	}
@@ -547,8 +548,10 @@ func (this *FPEncryption) CipherForSearch(pt string, twk []byte) (
 	for i := range keys {
 		var alg fpeAlgorithm
 
-		alg, err = ((*fpeContext)(this)).getAlgorithm(
-			keys[i].key, deftwk)
+		alg, err = ((*fpeContext)(fe)).getAlgorithm(keys[i].key, deftwk)
+		if err != nil {
+			return
+		}
 
 		copy(_ptr, ptr)
 		ctr, err = alg.EncryptRunes(_ptr, twk)
@@ -556,14 +559,10 @@ func (this *FPEncryption) CipherForSearch(pt string, twk []byte) (
 			return
 		}
 
-		this.tracking.AddEvent(
-			this.papi, ffs.Name, "",
-			trackingActionEncrypt,
-			1, i)
+		fe.tracking.AddEvent(fe.papi, ffs.Name, "", trackingActionEncrypt, 1, i)
 
 		ctr = convertRadix(ctr, ffs.InputRuneSet, ffs.OutputRuneSet)
-		ctr = encodeKeyNumber(
-			ctr, ffs.OutputRuneSet, i, ffs.NumEncodingBits)
+		ctr = encodeKeyNumber(ctr, ffs.OutputRuneSet, i, ffs.NumEncodingBits)
 		ctr, err = formatOutput(fmtr, ctr, ffs.PassthroughRuneSet)
 		if err != nil {
 			return
@@ -575,19 +574,19 @@ func (this *FPEncryption) CipherForSearch(pt string, twk []byte) (
 	return
 }
 
-func (this *FPEncryption) Close() {
-	this.tracking.Close()
+func (fe *FPEncryption) Close() {
+	fe.tracking.Close()
 }
 
 // Create a new format preserving decryption object. The returned object
 // can be reused to decrypt multiple ciphertexts using the format (and
 // algorithm and key) named by @ffs
 func NewFPDecryption(c Credentials, ffs string) (*FPDecryption, error) {
-	this, err := newFPEContext(c, ffs)
+	fc, err := newFPEContext(c, ffs)
 	if err == nil {
-		this.tracking = newTrackingContext(this.client, this.host)
+		fc.tracking = newTrackingContext(fc.client, fc.host)
 	}
-	return (*FPDecryption)(this), err
+	return (*FPDecryption)(fc), err
 }
 
 // Decrypt a ciphertext string using the key, algorithm, and format
@@ -595,9 +594,9 @@ func NewFPDecryption(c Credentials, ffs string) (*FPDecryption, error) {
 //
 // @twk may be nil, in which case, the default will be used. Regardless,
 // the tweak must match the one used during encryption of the plaintext
-func (this *FPDecryption) Cipher(ct string, twk []byte) (
+func (fd *FPDecryption) Cipher(ct string, twk []byte) (
 	pt string, err error) {
-	var ffs *ffsInfo = &this.ffs
+	var ffs *ffsInfo = &fd.ffs
 
 	var fmtr, ctr []rune
 	var kn int
@@ -610,8 +609,8 @@ func (this *FPDecryption) Cipher(ct string, twk []byte) (
 	}
 
 	ctr, kn = decodeKeyNumber(ctr, ffs.OutputRuneSet, ffs.NumEncodingBits)
-	if kn != this.kn {
-		err = (*fpeContext)(this).setAlgorithm(kn)
+	if kn != fd.kn {
+		err = (*fpeContext)(fd).setAlgorithm(kn)
 		if err != nil {
 			return
 		}
@@ -619,22 +618,22 @@ func (this *FPDecryption) Cipher(ct string, twk []byte) (
 
 	ctr = convertRadix(ctr, ffs.OutputRuneSet, ffs.InputRuneSet)
 
-	ptr, err := this.algo.DecryptRunes(ctr, twk)
+	ptr, err := fd.algo.DecryptRunes(ctr, twk)
 	if err != nil {
 		return
 	}
 
-	this.tracking.AddEvent(
-		this.papi, ffs.Name, "",
+	fd.tracking.AddEvent(
+		fd.papi, ffs.Name, "",
 		trackingActionDecrypt,
-		1, this.kn)
+		1, fd.kn)
 
 	ptr, err = formatOutput(fmtr, ptr, ffs.PassthroughRuneSet)
 	return string(ptr), err
 }
 
-func (this *FPDecryption) Close() {
-	this.tracking.Close()
+func (fd *FPDecryption) Close() {
+	fd.tracking.Close()
 }
 
 // FPEncrypt performs a format preserving encryption of a plaintext using
