@@ -3,9 +3,12 @@ package main
 import (
 	"flag"
 	"fmt"
-	"gitlab.com/ubiqsecurity/ubiq-go"
+
+	// "gitlab.com/ubiqsecurity/ubiq-go"
 	"io"
 	"os"
+
+	"../../ubiq-go"
 )
 
 const (

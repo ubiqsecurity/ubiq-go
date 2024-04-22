@@ -145,5 +145,46 @@ t, _ := decryption.End()
 pt = append(pt, t...)
 ```
 
+### Structured Encryption
+This library incorporates Ubiq Structured Encryption.
+
+#### Encrypt
+
+Pass credentials, the name of a structured dataaset, and data into the encryption function.
+The encrypted data will be returned.
+
+```go
+credentials, _ := ubiq.NewCredentials()
+
+datasetName := "SSN"
+plainText := "999-01-2345"
+
+var cipherText, err := ubiq.FPEncrypt(credentials, datasetName, plainText)
+if err != nil {
+        return err
+}
+
+fmt.Fprintf(os.Stdout, "ENCRYPTED cipher= %s \n", cipherText)
+```
+
+#### Decrypt
+
+Pass credentials, the name of a structured dataset, and data into the decryption function.
+The decrypted data will be returned.
+
+```go
+credentials, _ := ubiq.NewCredentials()
+
+datasetName := "SSN"
+cipherText := "300-0E-274t"
+
+var plainText, err := ubiq.FPDecrypt(credentials, datasetName, cipherText)
+if err != nil {
+        return err
+}
+
+fmt.Fprintf(os.Stdout, "DECRYPTED decrypted_text= %s \n", cipherText)
+```
+
 [dashboard]:https://dashboard.ubiqsecurity.com/
 [credentials]:https://dev.ubiqsecurity.com/docs/how-to-create-api-keys

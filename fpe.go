@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 
 	algo "gitlab.com/ubiqsecurity/ubiq-fpe-go"
@@ -22,14 +23,22 @@ type ffsInfo struct {
 	OutputRuneSet           []rune
 	InputCharacterSet       string `json:"input_character_set"`
 	InputRuneSet            []rune
-	InputLengthMin          int    `json:"min_input_length"`
-	InputLengthMax          int    `json:"max_input_length"`
-	NumEncodingBits         int    `json:"msb_encoding_bits"`
-	Salt                    string `json:"salt"`
-	Tweak                   string `json:"tweak"`
-	TweakLengthMax          int    `json:"tweak_max_len"`
-	TweakLengthMin          int    `json:"tweak_min_len"`
-	TweakSource             string `json:"tweak_source"`
+	InputLengthMin          int               `json:"min_input_length"`
+	InputLengthMax          int               `json:"max_input_length"`
+	NumEncodingBits         int               `json:"msb_encoding_bits"`
+	Salt                    string            `json:"salt"`
+	Tweak                   string            `json:"tweak"`
+	TweakLengthMax          int               `json:"tweak_max_len"`
+	TweakLengthMin          int               `json:"tweak_min_len"`
+	TweakSource             string            `json:"tweak_source"`
+	PassthroughRules        []passthroughRule `json:"passthrough_rules"`
+}
+
+type passthroughRule struct {
+	Type     string      `json:"type"`
+	Value    interface{} `json:"value"`
+	Priority int         `json:"priority"`
+	Buffer   []rune
 }
 
 type defKeys struct {
@@ -330,18 +339,61 @@ func convertRadix(inp, ics, ocs []rune) []rune {
 
 // remove passthrough characters from the input and preserve the format
 // so the output can be reformatted after encryption/decryption
-func formatInput(inp, pth, icr, ocr []rune) (fmtr, out []rune, err error) {
-	for _, c := range inp {
-		if findRune(pth, c) >= 0 {
-			fmtr = append(fmtr, c)
-		} else {
-			fmtr = append(fmtr, ocr[0])
+func formatInput(inp, pth, icr, ocr []rune, rules []passthroughRule) (fmtr, out []rune, updatedRules []passthroughRule, err error) {
+	// Rules may contain updated information (buffer value)
+	updatedRules = rules
 
-			if findRune(icr, c) >= 0 {
-				out = append(out, c)
-			} else {
-				err = errors.New("invalid input character")
+	if len(pth) > 0 && len(rules) == 0 {
+		var pthRule passthroughRule
+		pthRule.Priority = 1
+		pthRule.Type = "passthrough"
+		pthRule.Value = string(pth)
+		updatedRules = append(updatedRules, pthRule)
+	}
+
+	// Sort the rules by priority (asc)
+	sort.Slice(updatedRules[:], func(i, j int) bool {
+		return updatedRules[i].Priority < updatedRules[j].Priority
+	})
+	out = []rune(inp)
+	for idx, rule := range updatedRules {
+		switch rule.Type {
+		case "passthrough":
+			var pthOut []rune
+			pthChars := []rune(rule.Value.(string))
+			for _, c := range out {
+				if findRune(pthChars, c) >= 0 {
+					fmtr = append(fmtr, c)
+				} else {
+					fmtr = append(fmtr, ocr[0])
+
+					if findRune(icr, c) >= 0 {
+						pthOut = append(pthOut, c)
+					} else {
+						err = errors.New("invalid input character")
+					}
+				}
 			}
+			out = pthOut
+		case "prefix":
+			prefix := int(rule.Value.(float64))
+			if prefix > 0 {
+				// Store removed portion in rule.
+				rule.Buffer = out[0:prefix]
+				updatedRules[idx] = rule
+				out = out[prefix:]
+			}
+		case "suffix":
+			suf := int(rule.Value.(float64))
+			if suf > 0 {
+				suffix := len(out) - suf
+				// Store removed portion in rule.
+				rule.Buffer = out[suffix:]
+				updatedRules[idx] = rule
+				out = out[:suffix]
+			}
+		default:
+			err = errors.New("invalid rule type")
 		}
 	}
 
@@ -349,18 +401,37 @@ func formatInput(inp, pth, icr, ocr []rune) (fmtr, out []rune, err error) {
 }
 
 // reinsert passthrough characters into output
-func formatOutput(fmtr, inp, pth []rune) (out []rune, err error) {
-	for _, c := range fmtr {
-		if findRune(pth, c) >= 0 {
-			out = append(out, c)
-		} else {
-			out = append(out, inp[0])
-			inp = inp[1:]
-		}
-	}
+func formatOutput(fmtr, inp, pth []rune, rules []passthroughRule) (out []rune, err error) {
+	// Sort the rules by priority (desc)
+	sort.Slice(rules[:], func(i, j int) bool {
+		return rules[i].Priority > rules[j].Priority
+	})
 
-	if len(inp) > 0 {
-		err = errors.New("mismatched format and output strings")
+	out = []rune(inp)
+	for _, rule := range rules {
+		switch rule.Type {
+		case "passthrough":
+			var pth_out []rune
+			for _, c := range fmtr {
+				if findRune(pth, c) >= 0 {
+					pth_out = append(pth_out, c)
+				} else {
+					pth_out = append(pth_out, out[0])
+					out = out[1:]
+				}
+			}
+
+			if len(out) > 0 {
+				err = errors.New("mismatched format and output strings")
+			}
+			out = pth_out
+		case "prefix":
+			out = append(rule.Buffer, out...)
+		case "suffix":
+			out = append(out, rule.Buffer...)
+		default:
+			err = errors.New("invalid rule type")
+		}
 	}
 
 	return
@@ -483,10 +554,11 @@ func (fe *FPEncryption) Cipher(pt string, twk []byte) (
 	var ffs *ffsInfo = &fe.ffs
 
 	var fmtr, ptr, ctr []rune
+	var rules []passthroughRule
 
-	fmtr, ptr, err = formatInput(
+	fmtr, ptr, rules, err = formatInput(
 		[]rune(pt),
-		ffs.PassthroughRuneSet, ffs.InputRuneSet, ffs.OutputRuneSet)
+		ffs.PassthroughRuneSet, ffs.InputRuneSet, ffs.OutputRuneSet, ffs.PassthroughRules)
 	if err != nil {
 		return
 	}
@@ -509,7 +581,7 @@ func (fe *FPEncryption) Cipher(pt string, twk []byte) (
 	ctr = convertRadix(ctr, ffs.InputRuneSet, ffs.OutputRuneSet)
 	ctr = encodeKeyNumber(
 		ctr, ffs.OutputRuneSet, fe.kn, ffs.NumEncodingBits)
-	ctr, err = formatOutput(fmtr, ctr, ffs.PassthroughRuneSet)
+	ctr, err = formatOutput(fmtr, ctr, ffs.PassthroughRuneSet, rules)
 
 	return string(ctr), err
 }
@@ -523,6 +595,7 @@ func (fe *FPEncryption) CipherForSearch(pt string, twk []byte) (
 	ct []string, err error) {
 	var ffs *ffsInfo = &fe.ffs
 	var fmtr, ptr, ctr []rune
+	var rules []passthroughRule
 
 	deftwk, err := base64.StdEncoding.DecodeString(fe.ffs.Tweak)
 	if err != nil {
@@ -534,7 +607,7 @@ func (fe *FPEncryption) CipherForSearch(pt string, twk []byte) (
 		return
 	}
 
-	fmtr, ptr, err = formatInput([]rune(pt), ffs.PassthroughRuneSet, ffs.InputRuneSet, ffs.OutputRuneSet)
+	fmtr, ptr, rules, err = formatInput([]rune(pt), ffs.PassthroughRuneSet, ffs.InputRuneSet, ffs.OutputRuneSet, ffs.PassthroughRules)
 	if err != nil {
 		return
 	}
@@ -563,7 +636,7 @@ func (fe *FPEncryption) CipherForSearch(pt string, twk []byte) (
 
 		ctr = convertRadix(ctr, ffs.InputRuneSet, ffs.OutputRuneSet)
 		ctr = encodeKeyNumber(ctr, ffs.OutputRuneSet, i, ffs.NumEncodingBits)
-		ctr, err = formatOutput(fmtr, ctr, ffs.PassthroughRuneSet)
+		ctr, err = formatOutput(fmtr, ctr, ffs.PassthroughRuneSet, rules)
 		if err != nil {
 			return
 		}
@@ -600,10 +673,11 @@ func (fd *FPDecryption) Cipher(ct string, twk []byte) (
 
 	var fmtr, ctr []rune
 	var kn int
+	var rules []passthroughRule
 
-	fmtr, ctr, err = formatInput(
+	fmtr, ctr, rules, err = formatInput(
 		[]rune(ct),
-		ffs.PassthroughRuneSet, ffs.OutputRuneSet, ffs.InputRuneSet)
+		ffs.PassthroughRuneSet, ffs.OutputRuneSet, ffs.InputRuneSet, ffs.PassthroughRules)
 	if err != nil {
 		return
 	}
@@ -628,7 +702,7 @@ func (fd *FPDecryption) Cipher(ct string, twk []byte) (
 		trackingActionDecrypt,
 		1, fd.kn)
 
-	ptr, err = formatOutput(fmtr, ptr, ffs.PassthroughRuneSet)
+	ptr, err = formatOutput(fmtr, ptr, ffs.PassthroughRuneSet, rules)
 	return string(ptr), err
 }
 
