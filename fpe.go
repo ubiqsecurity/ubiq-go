@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math/big"
 	"net/http"
 	"net/url"
@@ -380,11 +381,25 @@ func formatInput(inp []rune, pth *algo.Alphabet, icr *algo.Alphabet, ocr0 rune, 
 				out = out[:suffix]
 			}
 		default:
-			err = errors.New("invalid rule type")
+			err = fmt.Errorf("ubiq go library does not support rule type \"%v\" at this time", rule.Type)
 		}
 	}
 
+	if !validateCharset(out, icr) {
+		err = errors.New("invalid input string character(s)")
+	}
+
 	return
+}
+
+func validateCharset(input []rune, charset *algo.Alphabet) bool {
+	for _, c := range input {
+		if charset.PosOf(c) == -1 {
+			return false
+		}
+	}
+
+	return true
 }
 
 // reinsert passthrough characters into output
@@ -554,7 +569,7 @@ func (fe *FPEncryption) Cipher(pt string, twk []byte) (
 	}
 
 	if len(ptr) < ffs.InputLengthMin || len(ptr) > ffs.InputLengthMax {
-		err = errors.New("input length out of bounds")
+		err = fmt.Errorf("invalid input length (%v) min: %v max %v", len(ptr), ffs.InputLengthMin, ffs.InputLengthMax)
 		return
 	}
 

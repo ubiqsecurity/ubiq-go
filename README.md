@@ -24,7 +24,7 @@ Available symbols are in the `ubiq` namespace/package.
 
 ### Requirements
 
-The library has been tested with Go 1.10; however, it may work with
+The library has been tested with Go 1.18; however, it may work with
 older versions.
 
 ## Usage
