@@ -3,7 +3,7 @@ package ubiq
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"strconv"
 	"testing"
@@ -201,7 +201,7 @@ func TestFPE1M(t *testing.T) {
 	}
 	defer file.Close()
 
-	raw, err := ioutil.ReadAll(file)
+	raw, err := io.ReadAll(file)
 	if err != nil {
 		t.Skip(err)
 	}
