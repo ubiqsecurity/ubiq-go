@@ -18,11 +18,11 @@ type ffsInfo struct {
 	Type                    string `json:"fpe_definable_type"`
 	Algorithm               string `json:"encryption_algorithm"`
 	PassthroughCharacterSet string `json:"passthrough"`
-	PassthroughRuneSet      []rune
+	PassthroughAlphabet     algo.Alphabet
 	OutputCharacterSet      string `json:"output_character_set"`
-	OutputRuneSet           []rune
+	OutputAlphabet          algo.Alphabet
 	InputCharacterSet       string `json:"input_character_set"`
-	InputRuneSet            []rune
+	InputAlphabet           algo.Alphabet
 	InputLengthMin          int               `json:"min_input_length"`
 	InputLengthMax          int               `json:"max_input_length"`
 	NumEncodingBits         int               `json:"msb_encoding_bits"`
@@ -139,11 +139,16 @@ func fetchFFS(client *httpClient, host, papi, name string) (ffsInfo, error) {
 			return ffsInfo{}, err
 		}
 
-		// convert the character string to arrays of runes
-		// to enable unicode handling
-		ffs.PassthroughRuneSet = []rune(ffs.PassthroughCharacterSet)
-		ffs.OutputRuneSet = []rune(ffs.OutputCharacterSet)
-		ffs.InputRuneSet = []rune(ffs.InputCharacterSet)
+		if err == nil {
+			// convert the character string to arrays of runes
+			// to enable unicode handling
+			ffs.PassthroughAlphabet, _ =
+				algo.NewAlphabet(ffs.PassthroughCharacterSet)
+			ffs.OutputAlphabet, _ =
+				algo.NewAlphabet(ffs.OutputCharacterSet)
+			ffs.InputAlphabet, _ =
+				algo.NewAlphabet(ffs.InputCharacterSet)
+		}
 
 		(*ffsCache[papi])[name] = ffs
 	}
@@ -310,44 +315,25 @@ func flushKey(papi, name *string, n int) {
 	}
 }
 
-// find the first occurrence of a rune in an array/slice
-//
-// i hate the inefficiency of this function, especially given
-// how often it is (expected to be) called. one idea is to sort it
-// and store the rune and its original position so that a binary
-// search can be performed. this could be done with a map, too. it
-// probably doesn't make sense to build out that data structure
-// unless a large number of encryptions/decryptions are being
-// performed
-func findRune(rs []rune, r rune) int {
-	for i := range rs {
-		if rs[i] == r {
-			return i
-		}
-	}
-
-	return -1
-}
-
 // convert a string representation of a number (@inp) in the radix/alphabet
 // described by @ics to the radix/alphabet described by @ocs
-func convertRadix(inp, ics, ocs []rune) []rune {
+func convertRadix(inp []rune, ics, ocs *algo.Alphabet) []rune {
 	var n *big.Int = big.NewInt(0)
-	return algo.BigIntToRunes(len(ocs), ocs,
-		algo.RunesToBigInt(n, len(ics), ics, inp), len(inp))
+	return algo.BigIntToRunes(ocs,
+		algo.RunesToBigInt(n, ics, inp), len(inp))
 }
 
 // remove passthrough characters from the input and preserve the format
 // so the output can be reformatted after encryption/decryption
-func formatInput(inp, pth, icr, ocr []rune, rules []passthroughRule) (fmtr, out []rune, updatedRules []passthroughRule, err error) {
+func formatInput(inp []rune, pth *algo.Alphabet, icr *algo.Alphabet, ocr0 rune, rules []passthroughRule) (fmtr []rune, out []rune, updatedRules []passthroughRule, err error) {
 	// Rules may contain updated information (buffer value)
 	updatedRules = rules
 
-	if len(pth) > 0 && len(rules) == 0 {
+	if pth.Len() > 0 && len(rules) == 0 {
 		var pthRule passthroughRule
 		pthRule.Priority = 1
 		pthRule.Type = "passthrough"
-		pthRule.Value = string(pth)
+		pthRule.Value = "legacy"
 		updatedRules = append(updatedRules, pthRule)
 	}
 
@@ -356,22 +342,23 @@ func formatInput(inp, pth, icr, ocr []rune, rules []passthroughRule) (fmtr, out 
 		return updatedRules[i].Priority < updatedRules[j].Priority
 	})
 	out = []rune(inp)
+
 	for idx, rule := range updatedRules {
 		switch rule.Type {
 		case "passthrough":
 			var pthOut []rune
-			pthChars := []rune(rule.Value.(string))
+			// If we don't have a legacy pth Alphabet, create one now with the passthrough rule's Value
+			pthRule := rule.Value.(string)
+			if pth.Len() == 0 && pthRule != "legacy" && len(pthRule) > 0 {
+				pthAlpha, _ := algo.NewAlphabet(pthRule)
+				pth = &pthAlpha
+			}
 			for _, c := range out {
-				if findRune(pthChars, c) >= 0 {
+				if pth.PosOf(c) >= 0 {
 					fmtr = append(fmtr, c)
 				} else {
-					fmtr = append(fmtr, ocr[0])
-
-					if findRune(icr, c) >= 0 {
-						pthOut = append(pthOut, c)
-					} else {
-						err = errors.New("invalid input character")
-					}
+					fmtr = append(fmtr, ocr0)
+					pthOut = append(pthOut, c)
 				}
 			}
 			out = pthOut
@@ -401,7 +388,7 @@ func formatInput(inp, pth, icr, ocr []rune, rules []passthroughRule) (fmtr, out 
 }
 
 // reinsert passthrough characters into output
-func formatOutput(fmtr, inp, pth []rune, rules []passthroughRule) (out []rune, err error) {
+func formatOutput(fmtr []rune, inp []rune, pth *algo.Alphabet, rules []passthroughRule) (out []rune, err error) {
 	// Sort the rules by priority (desc)
 	sort.Slice(rules[:], func(i, j int) bool {
 		return rules[i].Priority > rules[j].Priority
@@ -413,7 +400,7 @@ func formatOutput(fmtr, inp, pth []rune, rules []passthroughRule) (out []rune, e
 		case "passthrough":
 			var pth_out []rune
 			for _, c := range fmtr {
-				if findRune(pth, c) >= 0 {
+				if pth.PosOf(c) >= 0 {
 					pth_out = append(pth_out, c)
 				} else {
 					pth_out = append(pth_out, out[0])
@@ -438,20 +425,20 @@ func formatOutput(fmtr, inp, pth []rune, rules []passthroughRule) (out []rune, e
 }
 
 // encode the key number into a ciphertext
-func encodeKeyNumber(inp, ocs []rune, n, sft int) []rune {
-	idx := findRune(ocs, inp[0])
+func encodeKeyNumber(inp []rune, ocs *algo.Alphabet, n, sft int) []rune {
+	idx := ocs.PosOf(inp[0])
 	idx += n << sft
 
-	inp[0] = ocs[idx]
+	inp[0] = ocs.ValAt(idx)
 	return inp
 }
 
 // recover the key number from a ciphertext
-func decodeKeyNumber(inp, ocs []rune, sft int) ([]rune, int) {
-	c := findRune(ocs, inp[0])
+func decodeKeyNumber(inp []rune, ocs *algo.Alphabet, sft int) ([]rune, int) {
+	c := ocs.PosOf(inp[0])
 	n := c >> sft
 
-	inp[0] = ocs[c-(n<<sft)]
+	inp[0] = ocs.ValAt(c - (n << sft))
 	return inp, n
 }
 
@@ -495,7 +482,8 @@ func (fc *fpeContext) getAlgorithm(key, twk []byte) (
 		alg, err = algo.NewFF1(
 			key, twk,
 			fc.ffs.TweakLengthMin, fc.ffs.TweakLengthMax,
-			len(fc.ffs.InputRuneSet), fc.ffs.InputCharacterSet)
+			fc.ffs.InputAlphabet.Len(),
+			fc.ffs.InputCharacterSet)
 	} else {
 		err = errors.New("unsupported algorithm: " + fc.ffs.Algorithm)
 	}
@@ -523,7 +511,6 @@ func (fc *fpeContext) setAlgorithm(kn int) (err error) {
 	}
 
 	fc.algo, err = fc.getAlgorithm(key.key, twk)
-
 	if err == nil {
 		fc.kn = key.num
 	}
@@ -558,7 +545,10 @@ func (fe *FPEncryption) Cipher(pt string, twk []byte) (
 
 	fmtr, ptr, rules, err = formatInput(
 		[]rune(pt),
-		ffs.PassthroughRuneSet, ffs.InputRuneSet, ffs.OutputRuneSet, ffs.PassthroughRules)
+		&ffs.PassthroughAlphabet,
+		&ffs.InputAlphabet,
+		ffs.OutputAlphabet.ValAt(0), ffs.PassthroughRules)
+
 	if err != nil {
 		return
 	}
@@ -578,10 +568,10 @@ func (fe *FPEncryption) Cipher(pt string, twk []byte) (
 		trackingActionEncrypt,
 		1, fe.kn)
 
-	ctr = convertRadix(ctr, ffs.InputRuneSet, ffs.OutputRuneSet)
+	ctr = convertRadix(ctr, &ffs.InputAlphabet, &ffs.OutputAlphabet)
 	ctr = encodeKeyNumber(
-		ctr, ffs.OutputRuneSet, fe.kn, ffs.NumEncodingBits)
-	ctr, err = formatOutput(fmtr, ctr, ffs.PassthroughRuneSet, rules)
+		ctr, &ffs.OutputAlphabet, fe.kn, ffs.NumEncodingBits)
+	ctr, err = formatOutput(fmtr, ctr, &ffs.PassthroughAlphabet, rules)
 
 	return string(ctr), err
 }
@@ -607,7 +597,12 @@ func (fe *FPEncryption) CipherForSearch(pt string, twk []byte) (
 		return
 	}
 
-	fmtr, ptr, rules, err = formatInput([]rune(pt), ffs.PassthroughRuneSet, ffs.InputRuneSet, ffs.OutputRuneSet, ffs.PassthroughRules)
+	fmtr, ptr, rules, err = formatInput(
+		[]rune(pt),
+		&ffs.PassthroughAlphabet,
+		&ffs.InputAlphabet,
+		ffs.OutputAlphabet.ValAt(0),
+		ffs.PassthroughRules)
 	if err != nil {
 		return
 	}
@@ -634,9 +629,11 @@ func (fe *FPEncryption) CipherForSearch(pt string, twk []byte) (
 
 		fe.tracking.AddEvent(fe.papi, ffs.Name, "", trackingActionEncrypt, 1, i)
 
-		ctr = convertRadix(ctr, ffs.InputRuneSet, ffs.OutputRuneSet)
-		ctr = encodeKeyNumber(ctr, ffs.OutputRuneSet, i, ffs.NumEncodingBits)
-		ctr, err = formatOutput(fmtr, ctr, ffs.PassthroughRuneSet, rules)
+		ctr = convertRadix(ctr, &ffs.InputAlphabet, &ffs.OutputAlphabet)
+		ctr = encodeKeyNumber(
+			ctr, &ffs.OutputAlphabet, i, ffs.NumEncodingBits)
+		ctr, err = formatOutput(fmtr, ctr, &ffs.PassthroughAlphabet, rules)
+
 		if err != nil {
 			return
 		}
@@ -677,12 +674,16 @@ func (fd *FPDecryption) Cipher(ct string, twk []byte) (
 
 	fmtr, ctr, rules, err = formatInput(
 		[]rune(ct),
-		ffs.PassthroughRuneSet, ffs.OutputRuneSet, ffs.InputRuneSet, ffs.PassthroughRules)
+		&ffs.PassthroughAlphabet,
+		&ffs.OutputAlphabet,
+		ffs.InputAlphabet.ValAt(0),
+		ffs.PassthroughRules)
+
 	if err != nil {
 		return
 	}
 
-	ctr, kn = decodeKeyNumber(ctr, ffs.OutputRuneSet, ffs.NumEncodingBits)
+	ctr, kn = decodeKeyNumber(ctr, &ffs.OutputAlphabet, ffs.NumEncodingBits)
 	if kn != fd.kn {
 		err = (*fpeContext)(fd).setAlgorithm(kn)
 		if err != nil {
@@ -690,7 +691,7 @@ func (fd *FPDecryption) Cipher(ct string, twk []byte) (
 		}
 	}
 
-	ctr = convertRadix(ctr, ffs.OutputRuneSet, ffs.InputRuneSet)
+	ctr = convertRadix(ctr, &ffs.OutputAlphabet, &ffs.InputAlphabet)
 
 	ptr, err := fd.algo.DecryptRunes(ctr, twk)
 	if err != nil {
@@ -702,7 +703,8 @@ func (fd *FPDecryption) Cipher(ct string, twk []byte) (
 		trackingActionDecrypt,
 		1, fd.kn)
 
-	ptr, err = formatOutput(fmtr, ptr, ffs.PassthroughRuneSet, rules)
+	ptr, err = formatOutput(fmtr, ptr, &ffs.PassthroughAlphabet, rules)
+
 	return string(ptr), err
 }
 
