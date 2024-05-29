@@ -1,7 +1,10 @@
 # Changelog
 
-## TBD - TBD
+## 2.2.0 - 2024-05-29
 * Add partial encryption support
+
+## 0.0.3 / 2.0.0 - 2023-09-20
+* Add support for Structured Encryption
 
 ## 0.0.2 - 2020-10-28
 * Update build instructions
