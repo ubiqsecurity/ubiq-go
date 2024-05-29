@@ -17,4 +17,5 @@ test:
         - apt -y install git golang
     script:
         - go test -v
-        - go build examples/ubiq_sample.go
+        - go build examples/unstructured/ubiq_sample.go
+        - go build examples/structured/ubiq_structured_sample.go

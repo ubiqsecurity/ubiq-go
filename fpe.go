@@ -4,9 +4,11 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math/big"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 
 	algo "gitlab.com/ubiqsecurity/ubiq-fpe-go"
@@ -22,14 +24,22 @@ type ffsInfo struct {
 	OutputAlphabet          algo.Alphabet
 	InputCharacterSet       string `json:"input_character_set"`
 	InputAlphabet           algo.Alphabet
-	InputLengthMin          int    `json:"min_input_length"`
-	InputLengthMax          int    `json:"max_input_length"`
-	NumEncodingBits         int    `json:"msb_encoding_bits"`
-	Salt                    string `json:"salt"`
-	Tweak                   string `json:"tweak"`
-	TweakLengthMax          int    `json:"tweak_max_len"`
-	TweakLengthMin          int    `json:"tweak_min_len"`
-	TweakSource             string `json:"tweak_source"`
+	InputLengthMin          int               `json:"min_input_length"`
+	InputLengthMax          int               `json:"max_input_length"`
+	NumEncodingBits         int               `json:"msb_encoding_bits"`
+	Salt                    string            `json:"salt"`
+	Tweak                   string            `json:"tweak"`
+	TweakLengthMax          int               `json:"tweak_max_len"`
+	TweakLengthMin          int               `json:"tweak_min_len"`
+	TweakSource             string            `json:"tweak_source"`
+	PassthroughRules        []passthroughRule `json:"passthrough_rules"`
+}
+
+type passthroughRule struct {
+	Type     string      `json:"type"`
+	Value    interface{} `json:"value"`
+	Priority int         `json:"priority"`
+	Buffer   []rune
 }
 
 type defKeys struct {
@@ -316,39 +326,114 @@ func convertRadix(inp []rune, ics, ocs *algo.Alphabet) []rune {
 
 // remove passthrough characters from the input and preserve the format
 // so the output can be reformatted after encryption/decryption
-func formatInput(inp []rune, pth, icr *algo.Alphabet, ocr0 rune) (fmtr, out []rune, err error) {
-	fmtr = make([]rune, 0, len(inp))
-	out = make([]rune, 0, len(inp))
+func formatInput(inp []rune, pth *algo.Alphabet, icr *algo.Alphabet, ocr0 rune, rules []passthroughRule) (fmtr []rune, out []rune, updatedRules []passthroughRule, err error) {
+	// Rules may contain updated information (buffer value)
+	updatedRules = rules
 
-	for _, c := range inp {
-		if icr.PosOf(c) >= 0 {
-			fmtr = append(fmtr, ocr0)
-			out = append(out, c)
-		} else if pth.PosOf(c) >= 0 {
-			fmtr = append(fmtr, c)
-		} else {
-			err = errors.New("invalid input character")
+	if pth.Len() > 0 && len(rules) == 0 {
+		var pthRule passthroughRule
+		pthRule.Priority = 1
+		pthRule.Type = "passthrough"
+		pthRule.Value = "legacy"
+		updatedRules = append(updatedRules, pthRule)
+	}
+
+	// Sort the rules by priority (asc)
+	sort.Slice(updatedRules[:], func(i, j int) bool {
+		return updatedRules[i].Priority < updatedRules[j].Priority
+	})
+	out = []rune(inp)
+
+	for idx, rule := range updatedRules {
+		switch rule.Type {
+		case "passthrough":
+			var pthOut []rune
+			// If we don't have a legacy pth Alphabet, create one now with the passthrough rule's Value
+			pthRule := rule.Value.(string)
+			if pth.Len() == 0 && pthRule != "legacy" && len(pthRule) > 0 {
+				pthAlpha, _ := algo.NewAlphabet(pthRule)
+				pth = &pthAlpha
+			}
+			for _, c := range out {
+				if pth.PosOf(c) >= 0 {
+					fmtr = append(fmtr, c)
+				} else {
+					fmtr = append(fmtr, ocr0)
+					pthOut = append(pthOut, c)
+				}
+			}
+			out = pthOut
+		case "prefix":
+			prefix := int(rule.Value.(float64))
+			if prefix > 0 {
+				// Store removed portion in rule.
+				rule.Buffer = out[0:prefix]
+				updatedRules[idx] = rule
+				out = out[prefix:]
+			}
+		case "suffix":
+			suf := int(rule.Value.(float64))
+			if suf > 0 {
+				suffix := len(out) - suf
+				// Store removed portion in rule.
+				rule.Buffer = out[suffix:]
+				updatedRules[idx] = rule
+				out = out[:suffix]
+			}
+		default:
+			err = fmt.Errorf("ubiq go library does not support rule type \"%v\" at this time", rule.Type)
 		}
+	}
+
+	if !validateCharset(out, icr) {
+		err = errors.New("invalid input string character(s)")
 	}
 
 	return
 }
 
-// reinsert passthrough characters into output
-func formatOutput(fmtr, inp []rune, ocr0 rune) (out []rune, err error) {
-	out = make([]rune, 0, len(fmtr))
-
-	for _, c := range fmtr {
-		if c == ocr0 {
-			out = append(out, inp[0])
-			inp = inp[1:]
-		} else {
-			out = append(out, c)
+func validateCharset(input []rune, charset *algo.Alphabet) bool {
+	for _, c := range input {
+		if charset.PosOf(c) == -1 {
+			return false
 		}
 	}
 
-	if len(inp) > 0 {
-		err = errors.New("mismatched format and output strings")
+	return true
+}
+
+// reinsert passthrough characters into output
+func formatOutput(fmtr []rune, inp []rune, pth *algo.Alphabet, rules []passthroughRule) (out []rune, err error) {
+	// Sort the rules by priority (desc)
+	sort.Slice(rules[:], func(i, j int) bool {
+		return rules[i].Priority > rules[j].Priority
+	})
+
+	out = []rune(inp)
+	for _, rule := range rules {
+		switch rule.Type {
+		case "passthrough":
+			var pth_out []rune
+			for _, c := range fmtr {
+				if pth.PosOf(c) >= 0 {
+					pth_out = append(pth_out, c)
+				} else {
+					pth_out = append(pth_out, out[0])
+					out = out[1:]
+				}
+			}
+
+			if len(out) > 0 {
+				err = errors.New("mismatched format and output strings")
+			}
+			out = pth_out
+		case "prefix":
+			out = append(rule.Buffer, out...)
+		case "suffix":
+			out = append(out, rule.Buffer...)
+		default:
+			err = errors.New("invalid rule type")
+		}
 	}
 
 	return
@@ -471,18 +556,20 @@ func (fe *FPEncryption) Cipher(pt string, twk []byte) (
 	var ffs *ffsInfo = &fe.ffs
 
 	var fmtr, ptr, ctr []rune
+	var rules []passthroughRule
 
-	fmtr, ptr, err = formatInput(
+	fmtr, ptr, rules, err = formatInput(
 		[]rune(pt),
 		&ffs.PassthroughAlphabet,
 		&ffs.InputAlphabet,
-		ffs.OutputAlphabet.ValAt(0))
+		ffs.OutputAlphabet.ValAt(0), ffs.PassthroughRules)
+
 	if err != nil {
 		return
 	}
 
 	if len(ptr) < ffs.InputLengthMin || len(ptr) > ffs.InputLengthMax {
-		err = errors.New("input length out of bounds")
+		err = fmt.Errorf("invalid input length (%v) min: %v max %v", len(ptr), ffs.InputLengthMin, ffs.InputLengthMax)
 		return
 	}
 
@@ -499,7 +586,7 @@ func (fe *FPEncryption) Cipher(pt string, twk []byte) (
 	ctr = convertRadix(ctr, &ffs.InputAlphabet, &ffs.OutputAlphabet)
 	ctr = encodeKeyNumber(
 		ctr, &ffs.OutputAlphabet, fe.kn, ffs.NumEncodingBits)
-	ctr, err = formatOutput(fmtr, ctr, ffs.OutputAlphabet.ValAt(0))
+	ctr, err = formatOutput(fmtr, ctr, &ffs.PassthroughAlphabet, rules)
 
 	return string(ctr), err
 }
@@ -513,6 +600,7 @@ func (fe *FPEncryption) CipherForSearch(pt string, twk []byte) (
 	ct []string, err error) {
 	var ffs *ffsInfo = &fe.ffs
 	var fmtr, ptr, ctr []rune
+	var rules []passthroughRule
 
 	deftwk, err := base64.StdEncoding.DecodeString(fe.ffs.Tweak)
 	if err != nil {
@@ -524,11 +612,12 @@ func (fe *FPEncryption) CipherForSearch(pt string, twk []byte) (
 		return
 	}
 
-	fmtr, ptr, err = formatInput(
+	fmtr, ptr, rules, err = formatInput(
 		[]rune(pt),
 		&ffs.PassthroughAlphabet,
 		&ffs.InputAlphabet,
-		ffs.OutputAlphabet.ValAt(0))
+		ffs.OutputAlphabet.ValAt(0),
+		ffs.PassthroughRules)
 	if err != nil {
 		return
 	}
@@ -558,7 +647,8 @@ func (fe *FPEncryption) CipherForSearch(pt string, twk []byte) (
 		ctr = convertRadix(ctr, &ffs.InputAlphabet, &ffs.OutputAlphabet)
 		ctr = encodeKeyNumber(
 			ctr, &ffs.OutputAlphabet, i, ffs.NumEncodingBits)
-		ctr, err = formatOutput(fmtr, ctr, ffs.OutputAlphabet.ValAt(0))
+		ctr, err = formatOutput(fmtr, ctr, &ffs.PassthroughAlphabet, rules)
+
 		if err != nil {
 			return
 		}
@@ -595,12 +685,15 @@ func (fd *FPDecryption) Cipher(ct string, twk []byte) (
 
 	var fmtr, ctr []rune
 	var kn int
+	var rules []passthroughRule
 
-	fmtr, ctr, err = formatInput(
+	fmtr, ctr, rules, err = formatInput(
 		[]rune(ct),
 		&ffs.PassthroughAlphabet,
 		&ffs.OutputAlphabet,
-		ffs.InputAlphabet.ValAt(0))
+		ffs.InputAlphabet.ValAt(0),
+		ffs.PassthroughRules)
+
 	if err != nil {
 		return
 	}
@@ -625,7 +718,8 @@ func (fd *FPDecryption) Cipher(ct string, twk []byte) (
 		trackingActionDecrypt,
 		1, fd.kn)
 
-	ptr, err = formatOutput(fmtr, ptr, ffs.InputAlphabet.ValAt(0))
+	ptr, err = formatOutput(fmtr, ptr, &ffs.PassthroughAlphabet, rules)
+
 	return string(ptr), err
 }
 
