@@ -19,3 +19,12 @@ test:
         - go test -v
         - go build examples/unstructured/ubiq_sample.go
         - go build examples/structured/ubiq_structured_sample.go
+
+sast:
+  stage: test
+
+include:
+  - template: Jobs/SAST.latest.gitlab-ci.yml
+  - template: Jobs/Secret-Detection.gitlab-ci.yml
+#   - template: Jobs/Container-Scanning.gitlab-ci.yml
+  - template: Security/Dependency-Scanning.gitlab-ci.yml
