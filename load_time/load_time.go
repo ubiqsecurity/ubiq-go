@@ -2,11 +2,12 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"slices"
+	"strings"
 	"time"
 
 	"gitlab.com/ubiqsecurity/ubiq-go"
@@ -21,7 +22,8 @@ const (
 // options to the main function
 type parameters struct {
 	maxEncrypt, maxDecrypt, avgEncrypt, avgDecrypt int
-	infile, credfile, profile                      string
+	infile_base, credfile, profile                 string
+	infiles                                        []string
 }
 
 type testCase struct {
@@ -48,8 +50,9 @@ func usage(args ...string) {
 	fmt.Fprintf(os.Stderr, "  -h, -help               Show this help message and exit\n")
 	fmt.Fprintf(os.Stderr, "  -V, -version            Show program's version number and exit\n")
 	fmt.Fprintf(os.Stderr, "\n")
-	fmt.Fprintf(os.Stderr, "  -i, -in                 File to use containing cipher and plain text pairs\n")
-	fmt.Fprintf(os.Stderr, "                            with datasets.\n")
+	fmt.Fprintf(os.Stderr, "  -i, -in                 File(s) to use containing cipher and plain text pairs\n")
+	fmt.Fprintf(os.Stderr, "                            with datasets. Supports asterisk (*) for wildcard in \n")
+	fmt.Fprintf(os.Stderr, "                            path/filename. Directories should end in / \n")
 	fmt.Fprintf(os.Stderr, "  -c CREDENTIALS, -creds CREDENTIALS\n")
 	fmt.Fprintf(os.Stderr, "                          Set the file name with the API credentials\n")
 	fmt.Fprintf(os.Stderr, "                            (default: ~/.ubiq/credentials)\n")
@@ -67,8 +70,9 @@ func usage(args ...string) {
 }
 
 func getopts() (parameters, error) {
-	var help, version bool = false, false
+	var help, version, debug bool = false, false, false
 	var params parameters
+	var err error
 
 	f := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 
@@ -76,6 +80,8 @@ func getopts() (parameters, error) {
 	f.BoolVar(&help, "help", false, "")
 	f.BoolVar(&version, "V", false, "")
 	f.BoolVar(&version, "version", false, "")
+
+	f.BoolVar(&debug, "debug", false, "")
 
 	f.IntVar(&params.maxEncrypt, "E", 0, "")
 	f.IntVar(&params.maxEncrypt, "maxencrypt", 0, "")
@@ -86,8 +92,8 @@ func getopts() (parameters, error) {
 	f.IntVar(&params.avgDecrypt, "d", 0, "")
 	f.IntVar(&params.avgDecrypt, "avgdecrypt", 0, "")
 
-	f.StringVar(&params.infile, "i", "", "")
-	f.StringVar(&params.infile, "in", "", "")
+	f.StringVar(&params.infile_base, "i", "", "")
+	f.StringVar(&params.infile_base, "in", "", "")
 	f.StringVar(&params.credfile, "c", "", "")
 	f.StringVar(&params.credfile, "creds", "", "")
 	f.StringVar(&params.profile, "P", "", "")
@@ -103,8 +109,25 @@ func getopts() (parameters, error) {
 		os.Exit(exitSuccess)
 	}
 
-	if _, err := os.Stat(params.infile); errors.Is(err, os.ErrNotExist) {
+	var foundFiles []string
+	// If last character is `/`, it's a directory. Otherwise assume it's a file.
+	if params.infile_base[len(params.infile_base)-1:] == "/" {
+		foundFiles, err = filepath.Glob(fmt.Sprintf("%v*", params.infile_base))
+	} else {
+		foundFiles, err = filepath.Glob(params.infile_base)
+	}
+
+	if len(foundFiles) == 0 || foundFiles == nil {
+		return params, fmt.Errorf("unable to find any files with the pattern: %v", params.infile_base)
+	}
+	if err != nil {
 		return params, err
+	}
+
+	params.infiles = append(params.infiles, foundFiles[:]...)
+
+	if debug {
+		fmt.Printf("Found files: \n%v\n", strings.Join(params.infiles, "\n"))
 	}
 
 	return params, nil
@@ -114,68 +137,73 @@ func load_test(creds ubiq.Credentials, params parameters) error {
 	encDatasets := make(map[string]timerdata)
 	decDatasets := make(map[string]timerdata)
 
-	content, err := os.ReadFile(params.infile)
-	if err != nil {
-		return err
-	}
-
-	var testCases []testCase
-	err = json.Unmarshal(content, &testCases)
-	if err != nil {
-		return err
-	}
-
 	count := 0
-
-	for _, c := range testCases {
-		datasetName := c.Dataset
-		_, ok := encDatasets[datasetName]
-		if !ok {
-			ubiq.FPEncrypt(creds, datasetName, c.Plaintext, nil)
-			ubiq.FPDecrypt(creds, datasetName, c.Ciphertext, nil)
-			encDatasets[datasetName] = timerdata{ElapsedTimes: make([]int, 0), Count: 0}
-			decDatasets[datasetName] = timerdata{ElapsedTimes: make([]int, 0), Count: 0}
+	for _, infile := range params.infiles {
+		fmt.Printf("Loading file: %v\n", infile)
+		content, err := os.ReadFile(infile)
+		if err != nil {
+			if strings.Contains(fmt.Sprintf("%v", err), "is a directory") {
+				return fmt.Errorf("%v is a directory. Ensure directory paths end in /", infile)
+			}
+			return err
 		}
 
-		startEnc := time.Now()
-		ct, err := ubiq.FPEncrypt(creds, datasetName, c.Plaintext, nil)
-		endEnc := time.Now()
-		encElapsed := endEnc.Sub(startEnc)
-
+		var testCases []testCase
+		err = json.Unmarshal(content, &testCases)
 		if err != nil {
 			return err
 		}
 
-		if c.Ciphertext != ct {
-			return fmt.Errorf("ciphertext did not match encrypted plaintext '%s' != '%s'", c.Ciphertext, ct)
+		for _, c := range testCases {
+			datasetName := c.Dataset
+			_, ok := encDatasets[datasetName]
+			if !ok {
+				ubiq.FPEncrypt(creds, datasetName, c.Plaintext, nil)
+				ubiq.FPDecrypt(creds, datasetName, c.Ciphertext, nil)
+				encDatasets[datasetName] = timerdata{ElapsedTimes: make([]int, 0), Count: 0}
+				decDatasets[datasetName] = timerdata{ElapsedTimes: make([]int, 0), Count: 0}
+			}
+
+			startEnc := time.Now()
+			ct, err := ubiq.FPEncrypt(creds, datasetName, c.Plaintext, nil)
+			endEnc := time.Now()
+			encElapsed := endEnc.Sub(startEnc)
+
+			if err != nil {
+				return err
+			}
+
+			if c.Ciphertext != ct {
+				return fmt.Errorf("ciphertext did not match encrypted plaintext '%s' != '%s'", c.Ciphertext, ct)
+			}
+
+			if encSet, ok := encDatasets[datasetName]; ok {
+				encSet.ElapsedTimes = append(encSet.ElapsedTimes, int(encElapsed)/1000)
+				encSet.Count += 1
+				encDatasets[datasetName] = encSet
+			}
+
+			startDec := time.Now()
+			pt, err := ubiq.FPDecrypt(creds, datasetName, c.Ciphertext, nil)
+			endDec := time.Now()
+			decElapsed := endDec.Sub(startDec)
+
+			if err != nil {
+				return err
+			}
+
+			if c.Plaintext != pt {
+				return fmt.Errorf("plaintext did not match decrypted ciphertext '%s' != '%s'", c.Plaintext, pt)
+			}
+
+			if decSet, ok := decDatasets[datasetName]; ok {
+				decSet.ElapsedTimes = append(decSet.ElapsedTimes, int(decElapsed)/1000)
+				decSet.Count += 1
+				decDatasets[datasetName] = decSet
+			}
+
+			count += 1
 		}
-
-		if encSet, ok := encDatasets[datasetName]; ok {
-			encSet.ElapsedTimes = append(encSet.ElapsedTimes, int(encElapsed)/1000)
-			encSet.Count += 1
-			encDatasets[datasetName] = encSet
-		}
-
-		startDec := time.Now()
-		pt, err := ubiq.FPDecrypt(creds, datasetName, c.Ciphertext, nil)
-		endDec := time.Now()
-		decElapsed := endDec.Sub(startDec)
-
-		if err != nil {
-			return err
-		}
-
-		if c.Plaintext != pt {
-			return fmt.Errorf("plaintext did not match decrypted ciphertext '%s' != '%s'", c.Plaintext, pt)
-		}
-
-		if decSet, ok := decDatasets[datasetName]; ok {
-			decSet.ElapsedTimes = append(decSet.ElapsedTimes, int(decElapsed)/1000)
-			decSet.Count += 1
-			decDatasets[datasetName] = decSet
-		}
-
-		count += 1
 	}
 
 	fmt.Printf("Encrypt records count: %v. Times in microseconds\n", count)
@@ -262,7 +290,7 @@ func main() {
 	// called from this function in response to any errors
 	err := _main(getopts())
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
+		fmt.Fprintf(os.Stderr, "Error encountered: %v\n", err)
 		os.Exit(exitFailure)
 	}
 }

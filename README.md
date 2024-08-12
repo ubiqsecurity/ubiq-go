@@ -167,6 +167,25 @@ if err != nil {
 fmt.Fprintf(os.Stdout, "ENCRYPTED cipher= %s \n", cipherText)
 ```
 
+#### Encrypt for Search
+
+The same plaintext data will result in different cipher text when encrypted using different data keys. The Encrypt For Search function will encrypt the same plain text for a given dataset using all previously used data keys. This will provide a collection of cipher text values that can be used when searching for existing records where the data was encrypted and the specific version of the data key is not known in advance.
+
+```go
+credentials, _ := ubiq.NewCredentials()
+
+datasetName := "SSN"
+plainText := "999-01-2345"
+
+var cipherTextArr, err := ubiq.FPEncryptForSearch(credentials, datasetName, plainText)
+if err != nil {
+        return err
+}
+
+fmt.Fprintf(os.Stdout, "ENCRYPTED cipher= %v \n", cipherTextArr)
+// ENCRYPTED cipher= ["000-03-OJMp", "100-0B-dnKG", "200-12-NOx5", "300-0j-esgH"]
+```
+
 #### Decrypt
 
 Pass credentials, the name of a structured dataset, and data into the decryption function.
