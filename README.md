@@ -159,7 +159,7 @@ credentials, _ := ubiq.NewCredentials()
 datasetName := "SSN"
 plainText := "999-01-2345"
 
-var cipherText, err := ubiq.FPEncrypt(credentials, datasetName, plainText)
+var cipherText, err := ubiq.StructuredEncrypt(credentials, datasetName, plainText)
 if err != nil {
         return err
 }
@@ -177,7 +177,7 @@ credentials, _ := ubiq.NewCredentials()
 datasetName := "SSN"
 plainText := "999-01-2345"
 
-var cipherTextArr, err := ubiq.FPEncryptForSearch(credentials, datasetName, plainText)
+var cipherTextArr, err := ubiq.StructuredEncryptForSearch(credentials, datasetName, plainText)
 if err != nil {
         return err
 }
@@ -197,7 +197,7 @@ credentials, _ := ubiq.NewCredentials()
 datasetName := "SSN"
 cipherText := "300-0E-274t"
 
-var plainText, err := ubiq.FPDecrypt(credentials, datasetName, cipherText)
+var plainText, err := ubiq.StructuredDecrypt(credentials, datasetName, cipherText)
 if err != nil {
         return err
 }

@@ -11,19 +11,19 @@ import (
 	"sort"
 	"strconv"
 
-	algo "gitlab.com/ubiqsecurity/ubiq-fpe-go"
+	"gitlab.com/ubiqsecurity/ubiq-go/structured"
 )
 
-type ffsInfo struct {
+type datasetInfo struct {
 	Name                    string `json:"name"`
 	Type                    string `json:"fpe_definable_type"`
 	Algorithm               string `json:"encryption_algorithm"`
 	PassthroughCharacterSet string `json:"passthrough"`
-	PassthroughAlphabet     algo.Alphabet
+	PassthroughAlphabet     structured.Alphabet
 	OutputCharacterSet      string `json:"output_character_set"`
-	OutputAlphabet          algo.Alphabet
+	OutputAlphabet          structured.Alphabet
 	InputCharacterSet       string `json:"input_character_set"`
-	InputAlphabet           algo.Alphabet
+	InputAlphabet           structured.Alphabet
 	InputLengthMin          int               `json:"min_input_length"`
 	InputLengthMax          int               `json:"max_input_length"`
 	NumEncodingBits         int               `json:"msb_encoding_bits"`
@@ -43,21 +43,21 @@ type passthroughRule struct {
 }
 
 type defKeys struct {
-	CurrentKeyNum       int      `json:"current_key_number"`
-	EncryptedPrivateKey string   `json:"encrypted_private_key"`
-	FFS                 ffsInfo  `json:"ffs"`
-	EncryptedDataKeys   []string `json:"keys"`
-	Retrieved           float32  `json:"retrieved"`
+	CurrentKeyNum       int         `json:"current_key_number"`
+	EncryptedPrivateKey string      `json:"encrypted_private_key"`
+	Dataset             datasetInfo `json:"ffs"`
+	EncryptedDataKeys   []string    `json:"keys"`
+	Retrieved           float32     `json:"retrieved"`
 }
 
 // this interface was created so that it could be placed into
-// the fpeContext so that fpeContext could be used in both encryption
+// the structuredContext so that structuredContext could be used in both encryption
 // and decryption operations
 //
 // its a convenience for this code and should follow whatever interfaces
 // are provided by the underlying library rather than dictating what
 // the underlying library should look like/present
-type fpeAlgorithm interface {
+type structuredAlgorithm interface {
 	// the encrypt and decrypt interfaces aren't used because,
 	// internally, it's easier to deal with runes and avoid the
 	// back and forth conversions to strings
@@ -68,105 +68,105 @@ type fpeAlgorithm interface {
 	DecryptRunes([]rune, []byte) ([]rune, error)
 }
 
-type fpeContext struct {
+type structuredContext struct {
 	// object/data for dealing with the server
 	client           httpClient
 	host, papi, srsa string
 
 	// information about the format of the data
-	ffs ffsInfo
+	dataset datasetInfo
 
 	// the key number and algorithm
 	// a key number of -1 indicates that the key
 	// number and algorithm are not set
 	kn   int
-	algo fpeAlgorithm
+	algo structuredAlgorithm
 
 	tracking trackingContext
 }
 
-type fpeKey struct {
+type structuredKey struct {
 	num int
 	key []byte
 }
 
 // Reusable object to preserve context across
 // multiple encryptions using the same format
-type FPEncryption fpeContext
+type StructuredEncryption structuredContext
 
 // Reusable object to preserve context across
 // multiple decryptions using the same format
-type FPDecryption fpeContext
+type StructuredDecryption structuredContext
 
-// ffsCache is indexed first by the public api key and then
+// datasetCache is indexed first by the public api key and then
 // by the format name. objects in the map(s) are stored as
 // pointers to reduce the expense of fetching them, and also
 // so that they can be updated in place.
-var ffsCache map[string]*map[string]*ffsInfo
+var datasetCache map[string]*map[string]*datasetInfo
 
-func fetchFFS(client *httpClient, host, papi, name string) (ffsInfo, error) {
+func fetchDataset(client *httpClient, host, papi, name string) (datasetInfo, error) {
 	var err error
 	var ok bool
 
-	if ffsCache == nil {
-		ffsCache = make(map[string]*map[string]*ffsInfo)
+	if datasetCache == nil {
+		datasetCache = make(map[string]*map[string]*datasetInfo)
 	}
 
-	if _, ok = ffsCache[papi]; !ok {
-		m := make(map[string]*ffsInfo)
-		ffsCache[papi] = &m
+	if _, ok = datasetCache[papi]; !ok {
+		m := make(map[string]*datasetInfo)
+		datasetCache[papi] = &m
 	}
 
-	if _, ok = (*ffsCache[papi])[name]; !ok {
+	if _, ok = (*datasetCache[papi])[name]; !ok {
 		var query = "ffs_name=" + url.QueryEscape(name) + "&" +
 			"papi=" + url.QueryEscape(papi)
 
 		var rsp *http.Response
-		var ffs *ffsInfo
+		var dataset *datasetInfo
 
 		rsp, err = client.Get(host + "/api/v0/ffs?" + query)
 		if err != nil {
-			return ffsInfo{}, err
+			return datasetInfo{}, err
 		}
 		defer rsp.Body.Close()
 
 		if rsp.StatusCode == http.StatusOK {
-			ffs = new(ffsInfo)
-			err = json.NewDecoder(rsp.Body).Decode(ffs)
+			dataset = new(datasetInfo)
+			err = json.NewDecoder(rsp.Body).Decode(dataset)
 		} else {
 			err = errors.New("unexpected response: " + rsp.Status)
 		}
 		if err != nil {
-			return ffsInfo{}, err
+			return datasetInfo{}, err
 		}
 
 		if err == nil {
 			// convert the character string to arrays of runes
 			// to enable unicode handling
-			ffs.PassthroughAlphabet, _ =
-				algo.NewAlphabet(ffs.PassthroughCharacterSet)
-			ffs.OutputAlphabet, _ =
-				algo.NewAlphabet(ffs.OutputCharacterSet)
-			ffs.InputAlphabet, _ =
-				algo.NewAlphabet(ffs.InputCharacterSet)
+			dataset.PassthroughAlphabet, _ =
+				structured.NewAlphabet(dataset.PassthroughCharacterSet)
+			dataset.OutputAlphabet, _ =
+				structured.NewAlphabet(dataset.OutputCharacterSet)
+			dataset.InputAlphabet, _ =
+				structured.NewAlphabet(dataset.InputCharacterSet)
 		}
 
-		(*ffsCache[papi])[name] = ffs
+		(*datasetCache[papi])[name] = dataset
 	}
 
-	return *(*ffsCache[papi])[name], nil
+	return *(*datasetCache[papi])[name], nil
 }
 
-func flushFFS(papi, name *string) {
-	if ffsCache == nil {
-		ffsCache = make(map[string]*map[string]*ffsInfo)
+func flushDataset(papi, name *string) {
+	if datasetCache == nil {
+		datasetCache = make(map[string]*map[string]*datasetInfo)
 	}
 
 	if papi == nil {
-		ffsCache = make(map[string]*map[string]*ffsInfo)
-	} else if m, ok := ffsCache[*papi]; ok {
+		datasetCache = make(map[string]*map[string]*datasetInfo)
+	} else if m, ok := datasetCache[*papi]; ok {
 		if name == nil {
-			delete(ffsCache, *papi)
+			delete(datasetCache, *papi)
 		} else if _, ok := (*m)[*name]; ok {
 			delete(*m, *name)
 		}
@@ -177,22 +177,22 @@ func flushFFS(papi, name *string) {
 // and finally by the key number. items in the map are pointers
 // to allow updating in place and more efficient fetching (e.g.
 // pointers instead of copies of the objects)
-var keyCache map[string](*map[string](*map[int]*fpeKey))
+var keyCache map[string](*map[string](*map[int]*structuredKey))
 
 func fetchKey(client *httpClient, host, papi, srsa, name string, n int) (
-	fpeKey, error) {
+	structuredKey, error) {
 	var ok bool
 	var err error
 
 	if keyCache == nil {
-		keyCache = make(map[string](*map[string](*map[int]*fpeKey)))
+		keyCache = make(map[string](*map[string](*map[int]*structuredKey)))
 	}
 	if _, ok = keyCache[papi]; !ok {
-		m := make(map[string](*map[int]*fpeKey))
+		m := make(map[string](*map[int]*structuredKey))
 		keyCache[papi] = &m
 	}
 	if _, ok = (*keyCache[papi])[name]; !ok {
-		m := make(map[int]*fpeKey)
+		m := make(map[int]*structuredKey)
 		(*keyCache[papi])[name] = &m
 	}
 
@@ -200,7 +200,7 @@ func fetchKey(client *httpClient, host, papi, srsa, name string, n int) (
 		var query = "ffs_name=" + url.QueryEscape(name) + "&" +
 			"papi=" + url.QueryEscape(papi)
 
-		var key fpeKey
+		var key structuredKey
 		var rsp *http.Response
 		var obj struct {
 			EPK string `json:"encrypted_private_key"`
@@ -214,7 +214,7 @@ func fetchKey(client *httpClient, host, papi, srsa, name string, n int) (
 
 		rsp, err = client.Get(host + "/api/v0/fpe/key?" + query)
 		if err != nil {
-			return fpeKey{}, err
+			return structuredKey{}, err
 		}
 		defer rsp.Body.Close()
 
@@ -224,13 +224,13 @@ func fetchKey(client *httpClient, host, papi, srsa, name string, n int) (
 			err = errors.New("unexpected response: " + rsp.Status)
 		}
 		if err != nil {
-			return fpeKey{}, err
+			return structuredKey{}, err
 		}
 
 		key.num, _ = strconv.Atoi(obj.Num)
 		key.key, err = unwrapDataKey(obj.WDK, obj.EPK, srsa)
 		if err != nil {
-			return fpeKey{}, err
+			return structuredKey{}, err
 		}
 
 		(*(*keyCache[papi])[name])[key.num] = &key
@@ -243,7 +243,7 @@ func fetchKey(client *httpClient, host, papi, srsa, name string, n int) (
 }
 
 func fetchAllKeys(client *httpClient, host, papi, srsa, name string) (
-	keys []fpeKey, err error) {
+	keys []structuredKey, err error) {
 	var query = "ffs_name=" + url.QueryEscape(name) + "&" +
 		"papi=" + url.QueryEscape(papi)
 
@@ -265,21 +265,21 @@ func fetchAllKeys(client *httpClient, host, papi, srsa, name string) (
 	}
 
 	if keyCache == nil {
-		keyCache = make(map[string](*map[string](*map[int]*fpeKey)))
+		keyCache = make(map[string](*map[string](*map[int]*structuredKey)))
 	}
 	if _, ok = keyCache[papi]; !ok {
-		m := make(map[string](*map[int]*fpeKey))
+		m := make(map[string](*map[int]*structuredKey))
 		keyCache[papi] = &m
 	}
 	if _, ok = (*keyCache[papi])[name]; !ok {
-		m := make(map[int]*fpeKey)
+		m := make(map[int]*structuredKey)
 		(*keyCache[papi])[name] = &m
 	}
 
-	keys = make([]fpeKey, len(js[name].EncryptedDataKeys))
+	keys = make([]structuredKey, len(js[name].EncryptedDataKeys))
 	for i := range js[name].EncryptedDataKeys {
 		if _, ok := (*(*keyCache[papi])[name])[i]; !ok {
-			var key fpeKey
+			var key structuredKey
 
 			key.num = i
 			key.key, err = decryptDataKey(
@@ -299,10 +299,10 @@ func fetchAllKeys(client *httpClient, host, papi, srsa, name string) (
 
 func flushKey(papi, name *string, n int) {
 	if keyCache == nil {
-		keyCache = make(map[string](*map[string](*map[int]*fpeKey)))
+		keyCache = make(map[string](*map[string](*map[int]*structuredKey)))
 	}
 	if papi == nil {
-		keyCache = make(map[string](*map[string](*map[int]*fpeKey)))
+		keyCache = make(map[string](*map[string](*map[int]*structuredKey)))
 	} else if _, ok := keyCache[*papi]; ok {
 		if name == nil {
 			delete(keyCache, *papi)
@@ -318,15 +318,15 @@ func flushKey(papi, name *string, n int) {
 
 // convert a string representation of a number (@inp) in the radix/alphabet
 // described by @ics to the radix/alphabet described by @ocs
-func convertRadix(inp []rune, ics, ocs *algo.Alphabet) []rune {
+func convertRadix(inp []rune, ics, ocs *structured.Alphabet) []rune {
 	var n *big.Int = big.NewInt(0)
-	return algo.BigIntToRunes(ocs,
-		algo.RunesToBigInt(n, ics, inp), len(inp))
+	return structured.BigIntToRunes(ocs,
+		structured.RunesToBigInt(n, ics, inp), len(inp))
 }
 
 // remove passthrough characters from the input and preserve the format
 // so the output can be reformatted after encryption/decryption
-func formatInput(inp []rune, pth *algo.Alphabet, icr *algo.Alphabet, ocr0 rune, rules []passthroughRule) (fmtr []rune, out []rune, updatedRules []passthroughRule, err error) {
+func formatInput(inp []rune, pth *structured.Alphabet, icr *structured.Alphabet, ocr0 rune, rules []passthroughRule) (fmtr []rune, out []rune, updatedRules []passthroughRule, err error) {
 	// Rules may contain updated information (buffer value)
 	updatedRules = rules
 
@@ -351,7 +351,7 @@ func formatInput(inp []rune, pth *algo.Alphabet, icr *algo.Alphabet, ocr0 rune, 
 			// If we don't have a legacy pth Alphabet, create one now with the passthrough rule's Value
 			pthRule := rule.Value.(string)
 			if pth.Len() == 0 && pthRule != "legacy" && len(pthRule) > 0 {
-				pthAlpha, _ := algo.NewAlphabet(pthRule)
+				pthAlpha, _ := structured.NewAlphabet(pthRule)
 				pth = &pthAlpha
 			}
 			for _, c := range out {
@@ -392,7 +392,7 @@ func formatInput(inp []rune, pth *algo.Alphabet, icr *algo.Alphabet, ocr0 rune, 
 	return
 }
 
-func validateCharset(input []rune, charset *algo.Alphabet) bool {
+func validateCharset(input []rune, charset *structured.Alphabet) bool {
 	for _, c := range input {
 		if charset.PosOf(c) == -1 {
 			return false
@@ -403,7 +403,7 @@ func validateCharset(input []rune, charset *algo.Alphabet) bool {
 }
 
 // reinsert passthrough characters into output
-func formatOutput(fmtr []rune, inp []rune, pth *algo.Alphabet, rules []passthroughRule) (out []rune, err error) {
+func formatOutput(fmtr []rune, inp []rune, pth *structured.Alphabet, rules []passthroughRule) (out []rune, err error) {
 	// Sort the rules by priority (desc)
 	sort.Slice(rules[:], func(i, j int) bool {
 		return rules[i].Priority > rules[j].Priority
@@ -440,7 +440,7 @@ func formatOutput(fmtr []rune, inp []rune, pth *algo.Alphabet, rules []passthrou
 }
 
 // encode the key number into a ciphertext
-func encodeKeyNumber(inp []rune, ocs *algo.Alphabet, n, sft int) []rune {
+func encodeKeyNumber(inp []rune, ocs *structured.Alphabet, n, sft int) []rune {
 	idx := ocs.PosOf(inp[0])
 	idx += n << sft
 
@@ -449,7 +449,7 @@ func encodeKeyNumber(inp []rune, ocs *algo.Alphabet, n, sft int) []rune {
 }
 
 // recover the key number from a ciphertext
-func decodeKeyNumber(inp []rune, ocs *algo.Alphabet, sft int) ([]rune, int) {
+func decodeKeyNumber(inp []rune, ocs *structured.Alphabet, sft int) ([]rune, int) {
 	c := ocs.PosOf(inp[0])
 	n := c >> sft
 
@@ -458,25 +458,25 @@ func decodeKeyNumber(inp []rune, ocs *algo.Alphabet, sft int) ([]rune, int) {
 }
 
 // retrieve the format information from the server
-func (fc *fpeContext) getFFSInfo(name string) (ffs ffsInfo, err error) {
-	return fetchFFS(&fc.client, fc.host, fc.papi, name)
+func (fc *structuredContext) getDatasetInfo(name string) (dataset datasetInfo, err error) {
+	return fetchDataset(&fc.client, fc.host, fc.papi, name)
 }
 
 // retrieve the key from the server
-func (fc *fpeContext) getKey(kn int) (key fpeKey, err error) {
+func (fc *structuredContext) getKey(kn int) (key structuredKey, err error) {
 	return fetchKey(&fc.client,
 		fc.host, fc.papi, fc.srsa,
-		fc.ffs.Name, kn)
+		fc.dataset.Name, kn)
 }
 
-func (fc *fpeContext) getAllKeys() (keys []fpeKey, err error) {
+func (fc *structuredContext) getAllKeys() (keys []structuredKey, err error) {
 	return fetchAllKeys(&fc.client,
 		fc.host, fc.papi, fc.srsa,
-		fc.ffs.Name)
+		fc.dataset.Name)
 }
 
-func newFPEContext(c Credentials, ffs string) (fc *fpeContext, err error) {
-	fc = new(fpeContext)
+func newStructuredContext(c Credentials, dataset string) (fc *structuredContext, err error) {
+	fc = new(structuredContext)
 
 	fc.client = newHttpClient(c)
 
@@ -486,21 +486,21 @@ func newFPEContext(c Credentials, ffs string) (fc *fpeContext, err error) {
 
 	fc.kn = -1
 
-	fc.ffs, err = fc.getFFSInfo(ffs)
+	fc.dataset, err = fc.getDatasetInfo(dataset)
 
 	return
 }
 
-func (fc *fpeContext) getAlgorithm(key, twk []byte) (
-	alg fpeAlgorithm, err error) {
-	if fc.ffs.Algorithm == "FF1" {
-		alg, err = algo.NewFF1(
+func (fc *structuredContext) getAlgorithm(key, twk []byte) (
+	alg structuredAlgorithm, err error) {
+	if fc.dataset.Algorithm == "FF1" {
+		alg, err = structured.NewFF1(
 			key, twk,
-			fc.ffs.TweakLengthMin, fc.ffs.TweakLengthMax,
-			fc.ffs.InputAlphabet.Len(),
-			fc.ffs.InputCharacterSet)
+			fc.dataset.TweakLengthMin, fc.dataset.TweakLengthMax,
+			fc.dataset.InputAlphabet.Len(),
+			fc.dataset.InputCharacterSet)
 	} else {
-		err = errors.New("unsupported algorithm: " + fc.ffs.Algorithm)
+		err = errors.New("unsupported algorithm: " + fc.dataset.Algorithm)
 	}
 
 	return
@@ -511,11 +511,11 @@ func (fc *fpeContext) getAlgorithm(key, twk []byte) (
 // for encryption this can be done right away as the key number is
 // unknown. for decryption, it can't be done until the ciphertext
 // has been presented and the key number decoded from it
-func (fc *fpeContext) setAlgorithm(kn int) (err error) {
+func (fc *structuredContext) setAlgorithm(kn int) (err error) {
 	var twk []byte
-	var key fpeKey
+	var key structuredKey
 
-	twk, err = base64.StdEncoding.DecodeString(fc.ffs.Tweak)
+	twk, err = base64.StdEncoding.DecodeString(fc.dataset.Tweak)
 	if err != nil {
 		return
 	}
@@ -535,41 +535,41 @@ func (fc *fpeContext) setAlgorithm(kn int) (err error) {
 
 // Create a new format preserving encryption object. The returned object
 // can be reused to encrypt multiple plaintexts using the format (and
-// algorithm and key) named by @ffs
-func NewFPEncryption(c Credentials, ffs string) (*FPEncryption, error) {
-	fc, err := newFPEContext(c, ffs)
+// algorithm and key) named by @dataset
+func NewStructuredEncryption(c Credentials, dataset string) (*StructuredEncryption, error) {
+	fc, err := newStructuredContext(c, dataset)
 	if err == nil {
 		err = fc.setAlgorithm(-1)
 	}
 	if err == nil {
 		fc.tracking = newTrackingContext(fc.client, fc.host)
 	}
-	return (*FPEncryption)(fc), err
+	return (*StructuredEncryption)(fc), err
 }
 
 // Encrypt a plaintext string using the key, algorithm, and format
 // preserving parameters defined by the encryption object.
 //
 // @twk may be nil, in which case, the default will be used
-func (fe *FPEncryption) Cipher(pt string, twk []byte) (
+func (fe *StructuredEncryption) Cipher(pt string, twk []byte) (
 	ct string, err error) {
-	var ffs *ffsInfo = &fe.ffs
+	var dataset *datasetInfo = &fe.dataset
 
 	var fmtr, ptr, ctr []rune
 	var rules []passthroughRule
 
 	fmtr, ptr, rules, err = formatInput(
 		[]rune(pt),
-		&ffs.PassthroughAlphabet,
-		&ffs.InputAlphabet,
-		ffs.OutputAlphabet.ValAt(0), ffs.PassthroughRules)
+		&dataset.PassthroughAlphabet,
+		&dataset.InputAlphabet,
+		dataset.OutputAlphabet.ValAt(0), dataset.PassthroughRules)
 
 	if err != nil {
 		return
 	}
 
-	if len(ptr) < ffs.InputLengthMin || len(ptr) > ffs.InputLengthMax {
-		err = fmt.Errorf("invalid input length (%v) min: %v max %v", len(ptr), ffs.InputLengthMin, ffs.InputLengthMax)
+	if len(ptr) < dataset.InputLengthMin || len(ptr) > dataset.InputLengthMax {
+		err = fmt.Errorf("invalid input length (%v) min: %v max %v", len(ptr), dataset.InputLengthMin, dataset.InputLengthMax)
 		return
 	}
 
@@ -579,14 +579,14 @@ func (fe *FPEncryption) Cipher(pt string, twk []byte) (
 	}
 
 	fe.tracking.AddEvent(
-		fe.papi, ffs.Name, "",
+		fe.papi, dataset.Name, "",
 		trackingActionEncrypt,
 		1, fe.kn)
 
-	ctr = convertRadix(ctr, &ffs.InputAlphabet, &ffs.OutputAlphabet)
+	ctr = convertRadix(ctr, &dataset.InputAlphabet, &dataset.OutputAlphabet)
 	ctr = encodeKeyNumber(
-		ctr, &ffs.OutputAlphabet, fe.kn, ffs.NumEncodingBits)
-	ctr, err = formatOutput(fmtr, ctr, &ffs.PassthroughAlphabet, rules)
+		ctr, &dataset.OutputAlphabet, fe.kn, dataset.NumEncodingBits)
+	ctr, err = formatOutput(fmtr, ctr, &dataset.PassthroughAlphabet, rules)
 
 	return string(ctr), err
 }
@@ -596,32 +596,32 @@ func (fe *FPEncryption) Cipher(pt string, twk []byte) (
 // encryption object.
 //
 // @twk may be nil, in which case, the default will be used
-func (fe *FPEncryption) CipherForSearch(pt string, twk []byte) (
+func (fe *StructuredEncryption) CipherForSearch(pt string, twk []byte) (
 	ct []string, err error) {
-	var ffs *ffsInfo = &fe.ffs
+	var dataset *datasetInfo = &fe.dataset
 	var fmtr, ptr, ctr []rune
 	var rules []passthroughRule
 
-	deftwk, err := base64.StdEncoding.DecodeString(fe.ffs.Tweak)
+	deftwk, err := base64.StdEncoding.DecodeString(fe.dataset.Tweak)
 	if err != nil {
 		return
 	}
 
-	keys, err := ((*fpeContext)(fe)).getAllKeys()
+	keys, err := ((*structuredContext)(fe)).getAllKeys()
 	if err != nil {
 		return
 	}
 
 	fmtr, ptr, rules, err = formatInput(
 		[]rune(pt),
-		&ffs.PassthroughAlphabet,
-		&ffs.InputAlphabet,
-		ffs.OutputAlphabet.ValAt(0),
-		ffs.PassthroughRules)
+		&dataset.PassthroughAlphabet,
+		&dataset.InputAlphabet,
+		dataset.OutputAlphabet.ValAt(0),
+		dataset.PassthroughRules)
 	if err != nil {
 		return
 	}
-	if len(ptr) < ffs.InputLengthMin || len(ptr) > ffs.InputLengthMax {
+	if len(ptr) < dataset.InputLengthMin || len(ptr) > dataset.InputLengthMax {
 		err = errors.New("input length out of bounds")
 		return
 	}
@@ -629,9 +629,9 @@ func (fe *FPEncryption) CipherForSearch(pt string, twk []byte) (
 	ct = make([]string, len(keys))
 	_ptr := make([]rune, len(ptr))
 	for i := range keys {
-		var alg fpeAlgorithm
+		var alg structuredAlgorithm
 
-		alg, err = ((*fpeContext)(fe)).getAlgorithm(keys[i].key, deftwk)
+		alg, err = ((*structuredContext)(fe)).getAlgorithm(keys[i].key, deftwk)
 		if err != nil {
 			return
 		}
@@ -642,12 +642,12 @@ func (fe *FPEncryption) CipherForSearch(pt string, twk []byte) (
 			return
 		}
 
-		fe.tracking.AddEvent(fe.papi, ffs.Name, "", trackingActionEncrypt, 1, i)
+		fe.tracking.AddEvent(fe.papi, dataset.Name, "", trackingActionEncrypt, 1, i)
 
-		ctr = convertRadix(ctr, &ffs.InputAlphabet, &ffs.OutputAlphabet)
+		ctr = convertRadix(ctr, &dataset.InputAlphabet, &dataset.OutputAlphabet)
 		ctr = encodeKeyNumber(
-			ctr, &ffs.OutputAlphabet, i, ffs.NumEncodingBits)
-		ctr, err = formatOutput(fmtr, ctr, &ffs.PassthroughAlphabet, rules)
+			ctr, &dataset.OutputAlphabet, i, dataset.NumEncodingBits)
+		ctr, err = formatOutput(fmtr, ctr, &dataset.PassthroughAlphabet, rules)
 
 		if err != nil {
 			return
@@ -659,19 +659,19 @@ func (fe *FPEncryption) CipherForSearch(pt string, twk []byte) (
 	return
 }
 
-func (fe *FPEncryption) Close() {
+func (fe *StructuredEncryption) Close() {
 	fe.tracking.Close()
 }
 
 // Create a new format preserving decryption object. The returned object
 // can be reused to decrypt multiple ciphertexts using the format (and
-// algorithm and key) named by @ffs
-func NewFPDecryption(c Credentials, ffs string) (*FPDecryption, error) {
-	fc, err := newFPEContext(c, ffs)
+// algorithm and key) named by @dataset
+func NewStructuredDecryption(c Credentials, dataset string) (*StructuredDecryption, error) {
+	fc, err := newStructuredContext(c, dataset)
 	if err == nil {
 		fc.tracking = newTrackingContext(fc.client, fc.host)
 	}
-	return (*FPDecryption)(fc), err
+	return (*StructuredDecryption)(fc), err
 }
 
 // Decrypt a ciphertext string using the key, algorithm, and format
@@ -679,9 +679,9 @@ func NewFPDecryption(c Credentials, ffs string) (*FPDecryption, error) {
 //
 // @twk may be nil, in which case, the default will be used. Regardless,
 // the tweak must match the one used during encryption of the plaintext
-func (fd *FPDecryption) Cipher(ct string, twk []byte) (
+func (fd *StructuredDecryption) Cipher(ct string, twk []byte) (
 	pt string, err error) {
-	var ffs *ffsInfo = &fd.ffs
+	var dataset *datasetInfo = &fd.dataset
 
 	var fmtr, ctr []rune
 	var kn int
@@ -689,24 +689,24 @@ func (fd *FPDecryption) Cipher(ct string, twk []byte) (
 
 	fmtr, ctr, rules, err = formatInput(
 		[]rune(ct),
-		&ffs.PassthroughAlphabet,
-		&ffs.OutputAlphabet,
-		ffs.InputAlphabet.ValAt(0),
-		ffs.PassthroughRules)
+		&dataset.PassthroughAlphabet,
+		&dataset.OutputAlphabet,
+		dataset.InputAlphabet.ValAt(0),
+		dataset.PassthroughRules)
 
 	if err != nil {
 		return
 	}
 
-	ctr, kn = decodeKeyNumber(ctr, &ffs.OutputAlphabet, ffs.NumEncodingBits)
+	ctr, kn = decodeKeyNumber(ctr, &dataset.OutputAlphabet, dataset.NumEncodingBits)
 	if kn != fd.kn {
-		err = (*fpeContext)(fd).setAlgorithm(kn)
+		err = (*structuredContext)(fd).setAlgorithm(kn)
 		if err != nil {
 			return
 		}
 	}
 
-	ctr = convertRadix(ctr, &ffs.OutputAlphabet, &ffs.InputAlphabet)
+	ctr = convertRadix(ctr, &dataset.OutputAlphabet, &dataset.InputAlphabet)
 
 	ptr, err := fd.algo.DecryptRunes(ctr, twk)
 	if err != nil {
@@ -714,30 +714,30 @@ func (fd *FPDecryption) Cipher(ct string, twk []byte) (
 	}
 
 	fd.tracking.AddEvent(
-		fd.papi, ffs.Name, "",
+		fd.papi, dataset.Name, "",
 		trackingActionDecrypt,
 		1, fd.kn)
 
-	ptr, err = formatOutput(fmtr, ptr, &ffs.PassthroughAlphabet, rules)
+	ptr, err = formatOutput(fmtr, ptr, &dataset.PassthroughAlphabet, rules)
 
 	return string(ptr), err
 }
 
-func (fd *FPDecryption) Close() {
+func (fd *StructuredDecryption) Close() {
 	fd.tracking.Close()
 }
 
-// FPEncrypt performs a format preserving encryption of a plaintext using
-// the supplied credentials and according to the format named by @ffs
+// StructuredEncrypt performs a format preserving encryption of a plaintext using
+// the supplied credentials and according to the format named by @dataset
 //
 // @twk may be nil, in which case, the default will be used
 //
 // Upon success, error is nil, and the ciphertext is returned. If an
 // error occurs, it will be indicated by the error return value.
-func FPEncrypt(c Credentials, ffs, pt string, twk []byte) (string, error) {
+func StructuredEncrypt(c Credentials, dataset, pt string, twk []byte) (string, error) {
 	var ct string
 
-	enc, err := NewFPEncryption(c, ffs)
+	enc, err := NewStructuredEncryption(c, dataset)
 	if err == nil {
 		defer enc.Close()
 		ct, err = enc.Cipher(pt, twk)
@@ -746,19 +746,19 @@ func FPEncrypt(c Credentials, ffs, pt string, twk []byte) (string, error) {
 	return ct, err
 }
 
-// FPEncrypt performs a format preserving encryption of a plaintext using
-// the supplied credentials and according to the format named by @ffs, using
+// StructuredEncrypt performs a format preserving encryption of a plaintext using
+// the supplied credentials and according to the format named by @dataset, using
 // all keys associated with that format
 //
 // @twk may be nil, in which case, the default will be used
 //
 // Upon success, error is nil, and the ciphertexts are returned. If an
 // error occurs, it will be indicated by the error return value.
-func FPEncryptForSearch(c Credentials, ffs, pt string, twk []byte) (
+func StructuredEncryptForSearch(c Credentials, dataset, pt string, twk []byte) (
 	[]string, error) {
 	var ct []string
 
-	enc, err := NewFPEncryption(c, ffs)
+	enc, err := NewStructuredEncryption(c, dataset)
 	if err == nil {
 		defer enc.Close()
 		ct, err = enc.CipherForSearch(pt, twk)
@@ -767,20 +767,20 @@ func FPEncryptForSearch(c Credentials, ffs, pt string, twk []byte) (
 	return ct, err
 }
 
-// FPDecrypt performs a format preserving decryption of a ciphertext.
+// StructuredDecrypt performs a format preserving decryption of a ciphertext.
 // The credentials must be associated with the key used to encrypt
 // the ciphertext.
 //
-// @ffs is the name of the format used to encrypt the data
+// @dataset is the name of the format used to encrypt the data
 // @twk may be nil, in which case, the default will be used. In either
 // case it must match that used during encryption
 //
 // Upon success, error is nil, and the plaintext is returned. If an
 // error occurs, it will be indicated by the error return value.
-func FPDecrypt(c Credentials, ffs, ct string, twk []byte) (string, error) {
+func StructuredDecrypt(c Credentials, dataset, ct string, twk []byte) (string, error) {
 	var pt string
 
-	dec, err := NewFPDecryption(c, ffs)
+	dec, err := NewStructuredDecryption(c, dataset)
 	if err == nil {
 		defer dec.Close()
 		pt, err = dec.Cipher(ct, twk)

@@ -108,7 +108,7 @@ func getopts() parameters {
 }
 
 func simpleEncrypt(creds ubiq.Credentials, datasetName string, plainText string) error {
-	var cipherText, err = ubiq.FPEncrypt(creds, datasetName, plainText, nil)
+	var cipherText, err = ubiq.StructuredEncrypt(creds, datasetName, plainText, nil)
 	if err != nil {
 		return err
 	}
@@ -117,7 +117,7 @@ func simpleEncrypt(creds ubiq.Credentials, datasetName string, plainText string)
 }
 
 func simpleDecrypt(creds ubiq.Credentials, datasetName string, cipherText string) error {
-	var plainText, err = ubiq.FPDecrypt(creds, datasetName, cipherText, nil)
+	var plainText, err = ubiq.StructuredDecrypt(creds, datasetName, cipherText, nil)
 	if err != nil {
 		return err
 	}

@@ -158,14 +158,14 @@ func load_test(creds ubiq.Credentials, params parameters) error {
 			datasetName := c.Dataset
 			_, ok := encDatasets[datasetName]
 			if !ok {
-				ubiq.FPEncrypt(creds, datasetName, c.Plaintext, nil)
-				ubiq.FPDecrypt(creds, datasetName, c.Ciphertext, nil)
+				ubiq.StructuredEncrypt(creds, datasetName, c.Plaintext, nil)
+				ubiq.StructuredDecrypt(creds, datasetName, c.Ciphertext, nil)
 				encDatasets[datasetName] = timerdata{ElapsedTimes: make([]int, 0), Count: 0}
 				decDatasets[datasetName] = timerdata{ElapsedTimes: make([]int, 0), Count: 0}
 			}
 
 			startEnc := time.Now()
-			ct, err := ubiq.FPEncrypt(creds, datasetName, c.Plaintext, nil)
+			ct, err := ubiq.StructuredEncrypt(creds, datasetName, c.Plaintext, nil)
 			endEnc := time.Now()
 			encElapsed := endEnc.Sub(startEnc)
 
@@ -184,7 +184,7 @@ func load_test(creds ubiq.Credentials, params parameters) error {
 			}
 
 			startDec := time.Now()
-			pt, err := ubiq.FPDecrypt(creds, datasetName, c.Ciphertext, nil)
+			pt, err := ubiq.StructuredDecrypt(creds, datasetName, c.Ciphertext, nil)
 			endDec := time.Now()
 			decElapsed := endDec.Sub(startDec)
 

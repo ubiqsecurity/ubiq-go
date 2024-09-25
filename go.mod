@@ -5,7 +5,6 @@ go 1.18
 require (
 	github.com/go-ini/ini v1.67.0
 	github.com/youmark/pkcs8 v0.0.0-20201027041543-1326539a0a0a
-	gitlab.com/ubiqsecurity/ubiq-fpe-go v0.0.0-20231208163039-a332b3d2231b
 )
 
 require (
