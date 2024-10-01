@@ -7,6 +7,12 @@ import (
 	"math"
 )
 
+// This implementation conforms (as best as possible) to Draft SP 800-38G Rev. 1
+// https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-38Gr1-draft.pdf
+// The implementation passes all tests specified by NIST in their Cryptographic
+// Standards and Guidelines:
+// https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Standards-and-Guidelines/documents/examples/FF1samples.pdf
+
 // Context structure for FF1 Structured algorithm
 type FF1 struct {
 	ctx *ffx
