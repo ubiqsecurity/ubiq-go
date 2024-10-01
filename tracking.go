@@ -3,6 +3,7 @@ package ubiq
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"strconv"
 	"time"
 )
@@ -35,6 +36,7 @@ type trackingEvent struct {
 	Product        string `json:"product"`
 	ProductVersion string `json:"product_version"`
 	UserAgent      string `json:"user-agent"`
+	UserDefined    string `json:"user_defined"`
 }
 
 // the message sent to the server is an array of
@@ -69,6 +71,11 @@ type trackingContext struct {
 	//
 	client httpClient
 	host   string
+
+	//
+	// Stores user defined metadata
+	//
+	user_defined string
 
 	//
 	// tracking events are sent to the
@@ -192,6 +199,21 @@ func trackingRoutine(ctx trackingContext, minCount int, maxDelay time.Duration) 
 	close(ctx.done)
 }
 
+func (tc *trackingContext) AddUserDefinedMetadata(data string) error {
+	var data_test interface{}
+	var err = json.Unmarshal([]byte(data), &data_test)
+	if err != nil {
+		return errors.New("user defined metadata must be a valid json string")
+	}
+	if len(data) > 1024 {
+		return errors.New("user defined metadata cannot be longer than 1024 characters")
+	}
+
+	tc.user_defined = data
+
+	return nil
+}
+
 func (tc *trackingContext) AddEvent(papi, dsname, dsgroup string, action trackingAction, count, kn int) {
 	var now string = time.Now().Format(time.RFC3339)
 
@@ -214,6 +236,7 @@ func (tc *trackingContext) AddEvent(papi, dsname, dsgroup string, action trackin
 		Product:        "ubiq-go",
 		ProductVersion: Version,
 		UserAgent:      "ubiq-go/" + Version,
+		UserDefined:    tc.user_defined,
 	}
 }
 

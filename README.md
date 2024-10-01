@@ -58,10 +58,10 @@ credentials, err := ubiq.NewCredentials()
 #### Explicitly set the credentials
 ```go
 credentials, err := ubiq.NewCredentials(
-        "..." /* access key id */,
-        "..." /* secret signing key */,
-        "..." /* secret crypto access key */,
-        "..." /* Ubiq API server, may omit this parameter */)
+    "..." /* access key id */,
+    "..." /* secret signing key */,
+    "..." /* secret crypto access key */,
+    "..." /* Ubiq API server, may omit this parameter */)
 ```
 
 
@@ -107,12 +107,12 @@ defer encryption.Close()
 
 ct, _ := encryption.Begin()
 for {
-        n, e := infile.Read(pt)
-        if e == io.EOF {
-                break
-        }
-        t, _ := encryption.Update(pt[:n])
-        ct = append(ct, t...)
+    n, e := infile.Read(pt)
+    if e == io.EOF {
+        break
+    }
+    t, _ := encryption.Update(pt[:n])
+    ct = append(ct, t...)
 }
 t, _ := encryption.End()
 ct = append(ct, t...)
@@ -134,12 +134,12 @@ defer decryption.Close()
 
 pt, _ := decryption.Begin()
 for {
-        n, e := infile.Read(ct)
-        if e == io.EOF {
-                break
-        }
-        t, _ := decryption.Update(ct[:n])
-        pt = append(pt, t...)
+    n, e := infile.Read(ct)
+    if e == io.EOF {
+        break
+    }
+    t, _ := decryption.Update(ct[:n])
+    pt = append(pt, t...)
 }
 t, _ := decryption.End()
 pt = append(pt, t...)
@@ -161,7 +161,7 @@ plainText := "999-01-2345"
 
 var cipherText, err := ubiq.StructuredEncrypt(credentials, datasetName, plainText)
 if err != nil {
-        return err
+    return err
 }
 
 fmt.Fprintf(os.Stdout, "ENCRYPTED cipher= %s \n", cipherText)
@@ -179,7 +179,7 @@ plainText := "999-01-2345"
 
 var cipherTextArr, err := ubiq.StructuredEncryptForSearch(credentials, datasetName, plainText)
 if err != nil {
-        return err
+    return err
 }
 
 fmt.Fprintf(os.Stdout, "ENCRYPTED cipher= %v \n", cipherTextArr)
@@ -199,10 +199,44 @@ cipherText := "300-0E-274t"
 
 var plainText, err := ubiq.StructuredDecrypt(credentials, datasetName, cipherText)
 if err != nil {
-        return err
+    return err
 }
 
 fmt.Fprintf(os.Stdout, "DECRYPTED decrypted_text= %s \n", cipherText)
+```
+
+### Custom Metadata for Usage Reporting
+There are cases where a developer would like to attach metadata to usage information reported by the application.  Both the structured and unstructured interfaces allow user_defined metadata to be sent with the usage information reported by the libraries.
+
+The **add_reporting_user_defined_metadata** function accepts a string in JSON format that will be stored in the database with the usage records.  The string must be less than 1024 characters and be a valid JSON format.  The string must include both the `{` and `}` symbols.  The supplied value will be used until the object goes out of scope.  Due to asynchronous processing, changing the value may be immediately reflected in subsequent usage.  If immediate changes to the values are required, it would be safer to create a new encrypt / decrypt object and call the `add_reporting_user_defined_metadata` function with the new values.
+
+>Note: User Defined Metadata is only available when using the full encryption objects instead of the simple methods.
+
+Examples are shown below.
+
+```go
+    ...
+    credentials, _ := ubiq.NewCredentials()
+    encryption, err := ubiq.NewEncryption(credentials, 1)
+    if err == nil {
+        defer encryption.Close()
+        encryption.AddUserDefinedMetadata("{\"some_meaningful_flag\" : true }")
+
+        ct, _ := encryption.Begin()
+    ...
+
+    # Unstructured Encrypt operations
+```
+```go
+    ...
+    credentials, _ := ubiq.NewCredentials()
+    dec, err := NewStructuredDecryption(c, dataset)
+    dec.AddUserDefinedMetadata("{\"some_meaningful_flag\" : true }")
+	if err == nil {
+		defer dec.Close()
+		pt, err = dec.Cipher(ct, twk)
+    ...
+  # FPE Encrypt and Decrypt operations
 ```
 
 [dashboard]:https://dashboard.ubiqsecurity.com/

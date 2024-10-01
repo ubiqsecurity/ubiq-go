@@ -298,6 +298,11 @@ func (d *Decryption) Close() error {
 	return err
 }
 
+// Attach metadata to usage information reported by the application.
+func (d *Decryption) AddUserDefinedMetadata(data string) error {
+	return d.tracking.AddUserDefinedMetadata(data)
+}
+
 // Decrypt decrypts a single ciphertext message. The credentials
 // must be associated with the key used to encrypt the cipher text.
 //

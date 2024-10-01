@@ -250,6 +250,11 @@ func (e *Encryption) Close() error {
 	return nil
 }
 
+// Attach metadata to usage information reported by the application.
+func (e *Encryption) AddUserDefinedMetadata(data string) error {
+	return e.tracking.AddUserDefinedMetadata(data)
+}
+
 // Encrypt encrypts a single plain text message using a new key
 // and the algorithm associated with the specified credentials.
 //

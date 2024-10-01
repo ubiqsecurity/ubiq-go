@@ -663,6 +663,11 @@ func (fe *StructuredEncryption) Close() {
 	fe.tracking.Close()
 }
 
+// Attach metadata to usage information reported by the application.
+func (fe *StructuredEncryption) AddUserDefinedMetadata(data string) error {
+	return fe.tracking.AddUserDefinedMetadata(data)
+}
+
 // Create a new format preserving decryption object. The returned object
 // can be reused to decrypt multiple ciphertexts using the format (and
 // algorithm and key) named by @dataset
@@ -725,6 +730,11 @@ func (fd *StructuredDecryption) Cipher(ct string, twk []byte) (
 
 func (fd *StructuredDecryption) Close() {
 	fd.tracking.Close()
+}
+
+// Attach metadata to usage information reported by the application.
+func (fd *StructuredDecryption) AddUserDefinedMetadata(data string) error {
+	return fd.tracking.AddUserDefinedMetadata(data)
 }
 
 // StructuredEncrypt performs a format preserving encryption of a plaintext using
