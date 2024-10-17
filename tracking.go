@@ -3,6 +3,7 @@ package ubiq
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"strconv"
 	"time"
 )
@@ -35,6 +36,7 @@ type trackingEvent struct {
 	Product        string `json:"product"`
 	ProductVersion string `json:"product_version"`
 	UserAgent      string `json:"user-agent"`
+	UserDefined    string `json:"user_defined"`
 }
 
 // the message sent to the server is an array of
@@ -71,6 +73,11 @@ type trackingContext struct {
 	host   string
 
 	//
+	// Stores user defined metadata
+	//
+	user_defined string
+
+	//
 	// tracking events are sent to the
 	// background routine via this channel
 	//
@@ -90,7 +97,9 @@ func newTrackingContext(client httpClient, host string) trackingContext {
 		done:   make(chan struct{}),
 	}
 
-	go trackingRoutine(ctx, 5, 2*time.Second)
+	config, _ := NewConfiguration()
+
+	go trackingRoutine(ctx, config.EventReporting.MinimumCount, time.Duration(config.EventReporting.FlushInterval)*time.Second)
 	return ctx
 }
 
@@ -192,8 +201,50 @@ func trackingRoutine(ctx trackingContext, minCount int, maxDelay time.Duration) 
 	close(ctx.done)
 }
 
+func formatTimestamp(t time.Time) string {
+	// Default is RFC3339Nano:
+	//"2006-01-02T15:04:05.999999999Z07:00"
+	switch config.EventReporting.TimestampGranularity {
+	case "HALF_DAYS":
+		var halfDayTime time.Time
+		if t.Hour() >= 12 {
+			halfDayTime = time.Date(t.Year(), t.Month(), t.Day(), 12, 0, 0, 0, t.Location())
+		} else {
+			halfDayTime = time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
+		}
+		return halfDayTime.Format("2006-01-02T15:00:00Z07:00")
+	case "HOURS":
+		return t.Format("2006-01-02T15:00:00Z07:00")
+	case "MINUTES":
+		return t.Format("2006-01-02T15:04:00Z07:00")
+	case "SECONDS":
+		return t.Format("2006-01-02T15:04:05Z07:00")
+	case "MILLIS":
+		return t.Format("2006-01-02T15:04:05.999Z07:00")
+	case "MICROS":
+		return t.Format("2006-01-02T15:04:05.999999Z07:00")
+	}
+	// default:
+	return time.Now().Format(time.RFC3339Nano)
+}
+
+func (tc *trackingContext) AddUserDefinedMetadata(data string) error {
+	var data_test interface{}
+	var err = json.Unmarshal([]byte(data), &data_test)
+	if err != nil {
+		return errors.New("user defined metadata must be a valid json string")
+	}
+	if len(data) > 1024 {
+		return errors.New("user defined metadata cannot be longer than 1024 characters")
+	}
+
+	tc.user_defined = data
+
+	return nil
+}
+
 func (tc *trackingContext) AddEvent(papi, dsname, dsgroup string, action trackingAction, count, kn int) {
-	var now string = time.Now().Format(time.RFC3339)
+	var now string = formatTimestamp(time.Now())
 
 	//
 	// note that we send a pointer to the event.
@@ -214,6 +265,7 @@ func (tc *trackingContext) AddEvent(papi, dsname, dsgroup string, action trackin
 		Product:        "ubiq-go",
 		ProductVersion: Version,
 		UserAgent:      "ubiq-go/" + Version,
+		UserDefined:    tc.user_defined,
 	}
 }
 

@@ -32,11 +32,6 @@ type newEncryptionRequest struct {
 	Uses uint `json:"uses"`
 }
 
-type updateEncryptionRequest struct {
-	Requested uint `json:"requested"`
-	Actual    uint `json:"actual"`
-}
-
 // Encryption holds the context of a piecewise encryption operation.
 // Use NewEncryption() to create/initialize an Encryption object.
 //
@@ -248,6 +243,11 @@ func (e *Encryption) Close() error {
 	*e = Encryption{}
 
 	return nil
+}
+
+// Attach metadata to usage information reported by the application.
+func (e *Encryption) AddUserDefinedMetadata(data string) error {
+	return e.tracking.AddUserDefinedMetadata(data)
 }
 
 // Encrypt encrypts a single plain text message using a new key

@@ -8,10 +8,6 @@ import (
 	"net/http"
 )
 
-type updateDecryptionRequest struct {
-	Uses uint `json:"uses"`
-}
-
 type newDecryptionResponse struct {
 	EPK               string `json:"encrypted_private_key"`
 	EncryptionSession string `json:"encryption_session"`
@@ -33,15 +29,10 @@ type Decryption struct {
 	client httpClient
 	host   string
 
-	session, srsa string
+	srsa string
 
-	key struct {
-		raw, enc    []byte
-		fingerprint string
-		uses        uint
-	}
+	key decryptionKey
 
-	algo   algorithm
 	cipher *cipher
 
 	buf []byte
@@ -49,15 +40,28 @@ type Decryption struct {
 	tracking trackingContext
 }
 
+type decryptionKey struct {
+	Algo        algorithm `json:"algorithm"`
+	Raw         []byte    `json:"unwrapped_data_key"`
+	Wdk         string    `json:"wrapped_data_key"`
+	Epk         string    `json:"encrypted_private_key"`
+	Enc         []byte    `json:"encrypted_data_key"`
+	Fingerprint string    `json:"key_fingerprint"`
+	Uses        uint      `json:"uses"`
+	Session     string    `json:"encryption_session"`
+}
+
 func (d *Decryption) resetSession() error {
-	d.session = ""
+	d.key.Session = ""
 
-	d.key.raw = nil
-	d.key.enc = nil
-	d.key.fingerprint = ""
-	d.key.uses = 0
+	d.key.Raw = nil
+	d.key.Wdk = ""
+	d.key.Epk = ""
+	d.key.Enc = nil
+	d.key.Fingerprint = ""
+	d.key.Uses = 0
 
-	d.algo = algorithm{}
+	d.key.Algo = algorithm{}
 	d.cipher = nil
 
 	d.buf = nil
@@ -72,36 +76,70 @@ func (d *Decryption) newSession(edk []byte, algo int) error {
 	var rsp *http.Response
 	var err error
 
-	endp := d.host
-	endp += "/api/v0/decryption/key"
+	var keyFromCache decryptionKey
+	var usingCachedKey bool
 
-	body, _ := json.Marshal(newDecryptionRequest{
-		EDK: base64.StdEncoding.EncodeToString(edk)})
-	rsp, err = d.client.Post(
-		endp, "application/json", bytes.NewReader(body))
-	if rsp != nil {
-		defer rsp.Body.Close()
-	}
-	if err == nil {
-		if rsp.StatusCode == http.StatusOK {
-			var nd newDecryptionResponse
+	cacheKey := getUnstructuredCacheKey(edk, algo)
 
-			err = json.NewDecoder(rsp.Body).Decode(&nd)
-			if err == nil {
-				d.key.raw, err = unwrapDataKey(
-					nd.WDK, nd.EPK, d.srsa)
+	if config.KeyCaching.Unstructured {
+		keyFromCache, err = ubiqCache.readUnstructuredKey(cacheKey)
+		if err != nil {
+			if !errors.Is(err, ErrNotInCache) {
+				return err
 			}
-			if err == nil {
-				d.session = nd.EncryptionSession
-				d.key.fingerprint = nd.KeyFingerprint
-				d.key.enc = edk
-				d.key.uses = 0
-				d.algo, err = getAlgorithmById(algo)
-			}
-		} else {
-			err = errors.New(
-				"unexpected http response " + rsp.Status)
 		}
+		usingCachedKey = true
+	}
+
+	if !usingCachedKey || err != nil {
+		endp := d.host
+		endp += "/api/v0/decryption/key"
+
+		body, _ := json.Marshal(newDecryptionRequest{
+			EDK: base64.StdEncoding.EncodeToString(edk)})
+		rsp, err = d.client.Post(
+			endp, "application/json", bytes.NewReader(body))
+		if rsp != nil {
+			defer rsp.Body.Close()
+		}
+		if err == nil {
+			if rsp.StatusCode == http.StatusOK {
+				var nd newDecryptionResponse
+
+				err = json.NewDecoder(rsp.Body).Decode(&nd)
+				if err == nil {
+					d.key.Session = nd.EncryptionSession
+					d.key.Fingerprint = nd.KeyFingerprint
+					d.key.Enc = edk
+					d.key.Uses = 0
+					d.key.Algo, err = getAlgorithmById(algo)
+
+					d.key.Wdk = nd.WDK
+					d.key.Epk = nd.EPK
+				}
+			} else {
+				err = errors.New(
+					"unexpected http response " + rsp.Status)
+			}
+		}
+		if config.KeyCaching.Unstructured && config.KeyCaching.Encrypt {
+			ubiqCache.updateUnstructuredKey(cacheKey, d.key)
+		}
+	} else {
+		d.key.Session = keyFromCache.Session
+		d.key.Fingerprint = keyFromCache.Fingerprint
+		d.key.Enc = edk
+		d.key.Uses = keyFromCache.Uses
+		d.key.Algo = keyFromCache.Algo
+	}
+
+	if d.key.Raw == nil {
+		d.key.Raw, err = unwrapDataKey(
+			d.key.Wdk, d.key.Epk, d.srsa)
+	}
+
+	if config.KeyCaching.Unstructured && !config.KeyCaching.Encrypt && !usingCachedKey {
+		ubiqCache.updateUnstructuredKey(cacheKey, d.key)
 	}
 
 	return err
@@ -178,14 +216,14 @@ func (d *Decryption) Update(ciphertext []byte) ([]byte, error) {
 			if err == nil {
 				// if a session exists, but it has a different
 				// key, get rid of it
-				if len(d.session) > 0 &&
+				if len(d.key.Session) > 0 &&
 					!bytes.Equal(
-						d.key.enc, hdr.v0.key) {
+						d.key.Enc, hdr.v0.key) {
 					d.resetSession()
 				}
 
 				// if no session exists, create a new one
-				if len(d.session) == 0 {
+				if len(d.key.Session) == 0 {
 					err = d.newSession(
 						hdr.v0.key, int(hdr.v0.algo))
 				}
@@ -201,12 +239,12 @@ func (d *Decryption) Update(ciphertext []byte) ([]byte, error) {
 				// header is authenticated, pass it to the
 				// cipher creation function
 				if (hdr.v0.flags & headerV0FlagAAD) != 0 {
-					c, err = d.algo.newCipher(
-						d.key.raw, hdr.v0.iv,
+					c, err = d.key.Algo.newCipher(
+						d.key.Raw, hdr.v0.iv,
 						d.buf[:hdrlen])
 				} else {
-					c, err = d.algo.newCipher(
-						d.key.raw, hdr.v0.iv)
+					c, err = d.key.Algo.newCipher(
+						d.key.Raw, hdr.v0.iv)
 				}
 
 				if err == nil {
@@ -216,7 +254,7 @@ func (d *Decryption) Update(ciphertext []byte) ([]byte, error) {
 						1, 0)
 					// all is well, slice off the header
 					d.cipher = &c
-					d.key.uses++
+					d.key.Uses++
 					d.buf = d.buf[hdrlen:]
 				}
 			}
@@ -230,7 +268,7 @@ func (d *Decryption) Update(ciphertext []byte) ([]byte, error) {
 		// determine how much data is in the buffer,
 		// being careful to always leave enough data in
 		// the buffer to act as the authentication tag
-		sz := len(d.buf) - d.algo.len.tag
+		sz := len(d.buf) - d.key.Algo.len.tag
 		if sz > 0 {
 			// decrypt whatever data is not part of the
 			// data reserved for the tag, and slice it
@@ -255,7 +293,7 @@ func (d *Decryption) End() ([]byte, error) {
 	var err error
 
 	if d.cipher != nil {
-		sz := len(d.buf) - d.algo.len.tag
+		sz := len(d.buf) - d.key.Algo.len.tag
 
 		if sz > 0 {
 			// once the cipher has been created, the Update
@@ -273,7 +311,7 @@ func (d *Decryption) End() ([]byte, error) {
 			// number of bytes in the buffer is equal to
 			// the size of the tag
 
-			if d.algo.len.tag == 0 {
+			if d.key.Algo.len.tag == 0 {
 				// pass nil to indicate no tag
 				res, err = d.cipher.close(nil)
 			} else {
@@ -296,6 +334,11 @@ func (d *Decryption) Close() error {
 	d.tracking.Close()
 	*d = Decryption{}
 	return err
+}
+
+// Attach metadata to usage information reported by the application.
+func (d *Decryption) AddUserDefinedMetadata(data string) error {
+	return d.tracking.AddUserDefinedMetadata(data)
 }
 
 // Decrypt decrypts a single ciphertext message. The credentials

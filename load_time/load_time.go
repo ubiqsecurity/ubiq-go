@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"time"
 
@@ -35,6 +34,24 @@ type testCase struct {
 type timerdata struct {
 	ElapsedTimes []int
 	Count        int
+}
+
+type StructuredStatistics struct {
+	Min      time.Duration
+	Max      time.Duration
+	Duration time.Duration
+}
+type StructuredPerformanceCounter struct {
+	Count   int
+	Encrypt StructuredStatistics
+	Decrypt StructuredStatistics
+}
+
+type StructuredOperations struct {
+	enc *ubiq.StructuredEncryption
+	dec *ubiq.StructuredDecryption
+
+	perf StructuredPerformanceCounter
 }
 
 func usage(args ...string) {
@@ -67,6 +84,26 @@ func usage(args ...string) {
 	fmt.Fprintf(os.Stderr, "\n")
 
 	os.Exit(status)
+}
+
+func min(a, b time.Duration) time.Duration {
+	if a == 0 {
+		return b
+	}
+	if a <= b {
+		return a
+	}
+	return b
+}
+
+func max(a, b time.Duration) time.Duration {
+	if a == 0 {
+		return b
+	}
+	if a >= b {
+		return a
+	}
+	return b
 }
 
 func getopts() (parameters, error) {
@@ -134,10 +171,18 @@ func getopts() (parameters, error) {
 }
 
 func load_test(creds ubiq.Credentials, params parameters) error {
-	encDatasets := make(map[string]timerdata)
-	decDatasets := make(map[string]timerdata)
-
 	count := 0
+	var ops map[string]*StructuredOperations = make(map[string]*StructuredOperations)
+	enc, err := ubiq.NewStructuredEncryption(creds)
+	if err != nil {
+		return err
+	}
+	defer enc.Close()
+	dec, err := ubiq.NewStructuredDecryption(creds)
+	if err != nil {
+		return err
+	}
+	defer dec.Close()
 	for _, infile := range params.infiles {
 		fmt.Printf("Loading file: %v\n", infile)
 		content, err := os.ReadFile(infile)
@@ -155,19 +200,19 @@ func load_test(creds ubiq.Credentials, params parameters) error {
 		}
 
 		for _, c := range testCases {
-			datasetName := c.Dataset
-			_, ok := encDatasets[datasetName]
+			op, ok := ops[c.Dataset]
 			if !ok {
-				ubiq.FPEncrypt(creds, datasetName, c.Plaintext, nil)
-				ubiq.FPDecrypt(creds, datasetName, c.Ciphertext, nil)
-				encDatasets[datasetName] = timerdata{ElapsedTimes: make([]int, 0), Count: 0}
-				decDatasets[datasetName] = timerdata{ElapsedTimes: make([]int, 0), Count: 0}
+				var _op StructuredOperations
+				ops[c.Dataset] = &_op
+				op = &_op
 			}
 
 			startEnc := time.Now()
-			ct, err := ubiq.FPEncrypt(creds, datasetName, c.Plaintext, nil)
-			endEnc := time.Now()
-			encElapsed := endEnc.Sub(startEnc)
+			ct, err := enc.Cipher(c.Dataset, c.Plaintext, nil)
+			enc_elapsed := time.Since(startEnc)
+			op.perf.Encrypt.Duration += enc_elapsed
+			op.perf.Encrypt.Min = min(op.perf.Encrypt.Min, enc_elapsed)
+			op.perf.Encrypt.Max = max(op.perf.Encrypt.Max, enc_elapsed)
 
 			if err != nil {
 				return err
@@ -177,16 +222,12 @@ func load_test(creds ubiq.Credentials, params parameters) error {
 				return fmt.Errorf("ciphertext did not match encrypted plaintext '%s' != '%s'", c.Ciphertext, ct)
 			}
 
-			if encSet, ok := encDatasets[datasetName]; ok {
-				encSet.ElapsedTimes = append(encSet.ElapsedTimes, int(encElapsed)/1000)
-				encSet.Count += 1
-				encDatasets[datasetName] = encSet
-			}
-
 			startDec := time.Now()
-			pt, err := ubiq.FPDecrypt(creds, datasetName, c.Ciphertext, nil)
-			endDec := time.Now()
-			decElapsed := endDec.Sub(startDec)
+			pt, err := dec.Cipher(c.Dataset, c.Ciphertext, nil)
+			dec_elapsed := time.Since(startDec)
+			op.perf.Decrypt.Duration += dec_elapsed
+			op.perf.Decrypt.Min = min(op.perf.Decrypt.Min, dec_elapsed)
+			op.perf.Decrypt.Max = max(op.perf.Decrypt.Max, dec_elapsed)
 
 			if err != nil {
 				return err
@@ -196,20 +237,12 @@ func load_test(creds ubiq.Credentials, params parameters) error {
 				return fmt.Errorf("plaintext did not match decrypted ciphertext '%s' != '%s'", c.Plaintext, pt)
 			}
 
-			if decSet, ok := decDatasets[datasetName]; ok {
-				decSet.ElapsedTimes = append(decSet.ElapsedTimes, int(decElapsed)/1000)
-				decSet.Count += 1
-				decDatasets[datasetName] = decSet
-			}
-
-			count += 1
+			op.perf.Count++
+			count++
 		}
 	}
 
-	fmt.Printf("Encrypt records count: %v. Times in microseconds\n", count)
-	encAvg, encTotal := printOutput(encDatasets)
-	fmt.Printf("Decrypt records count: %v. Times in microseconds\n", count)
-	decAvg, decTotal := printOutput(decDatasets)
+	encAvg, encTotal, decAvg, decTotal := printOutput(ops)
 
 	var res []bool
 	res = append(res, evaluateThreshold(params.avgEncrypt, encAvg, "average encrypt"))
@@ -228,35 +261,44 @@ func load_test(creds ubiq.Credentials, params parameters) error {
 	return nil
 }
 
-func printOutput(datasetTimes map[string]timerdata) (average int, total int) {
-	total = 0
+func printOutput(datasetTimes map[string]*StructuredOperations) (encAvg, encTotal, decAvg, decTotal time.Duration) {
 	count := 0
-	for datasetName, timing := range datasetTimes {
-		totalTime := 0
-		for _, v := range timing.ElapsedTimes {
-			totalTime += v
-		}
-
-		slices.Sort(timing.ElapsedTimes)
-		minTime := timing.ElapsedTimes[0]
-		maxTime := timing.ElapsedTimes[len(timing.ElapsedTimes)-1]
-		fmt.Printf("    Dataset: %v, Count: %v Average: %v, Total %v, Min: %v, Max: %v\n", datasetName, timing.Count, int(float64(totalTime)/float64(timing.Count)), totalTime, minTime, maxTime)
-		total += totalTime
-		count += timing.Count
+	encOutput := make([]string, len(datasetTimes))
+	decOutput := make([]string, len(datasetTimes))
+	i := 0
+	for datasetName, ops := range datasetTimes {
+		encOutput[i] = fmt.Sprintf("    Dataset: %v, Count: %v Average: %v, Total %v, Min: %v, Max: %v\n", datasetName, ops.perf.Count, time.Duration(float64(ops.perf.Encrypt.Duration)/float64(ops.perf.Count)), ops.perf.Encrypt.Duration, ops.perf.Encrypt.Min, ops.perf.Encrypt.Max)
+		decOutput[i] = fmt.Sprintf("    Dataset: %v, Count: %v Average: %v, Total %v, Min: %v, Max: %v\n", datasetName, ops.perf.Count, time.Duration(float64(ops.perf.Decrypt.Duration)/float64(ops.perf.Count)), ops.perf.Decrypt.Duration, ops.perf.Decrypt.Min, ops.perf.Decrypt.Max)
+		encTotal += ops.perf.Encrypt.Duration
+		decTotal += ops.perf.Decrypt.Duration
+		count += ops.perf.Count
+		i++
 	}
-	average = int(float64(total) / float64(count))
-	fmt.Printf("        Total: Average: %v, Total: %v\n", average, total)
+	encAvg = time.Duration(float64(encTotal) / float64(count))
+	decAvg = time.Duration(float64(decTotal) / float64(count))
+	fmt.Printf("Encrypt records count: %v.\n", count)
+	for _, statement := range encOutput {
+		fmt.Printf("%v", statement)
+	}
+	fmt.Printf("        ENC Total: Average: %v, Total: %v\n", encAvg, encTotal)
 
-	return average, total
+	fmt.Printf("Decrypt records count: %v.\n", count)
+	for _, statement := range decOutput {
+		fmt.Printf("%v", statement)
+	}
+	fmt.Printf("        DEC Total: Average: %v, Total: %v\n", decAvg, decTotal)
+
+	return encAvg, encTotal, decAvg, decTotal
 }
 
-func evaluateThreshold(threshold int, reality int, label string) bool {
+func evaluateThreshold(threshold int, reality time.Duration, label string) bool {
+	timeThreshold := time.Duration(threshold) * time.Microsecond
 	if threshold == 0 {
 		fmt.Printf("NOTE: No maximum allowed %v threshold supplied\n", label)
 		return true
 	}
 
-	if reality < threshold {
+	if reality < timeThreshold {
 		fmt.Printf("PASSED: Maximum allowed %v threshold of %v microseconds\n", label, threshold)
 		return true
 	} else {

@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-func TestGetFFS(t *testing.T) {
+func TestDeprecatedGetFFS(t *testing.T) {
 	credentials, err := NewCredentials()
 	if err != nil {
 		t.Fatal(err)
@@ -23,7 +23,7 @@ func TestGetFFS(t *testing.T) {
 	enc.Close()
 }
 
-func testFPE(t *testing.T, ffs, pt string) {
+func testDeprecatedFPE(t *testing.T, ffs, pt string) {
 	c, err := NewCredentials()
 	if err != nil {
 		t.Fatal(err)
@@ -44,25 +44,25 @@ func testFPE(t *testing.T, ffs, pt string) {
 	}
 }
 
-func TestFPEAlnumSSN(t *testing.T) {
-	testFPE(t, "ALPHANUM_SSN", "123-45-6789")
+func TestDeprecatedFPEAlnumSSN(t *testing.T) {
+	testDeprecatedFPE(t, "ALPHANUM_SSN", "123-45-6789")
 }
-func TestFPEBirthdate(t *testing.T) {
-	testFPE(t, "BIRTH_DATE", "04-20-1969")
+func TestDeprecatedFPEBirthdate(t *testing.T) {
+	testDeprecatedFPE(t, "BIRTH_DATE", "04-20-1969")
 }
-func TestFPESSN(t *testing.T) {
-	testFPE(t, "SSN", "987-65-4321")
+func TestDeprecatedFPESSN(t *testing.T) {
+	testDeprecatedFPE(t, "SSN", "987-65-4321")
 }
-func TestFPEUTF8(t *testing.T) {
-	testFPE(t, "UTF8_STRING", "abcdefghijklmnopqrstuvwxyzこんにちは世界")
+func TestDeprecatedFPEUTF8(t *testing.T) {
+	testDeprecatedFPE(t, "UTF8_STRING", "abcdefghijklmnopqrstuvwxyzこんにちは世界")
 }
-func TestFPEUTF8Complex(t *testing.T) {
-	testFPE(t,
+func TestDeprecatedFPEUTF8Complex(t *testing.T) {
+	testDeprecatedFPE(t,
 		"UTF8_STRING_COMPLEX",
 		"ÑÒÓķĸĹϺϻϼϽϾÔÕϿは世界abcdefghijklmnopqrstuvwxyzこんにちÊʑʒʓËÌÍÎÏðñòóôĵĶʔʕ")
 }
 
-func testFPEForSearchLocal(t *testing.T, ffs, pt string) {
+func testDeprecatedFPEForSearchLocal(t *testing.T, ffs, pt string) {
 	c, err := NewCredentials()
 	if err != nil {
 		t.Fatal(err)
@@ -87,21 +87,21 @@ func testFPEForSearchLocal(t *testing.T, ffs, pt string) {
 	}
 }
 
-func TestFPEAlnumSSNForSearchLocal(t *testing.T) {
-	testFPEForSearchLocal(t, "ALPHANUM_SSN", "123-45-6789")
+func TestDeprecatedFPEAlnumSSNForSearchLocal(t *testing.T) {
+	testDeprecatedFPEForSearchLocal(t, "ALPHANUM_SSN", "123-45-6789")
 }
-func TestFPEBirthdateForSearchLocal(t *testing.T) {
-	testFPEForSearchLocal(t, "BIRTH_DATE", "04-20-1969")
+func TestDeprecatedFPEBirthdateForSearchLocal(t *testing.T) {
+	testDeprecatedFPEForSearchLocal(t, "BIRTH_DATE", "04-20-1969")
 }
-func TestFPESSNForSearchLocal(t *testing.T) {
-	testFPEForSearchLocal(t, "SSN", "987-65-4321")
+func TestDeprecatedFPESSNForSearchLocal(t *testing.T) {
+	testDeprecatedFPEForSearchLocal(t, "SSN", "987-65-4321")
 }
-func TestFPEUTF8ForSearchLocal(t *testing.T) {
-	testFPEForSearchLocal(
+func TestDeprecatedFPEUTF8ForSearchLocal(t *testing.T) {
+	testDeprecatedFPEForSearchLocal(
 		t, "UTF8_STRING", "abcdefghijklmnopqrstuvwxyzこんにちは世界")
 }
-func TestFPEUTF8ComplexForSearchLocal(t *testing.T) {
-	testFPEForSearchLocal(
+func TestDeprecatedFPEUTF8ComplexForSearchLocal(t *testing.T) {
+	testDeprecatedFPEForSearchLocal(
 		t,
 		"UTF8_STRING_COMPLEX",
 		"ÑÒÓķĸĹϺϻϼϽϾÔÕϿは世界abcdefghijklmnopqrstuvwxyzこんにちÊʑʒʓËÌÍÎÏðñòóôĵĶʔʕ")
@@ -144,28 +144,28 @@ func testFPEForSearchRemote(t *testing.T, ffs, pt, expected_ct string) {
 	}
 }
 
-func TestFPEAlnumSSNForSearchRemote(t *testing.T) {
+func TestDeprecatedFPEAlnumSSNForSearchRemote(t *testing.T) {
 	testFPEForSearchRemote(
 		t,
 		"ALPHANUM_SSN",
 		";0123456-789ABCDEF|",
 		";!!!E7`+-ai1ykOp8r|")
 }
-func TestFPEBirthdateForSearchRemote(t *testing.T) {
+func TestDeprecatedFPEBirthdateForSearchRemote(t *testing.T) {
 	testFPEForSearchRemote(
 		t,
 		"BIRTH_DATE",
 		";01\\02-1960|",
 		";!!\\!!-oKzi|")
 }
-func TestFPESSNForSearchRemote(t *testing.T) {
+func TestDeprecatedFPESSNForSearchRemote(t *testing.T) {
 	testFPEForSearchRemote(
 		t,
 		"SSN",
 		"-0-1-2-3-4-5-6-7-8-9-",
 		"-0-0-0-0-1-I-L-8-j-D-")
 }
-func TestFPEUTF8ComplexForSearchRemote(t *testing.T) {
+func TestDeprecatedFPEUTF8ComplexForSearchRemote(t *testing.T) {
 	testFPEForSearchRemote(
 		t,
 		"UTF8_STRING_COMPLEX",
@@ -194,7 +194,7 @@ type FPEOperations struct {
 	perf FPEPerformanceCounter
 }
 
-func TestFPE1M(t *testing.T) {
+func TestDeprecatedFPE1M(t *testing.T) {
 	file, err := os.Open("1m.json")
 	if err != nil {
 		t.Skip(err)
