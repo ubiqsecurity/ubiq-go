@@ -13,8 +13,6 @@ const (
 	exitFailure
 )
 
-const maxSimpleSize = 50 * 1024 * 1024
-
 type mode int
 
 const (
@@ -22,18 +20,10 @@ const (
 	modeDecrypt
 )
 
-type method int
-
-const (
-	methodSimple method = iota
-	methodPiecewise
-)
-
 // parameters is used to convey command line
 // options to the main function
 type parameters struct {
 	mode                                             mode
-	method                                           method
 	encrypt, decrypt, credfile, profile, datasetName string
 }
 
@@ -107,8 +97,12 @@ func getopts() parameters {
 	return params
 }
 
-func simpleEncrypt(creds ubiq.Credentials, datasetName string, plainText string) error {
-	var cipherText, err = ubiq.FPEncrypt(creds, datasetName, plainText, nil)
+func encrypt(creds ubiq.Credentials, datasetName string, plainText string) error {
+	enc, err := ubiq.NewStructuredEncryption(creds)
+	if err != nil {
+		return err
+	}
+	cipherText, err := enc.Cipher(datasetName, plainText, nil)
 	if err != nil {
 		return err
 	}
@@ -116,8 +110,12 @@ func simpleEncrypt(creds ubiq.Credentials, datasetName string, plainText string)
 	return err
 }
 
-func simpleDecrypt(creds ubiq.Credentials, datasetName string, cipherText string) error {
-	var plainText, err = ubiq.FPDecrypt(creds, datasetName, cipherText, nil)
+func decrypt(creds ubiq.Credentials, datasetName string, cipherText string) error {
+	dec, err := ubiq.NewStructuredDecryption(creds)
+	if err != nil {
+		return err
+	}
+	plainText, err := dec.Cipher(datasetName, cipherText, nil)
 	if err != nil {
 		return err
 	}
@@ -136,9 +134,9 @@ func _main(params parameters) error {
 
 	// encrypt or decrypt using the specified method
 	if params.mode == modeEncrypt {
-		err = simpleEncrypt(credentials, params.datasetName, params.encrypt)
+		err = encrypt(credentials, params.datasetName, params.encrypt)
 	} else /* decrypt */ {
-		err = simpleDecrypt(credentials, params.datasetName, params.decrypt)
+		err = decrypt(credentials, params.datasetName, params.decrypt)
 	}
 	return err
 }

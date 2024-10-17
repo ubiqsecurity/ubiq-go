@@ -69,10 +69,10 @@ func (c *cipher) close(args ...[]byte) ([]byte, error) {
 func verifyKeyAndIvLength(key, iv []byte, keylen, ivlen int) error {
 	str := "invalid %s size: have %d, want %d"
 	if len(key) != keylen {
-		return errors.New(fmt.Sprintf(str, "key", len(key), keylen))
+		return fmt.Errorf(str, "key", len(key), keylen)
 	}
 	if len(iv) != ivlen {
-		return errors.New(fmt.Sprintf(str, "iv", len(iv), ivlen))
+		return fmt.Errorf(str, "iv", len(iv), ivlen)
 	}
 	return nil
 }
