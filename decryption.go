@@ -19,7 +19,7 @@ type newDecryptionRequest struct {
 	EDK string `json:"encrypted_data_key"`
 }
 
-// Decryption holds the context of a piecewise decryption operation.
+// Decryption holds the context of a chunked decryption operation.
 // Use NewDecryption() to create/initialize an Decryption object.
 //
 // The caller should use the Begin(), Update()..., End() sequence of

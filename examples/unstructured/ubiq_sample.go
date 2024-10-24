@@ -28,7 +28,7 @@ type method int
 
 const (
 	methodSimple method = iota
-	methodPiecewise
+	methodChunking
 )
 
 // parameters is used to convey command line
@@ -56,7 +56,8 @@ func usage(args ...string) {
 	fmt.Fprintf(os.Stderr, "  -d, -decrypt            Decrypt the contents of the input file and write\n")
 	fmt.Fprintf(os.Stderr, "                            the results to the output file\n")
 	fmt.Fprintf(os.Stderr, "  -s, -simple             Use the simple encryption / decryption interfaces\n")
-	fmt.Fprintf(os.Stderr, "  -p, -piecewise          Use the piecewise encryption / decryption interfaces\n")
+	fmt.Fprintf(os.Stderr, "  -p, -chunking           Use the encryption / decryption interfaces to handle\n")
+	fmt.Fprintf(os.Stderr, "                            large data elements where data is loadedin chunks\n")
 	fmt.Fprintf(os.Stderr, "  -i INFILE, -in INFILE   Set input file name\n")
 	fmt.Fprintf(os.Stderr, "  -o OUTFILE, -out OUTFILE\n")
 	fmt.Fprintf(os.Stderr, "                          Set output file name\n")
@@ -72,7 +73,7 @@ func usage(args ...string) {
 func getopts() parameters {
 	var help, version bool = false, false
 	var encrypt, decrypt bool = false, false
-	var simple, piecewise bool = false, false
+	var simple, chunking bool = false, false
 	var params parameters
 
 	f := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
@@ -89,8 +90,8 @@ func getopts() parameters {
 
 	f.BoolVar(&simple, "s", false, "")
 	f.BoolVar(&simple, "simple", false, "")
-	f.BoolVar(&piecewise, "p", false, "")
-	f.BoolVar(&piecewise, "piecewise", false, "")
+	f.BoolVar(&chunking, "p", false, "")
+	f.BoolVar(&chunking, "chunking", false, "")
 
 	f.StringVar(&params.infile, "i", "", "")
 	f.StringVar(&params.infile, "in", "", "")
@@ -120,12 +121,12 @@ func getopts() parameters {
 		params.mode = modeDecrypt
 	}
 
-	if simple == piecewise {
-		usage("please specify one of simple or piecewise methods")
+	if simple == chunking {
+		usage("please specify one of simple or chunking methods")
 	} else if simple {
 		params.method = methodSimple
-	} else /* piecewise */ {
-		params.method = methodPiecewise
+	} else /* chunking */ {
+		params.method = methodChunking
 	}
 
 	if len(params.infile) == 0 {
@@ -158,7 +159,7 @@ func simpleEncrypt(c ubiq.Credentials, ifp, ofp *os.File, size int64) error {
 	return err
 }
 
-func piecewiseEncrypt(c ubiq.Credentials, ifp, ofp *os.File) error {
+func chunkingEncrypt(c ubiq.Credentials, ifp, ofp *os.File) error {
 	var pt, ct []byte = make([]byte, 128*1024), []byte{}
 
 	// new encryption object
@@ -224,7 +225,7 @@ func simpleDecrypt(c ubiq.Credentials, ifp, ofp *os.File, size int64) error {
 	return err
 }
 
-func piecewiseDecrypt(c ubiq.Credentials, ifp, ofp *os.File) error {
+func chunkingDecrypt(c ubiq.Credentials, ifp, ofp *os.File) error {
 	var ct, pt []byte = make([]byte, 128*1024), []byte{}
 
 	// new decryption object
@@ -296,7 +297,7 @@ func _main(params parameters) error {
 	if params.method == methodSimple && size > maxSimpleSize {
 		fmt.Fprintf(os.Stderr, "NOTE: This is only for demonstration purposes and is designed to work on memory\n")
 		fmt.Fprintf(os.Stderr, "      constrained devices.  Therefore, this sample application will switch to\n")
-		fmt.Fprintf(os.Stderr, "      the piecewise APIs for files larger than %u bytes in order to reduce\n", maxSimpleSize)
+		fmt.Fprintf(os.Stderr, "      the chunking APIs for files larger than %v bytes in order to reduce\n", maxSimpleSize)
 		fmt.Fprintf(os.Stderr, "      excessive resource usages on resource constrained IoT devices\n")
 		params.method = maxSimpleSize
 	}
@@ -315,11 +316,11 @@ func _main(params parameters) error {
 		} else /* decrypt */ {
 			err = simpleDecrypt(credentials, ifp, ofp, size)
 		}
-	} else /* piecewise */ {
+	} else /* chunking */ {
 		if params.mode == modeEncrypt {
-			err = piecewiseEncrypt(credentials, ifp, ofp)
+			err = chunkingEncrypt(credentials, ifp, ofp)
 		} else /* decrypt */ {
-			err = piecewiseDecrypt(credentials, ifp, ofp)
+			err = chunkingDecrypt(credentials, ifp, ofp)
 		}
 	}
 

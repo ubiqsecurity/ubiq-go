@@ -32,7 +32,7 @@ type newEncryptionRequest struct {
 	Uses uint `json:"uses"`
 }
 
-// Encryption holds the context of a piecewise encryption operation.
+// Encryption holds the context of a chunked encryption operation.
 // Use NewEncryption() to create/initialize an Encryption object.
 //
 // After creating an Encryption object, the caller should use the
