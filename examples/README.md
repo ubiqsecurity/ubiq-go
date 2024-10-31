@@ -65,7 +65,8 @@ Encrypt or decrypt files using the Ubiq service
   -d, -decrypt            Decrypt the contents of the input file and write
                             the results to the output file
   -s, -simple             Use the simple encryption / decryption interfaces
-  -p, -piecewise          Use the piecewise encryption / decryption interfaces
+  -p, -chunking           Use the encryption / decryption interfaces to handle
+                              large data elements where data is loaded in chunks
   -i INFILE, -in INFILE   Set input file name
   -o OUTFILE, -out OUTFILE
                           Set output file name
@@ -88,13 +89,13 @@ $ ./ubiq_sample -i README.md -o /tmp/readme.enc -e -s -c ./credentials
 $ ./ubiq_sample -i /tmp/readme.enc -o /tmp/README.out -d -s -c ./credentials
 ```
 
-#### Demonstrate using the piecewise (-p / -piecewise) API interface to encrypt this README.md file and write the encrypted data to /tmp/readme.enc
+#### Demonstrate using the chunking (-p / -chunking) API interface to encrypt this README.md file and write the encrypted data to /tmp/readme.enc
 
 ```sh
 $ ./ubiq_sample -i README.md -o /tmp/readme.enc -e -p -c ./credentials
 ```
 
-#### Demonstrate using the piecewise (-p / -piecewise) API interface to decrypt the /tmp/readme.enc file and write the decrypted output to /tmp/README.out
+#### Demonstrate using the chunking (-p / -chunking) API interface to decrypt the /tmp/readme.enc file and write the decrypted output to /tmp/README.out
 
 ```sh
 $ ./ubiq_sample -i /tmp/readme.enc -o /tmp/README.out -d -p -c ./credentials

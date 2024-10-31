@@ -93,7 +93,7 @@ credentials, err := ubiq.NewCredentials()
 pt, err := ubiq.Decrypt(credentials, ct)
 ```
 
-### Piecewise encryption and decryption
+### Chunking encryption and decryption
 
 #### Encrypt a large data element where data is loaded in chunks
 
