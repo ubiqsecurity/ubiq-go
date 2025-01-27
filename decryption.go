@@ -29,6 +29,9 @@ type Decryption struct {
 	client httpClient
 	host   string
 
+	config *Configuration
+	cache  *cache
+
 	srsa string
 
 	key decryptionKey
@@ -81,8 +84,8 @@ func (d *Decryption) newSession(edk []byte, algo int) error {
 
 	cacheKey := getUnstructuredCacheKey(edk, algo)
 
-	if config.KeyCaching.Unstructured {
-		keyFromCache, err = ubiqCache.readUnstructuredKey(cacheKey)
+	if d.config.KeyCaching.Unstructured {
+		keyFromCache, err = d.cache.readUnstructuredKey(cacheKey)
 		if err != nil {
 			if !errors.Is(err, ErrNotInCache) {
 				return err
@@ -122,8 +125,8 @@ func (d *Decryption) newSession(edk []byte, algo int) error {
 					"unexpected http response " + rsp.Status)
 			}
 		}
-		if config.KeyCaching.Unstructured && config.KeyCaching.Encrypt {
-			ubiqCache.updateUnstructuredKey(cacheKey, d.key)
+		if d.config.KeyCaching.Unstructured && d.config.KeyCaching.Encrypt {
+			d.cache.updateUnstructuredKey(cacheKey, d.key)
 		}
 	} else {
 		d.key.Session = keyFromCache.Session
@@ -138,8 +141,8 @@ func (d *Decryption) newSession(edk []byte, algo int) error {
 			d.key.Wdk, d.key.Epk, d.srsa)
 	}
 
-	if config.KeyCaching.Unstructured && !config.KeyCaching.Encrypt && !usingCachedKey {
-		ubiqCache.updateUnstructuredKey(cacheKey, d.key)
+	if d.config.KeyCaching.Unstructured && !d.config.KeyCaching.Encrypt && !usingCachedKey {
+		d.cache.updateUnstructuredKey(cacheKey, d.key)
 	}
 
 	return err
@@ -149,15 +152,19 @@ func (d *Decryption) newSession(edk []byte, algo int) error {
 // of a decryption while it is in process.
 func NewDecryption(c Credentials) (*Decryption, error) {
 	dec := Decryption{}
+	var err error
 
 	dec.client = newHttpClient(c)
 	dec.host, _ = c.host()
 
 	dec.srsa, _ = c.srsa()
 
-	dec.tracking = newTrackingContext(dec.client, dec.host)
+	dec.tracking = newTrackingContext(dec.client, dec.host, c.config)
 
-	return &dec, nil
+	dec.config = c.config
+	dec.cache = &c.cache
+
+	return &dec, err
 }
 
 // Begin starts a new decryption operation. The Decryption object

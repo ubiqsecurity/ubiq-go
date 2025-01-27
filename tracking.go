@@ -87,17 +87,21 @@ type trackingContext struct {
 	// routine to signal completion/exit
 	//
 	done chan struct{}
+
+	//
+	// A reference to configuration information (frequency, granularity)
+	//
+	config *Configuration
 }
 
-func newTrackingContext(client httpClient, host string) trackingContext {
+func newTrackingContext(client httpClient, host string, config *Configuration) trackingContext {
 	ctx := trackingContext{
 		client: client,
 		host:   host,
 		events: make(chan *trackingEvent),
 		done:   make(chan struct{}),
+		config: config,
 	}
-
-	config, _ := NewConfiguration()
 
 	go trackingRoutine(ctx, config.EventReporting.MinimumCount, time.Duration(config.EventReporting.FlushInterval)*time.Second)
 	return ctx
@@ -201,7 +205,7 @@ func trackingRoutine(ctx trackingContext, minCount int, maxDelay time.Duration) 
 	close(ctx.done)
 }
 
-func formatTimestamp(t time.Time) string {
+func formatTimestamp(t time.Time, config *Configuration) string {
 	// Default is RFC3339Nano:
 	//"2006-01-02T15:04:05.999999999Z07:00"
 	switch config.EventReporting.TimestampGranularity {
@@ -244,7 +248,7 @@ func (tc *trackingContext) AddUserDefinedMetadata(data string) error {
 }
 
 func (tc *trackingContext) AddEvent(papi, dsname, dsgroup string, action trackingAction, count, kn int) {
-	var now string = formatTimestamp(time.Now())
+	var now string = formatTimestamp(time.Now(), tc.config)
 
 	//
 	// note that we send a pointer to the event.

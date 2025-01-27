@@ -33,12 +33,70 @@ older versions.
 
 ## Usage
 
+### Configuration
+
+A configuration can be supplied to control various functions, such as caching timing, security, and how usage is reported back to the ubiq servers. The configuration file can be loaded from an explicit file or read from the default location [`~/.ubiq/configuration`]. If a configuration is not provided, default values will be used. See [below](#configuration-file) for a sample configuration file and content description.
+
+#### Read configuration from default [`~/.ubiq/configuration`] or use default values
+```go
+config, err := ubiq.NewConfiguration()
+```
+
+#### Read configuration from a specific file
+```go
+config, err := ubiq.NewConfiguration(<path_to_file>)
+```
+
+#### Read configuration from JSON String
+```go
+// Load from ENV variables or hardcoded string
+configJson := "{\"logging\": {\"verbose\": true}}"
+config, err := ubiq.NewConfigurationFromJson(configJson)
+```
+
 ### Credentials
 
 The library needs to be configured with your account credentials which are
 available in your [Ubiq Dashboard][dashboard] [credentials][credentials]. The
 credentials can be set using environment variables, loaded from an explicitly
 specified file, or read from the default location (~/.ubiq/credentials).
+
+#### Using CredentialsParams Object
+Credentials can be built using explicit parameters using the CredentialsParams object. Set the values you need, and then call `.Build()` to get a Credentials object. 
+```go
+// Explicitly set values, with config
+credParams := ubiq.CredentialsParams{
+  AccessKeyId: "...",
+  SecretSigningKey: "...",
+  SecretCryptoAccessKey: "..."
+  
+  config: &config
+}
+
+// File and Profile
+// No config object, will default to ~/.ubiq/credentials or default values.
+credParams := ubiq.CredentialsParams{
+  CredentialsFile: "/path/to/credentials",
+  Profile: "profile-name",
+}
+
+// ENV variables 
+// (UBIQ_ACCESS_KEY_ID, UBIQ_SECRET_SIGNING_KEY, UBIQ_SECRET_CRYPTO_ACCESS_KEY)
+// or default file/profile
+credParams := ubiq.CredentialsParams{
+  config: &config,
+}
+
+// Build the credentials object!
+credentials, err := credParams.Build()
+```
+
+> **Note:** Providing a Configuration object during Credentials creation allows you to change the configuration at runtime.
+>
+>```go
+>  config.Logging.Verbose = true
+>  config.KeyCaching.TTLSeconds = 30
+>```
 
 #### Read credentials from a specific file and use a specific profile
 ```go
@@ -78,7 +136,6 @@ will be returned.
 
 ```go
 var pt []byte = ...
-credentials, err := ubiq.NewCredentials()
 ct, err := ubiq.Encrypt(credentials, pt)
 ```
 
@@ -89,7 +146,6 @@ plaintext data will be returned.
 
 ```go
 var ct []byte = ...
-credentials, err := ubiq.NewCredentials()
 pt, err := ubiq.Decrypt(credentials, ct)
 ```
 
@@ -105,7 +161,6 @@ pt, err := ubiq.Decrypt(credentials, ct)
 ```go
 var pt []byte = make([]byte, 128*1024)
 
-credentials, _ := ubiq.NewCredentials()
 encryption, _ := ubiq.NewEncryption(credentials, 1)
 defer encryption.Close()
 
@@ -132,7 +187,6 @@ ct = append(ct, t...)
 ```go
 var ct []byte = make([]byte, 128*1024)
 
-credentials, _ := ubiq.NewCredentials()
 decryption, _ := ubiq.NewDecryption(credentials)
 defer decryption.Close()
 
@@ -158,8 +212,6 @@ Pass credentials, the name of a structured dataaset, and data into the encryptio
 The encrypted data will be returned.
 
 ```go
-credentials, _ := ubiq.NewCredentials()
-
 datasetName := "SSN"
 plainText := "999-01-2345"
 
@@ -180,8 +232,6 @@ return err
 The same plaintext data will result in different cipher text when encrypted using different data keys. The Encrypt For Search function will encrypt the same plain text for a given dataset using all previously used data keys. This will provide a collection of cipher text values that can be used when searching for existing records where the data was encrypted and the specific version of the data key is not known in advance.
 
 ```go
-credentials, _ := ubiq.NewCredentials()
-
 datasetName := "SSN"
 plainText := "999-01-2345"
 
@@ -204,8 +254,6 @@ Pass credentials, the name of a structured dataset, and data into the decryption
 The decrypted data will be returned.
 
 ```go
-credentials, _ := ubiq.NewCredentials()
-
 datasetName := "SSN"
 cipherText := "300-0E-274t"
 
@@ -225,49 +273,14 @@ fmt.Fprintf(os.Stdout, "DECRYPTED decrypted_text= %s \n", plainText)
 
 A sample configuration file is shown below.  The configuration is in JSON format.  
 
-#### Event Reporting
-The <b>event_reporting</b> section contains values to control how often the usage is reported.  
-
-- <b>wake_interval</b> indicates the number of seconds to sleep before waking to determine if there has been enough activity to report usage
-- <b>minimum_count</b> indicates the minimum number of usage records that must be queued up before sending the usage
-- <b>flush_interval</b> indicates the sleep interval before all usage will be flushed to server.
-- <b>trap_exceptions</b> indicates whether exceptions encountered while reporting usage will be trapped and ignored or if it will become an error that gets reported to the application
-- <b>timestamp_granularity</b> indicates the how granular the timestamp will be when reporting events.  Valid values are
-  - "MICROS"  
-    // DEFAULT: values are reported down to the microsecond resolution when possible
-  - "MILLIS"  
-  // values are reported to the millisecond
-  - "SECONDS"  
-  // values are reported to the second
-  - "MINUTES"  
-  // values are reported to minute
-  - "HOURS"  
-  // values are reported to hour
-  - "HALF_DAYS"  
-  // values are reported to half day
-  - "DAYS"  
-  // values are reported to the day
-
-#### Key Caching
-The <b>key_caching</b> section contains values to control how and when keys are cached.
-
-- <b>unstructured</b> indicates whether keys will be cached when doing unstructured decryption. (default: true)
-- <b>structured</b> indicates whether keys will be cached when doing structured encryption/decryption. (default: true)
-- <b>encrypt</b> indicates if keys should be stored encrypted. If keys are encrypted, they will be harder to access via memory, but require them to be decrypted with each use. (default: false)
-- <b>ttl_seconds</b> how many seconds before cache entries should expire and be re-retrieved (default: 1800)
-
-#### Logging
-The <b>logging</b> section contains values to control logging levels.
-
-- <b>verbose</b> enables and disables logging output like event processing and caching.
-
+By default, configuration is loaded in from `~/.ubiq/configuration`. If the file does not exist, the default values (show below) will be used.
 
 ```json
 {
   "event_reporting": {
-    "wake_interval": 1,
-    "minimum_count": 2,
-    "flush_interval": 2,
+    "wake_interval": 10,
+    "minimum_count": 50,
+    "flush_interval": 90,
     "trap_exceptions": false,
     "timestamp_granularity" : "MICROS"
   },
@@ -283,6 +296,43 @@ The <b>logging</b> section contains values to control logging levels.
 }
 ```
 
+#### Event Reporting
+The <b>event_reporting</b> section contains values to control how often the usage is reported.  
+
+- <b>wake_interval</b> indicates the number of seconds to sleep before waking to determine if there has been enough activity to report usage (default: 10 seconds)
+- <b>minimum_count</b> indicates the minimum number of usage records that must be queued up before sending the usage (defualt: 50 records)
+- <b>flush_interval</b> indicates the sleep interval before all usage will be flushed to server. (default: 90 seconds)
+- <b>trap_exceptions</b> indicates whether exceptions encountered while reporting usage will be trapped and ignored or if it will become an error that gets reported to the application (default: false)
+- <b>timestamp_granularity</b> indicates the how granular the timestamp will be when reporting events. (default: MICROS) Valid values are
+  - "MICROS"  
+    - DEFAULT: values are reported down to the microsecond resolution when possible
+  - "MILLIS"  
+    - values are reported to the millisecond
+  - "SECONDS"  
+    - values are reported to the second
+  - "MINUTES"  
+    - values are reported to minute
+  - "HOURS"  
+    - values are reported to hour
+  - "HALF_DAYS"  
+    - values are reported to half day
+  - "DAYS"  
+    - values are reported to the day
+
+#### Key Caching
+The <b>key_caching</b> section contains values to control how and when keys are cached.
+
+- <b>unstructured</b> indicates whether keys will be cached when doing unstructured decryption. (default: true)
+- <b>structured</b> indicates whether keys will be cached when doing structured encryption/decryption. (default: true)
+- <b>encrypt</b> indicates if keys should be stored encrypted. If keys are encrypted, they will be harder to access via memory, but require them to be decrypted with each use. (default: false)
+- <b>ttl_seconds</b> how many seconds before cache entries should expire and be re-retrieved (default: 1800 seconds)
+
+#### Logging
+The <b>logging</b> section contains values to control logging levels.
+
+- <b>verbose</b> enables and disables logging output like event processing and caching. (default: false)
+
+
 ### Custom Metadata for Usage Reporting
 There are cases where a developer would like to attach metadata to usage information reported by the application.  Both the structured and unstructured interfaces allow user_defined metadata to be sent with the usage information reported by the libraries.
 
@@ -295,7 +345,6 @@ Examples are shown below.
 ```go
     # Unstructured
     ...
-    credentials, _ := ubiq.NewCredentials()
     encryption, err := ubiq.NewEncryption(credentials, 1)
     if err == nil {
     defer encryption.Close()
@@ -309,7 +358,6 @@ Examples are shown below.
 ```go
     # Structured
     ...
-    credentials, _ := ubiq.NewCredentials()
     dec, err := NewStructuredDecryption(c)
     dec.AddUserDefinedMetadata("{\"some_meaningful_flag\" : true }")
 	if err == nil {

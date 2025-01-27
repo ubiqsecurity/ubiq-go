@@ -74,6 +74,8 @@ type structuredContext struct {
 	// object/data for dealing with the server
 	client           httpClient
 	host, papi, srsa string
+	config           *Configuration
+	cache            *cache
 
 	// information about the format of the data
 	dataset datasetInfo
@@ -102,35 +104,33 @@ type StructuredEncryption structuredContext
 // multiple decryptions using the same format
 type StructuredDecryption structuredContext
 
-func fetchDataset(client *httpClient, host, papi, name string) (datasetInfo, error) {
+// retrieve the format information from the server
+func (sC *structuredContext) fetchDataset(name string) (datasetInfo, error) {
 	var err error
 	var dataset *datasetInfo
+	var fromCache bool
 
-	err = initializationCheck()
-	if err != nil {
-		return datasetInfo{}, err
-	}
+	cacheKey := getStructuredDatasetKey(sC.papi, name)
 
-	cacheKey := getStructuredDatasetKey(papi, name)
-
-	if config.KeyCaching.Structured {
-		cachedDataset, err := ubiqCache.readDataset(cacheKey)
+	if sC.config.KeyCaching.Structured {
+		cachedDataset, err := sC.cache.readDataset(cacheKey)
 		if err != nil {
 			if !errors.Is(err, ErrNotInCache) {
 				return datasetInfo{}, err
 			}
 		} else {
 			dataset = &cachedDataset
+			fromCache = true
 		}
 	}
 
 	if err != nil || dataset == nil {
 		var query = "ffs_name=" + url.QueryEscape(name) + "&" +
-			"papi=" + url.QueryEscape(papi)
+			"papi=" + url.QueryEscape(sC.papi)
 
 		var rsp *http.Response
 
-		rsp, err = client.Get(host + "/api/v0/ffs?" + query)
+		rsp, err = sC.client.Get(sC.host + "/api/v0/ffs?" + query)
 		if err != nil {
 			return datasetInfo{}, err
 		}
@@ -158,34 +158,29 @@ func fetchDataset(client *httpClient, host, papi, name string) (datasetInfo, err
 	dataset.InputAlphabet, _ =
 		structured.NewAlphabet(dataset.InputCharacterSet)
 
-	if config.KeyCaching.Structured {
-		ubiqCache.updateDataset(cacheKey, *dataset)
+	if sC.config.KeyCaching.Structured && !fromCache {
+		sC.cache.updateDataset(cacheKey, *dataset)
 	}
 
 	return *dataset, nil
 }
 
-func flushDataset(papi, name *string) {
-	initializationCheck()
-	if config.KeyCaching.Structured {
-		ubiqCache.cache.Delete(getStructuredDatasetKey(*papi, *name))
+func (sC *structuredContext) flushDataset(papi, name *string) {
+	if sC.config.KeyCaching.Structured {
+		sC.cache.cache.Delete(getStructuredDatasetKey(*papi, *name))
 	}
 }
 
-func fetchKey(client *httpClient, host, papi, srsa, name string, n int) (
+// retrieve the key from the server
+func (sC *structuredContext) fetchKey(name string, n int) (
 	structuredKey, error) {
 	var err error
 	var key *structuredKey
 	var fromCache bool
 
-	err = initializationCheck()
-	if err != nil {
-		return structuredKey{}, err
-	}
-
-	cacheKey := getStructuredCacheKey(papi, name, n)
-	if config.KeyCaching.Structured {
-		cacheResult, err := ubiqCache.readStructuredKey(cacheKey)
+	cacheKey := getStructuredCacheKey(sC.papi, name, n)
+	if sC.config.KeyCaching.Structured {
+		cacheResult, err := sC.cache.readStructuredKey(cacheKey)
 		if err != nil {
 			if !errors.Is(err, ErrNotInCache) {
 				return structuredKey{}, err
@@ -203,11 +198,11 @@ func fetchKey(client *httpClient, host, papi, srsa, name string, n int) (
 	}
 
 	if err != nil || key == nil {
-		if config.Logging.Verbose {
+		if sC.config.Logging.Verbose {
 			fmt.Fprintf(os.Stdout, "EXPENSIVE --- Fetching Key %v %v From API\n", name, n)
 		}
 		var query = "ffs_name=" + url.QueryEscape(name) + "&" +
-			"papi=" + url.QueryEscape(papi)
+			"papi=" + url.QueryEscape(sC.papi)
 
 		var rsp *http.Response
 
@@ -215,7 +210,7 @@ func fetchKey(client *httpClient, host, papi, srsa, name string, n int) (
 			query += "&key_number=" + strconv.Itoa(n)
 		}
 
-		rsp, err = client.Get(host + "/api/v0/fpe/key?" + query)
+		rsp, err = sC.client.Get(sC.host + "/api/v0/fpe/key?" + query)
 		if err != nil {
 			return structuredKey{}, err
 		}
@@ -237,42 +232,43 @@ func fetchKey(client *httpClient, host, papi, srsa, name string, n int) (
 	}
 
 	// Store without unwrapped data key if Encrypt
-	if config.KeyCaching.Structured && config.KeyCaching.Encrypt && !fromCache {
-		ubiqCache.updateStructuredKey(cacheKey, *key)
+	if sC.config.KeyCaching.Structured && sC.config.KeyCaching.Encrypt && !fromCache {
+		sC.cache.updateStructuredKey(cacheKey, *key)
 		// If -1, it is the current key. Also store at the key number.
 		if n == -1 {
-			ubiqCache.updateStructuredKey(getStructuredCacheKey(papi, name, key.Num), *key)
+			sC.cache.updateStructuredKey(getStructuredCacheKey(sC.papi, name, key.Num), *key)
 		}
 	}
 
 	// If key is empty, either encrypted cache or fresh pull
 	if len(key.Key) == 0 {
-		key.Key, err = unwrapDataKey(key.WDK, key.EPK, srsa)
+		key.Key, err = unwrapDataKey(key.WDK, key.EPK, sC.srsa)
 		if err != nil {
 			return structuredKey{}, err
 		}
 	}
 
 	// Store unwrapped if not encrypted
-	if config.KeyCaching.Structured && !config.KeyCaching.Encrypt && !fromCache {
-		ubiqCache.updateStructuredKey(cacheKey, *key)
+	if sC.config.KeyCaching.Structured && !sC.config.KeyCaching.Encrypt && !fromCache {
+		sC.cache.updateStructuredKey(cacheKey, *key)
 		// If -1, it is the current key. Also store at the key number.
 		if n == -1 {
-			ubiqCache.updateStructuredKey(getStructuredCacheKey(papi, name, key.Num), *key)
+			sC.cache.updateStructuredKey(getStructuredCacheKey(sC.papi, name, key.Num), *key)
 		}
 	}
 
 	return *key, nil
 }
 
-func fetchAllKeys(client *httpClient, host, papi, srsa, name string) (
+// Retrieve all keys from the server
+func (sC *structuredContext) fetchAllKeys(name string) (
 	keys []structuredKey, err error) {
 	var query = "ffs_name=" + url.QueryEscape(name) + "&" +
-		"papi=" + url.QueryEscape(papi)
+		"papi=" + url.QueryEscape(sC.papi)
 
 	var rsp *http.Response
 
-	rsp, err = client.Get(host + "/api/v0/fpe/def_keys?" + query)
+	rsp, err = sC.client.Get(sC.host + "/api/v0/fpe/def_keys?" + query)
 	if err != nil {
 		return nil, err
 	}
@@ -281,14 +277,13 @@ func fetchAllKeys(client *httpClient, host, papi, srsa, name string) (
 	js := make(map[string]defKeys)
 	json.NewDecoder(rsp.Body).Decode(&js)
 
-	pk, err := decryptPrivateKey(js[name].EncryptedPrivateKey, srsa)
+	pk, err := decryptPrivateKey(js[name].EncryptedPrivateKey, sC.srsa)
 	if err != nil {
 		return nil, err
 	}
 
-	initializationCheck()
-	shouldCache := config.KeyCaching.Structured
-	shouldEncrypt := config.KeyCaching.Encrypt
+	shouldCache := sC.config.KeyCaching.Structured
+	shouldEncrypt := sC.config.KeyCaching.Encrypt
 
 	keys = make([]structuredKey, len(js[name].EncryptedDataKeys))
 	for i := range js[name].EncryptedDataKeys {
@@ -298,11 +293,11 @@ func fetchAllKeys(client *httpClient, host, papi, srsa, name string) (
 		key.EPK = js[name].EncryptedPrivateKey
 		key.WDK = js[name].EncryptedDataKeys[i]
 
-		cacheKey := getStructuredCacheKey(papi, name, i)
+		cacheKey := getStructuredCacheKey(sC.papi, name, i)
 
 		// Store without decrypted data key if encrypted
 		if shouldCache && shouldEncrypt {
-			ubiqCache.updateStructuredKey(cacheKey, key)
+			sC.cache.updateStructuredKey(cacheKey, key)
 		}
 
 		key.Key, err = decryptDataKey(
@@ -312,7 +307,7 @@ func fetchAllKeys(client *httpClient, host, papi, srsa, name string) (
 		}
 
 		if shouldCache && !shouldEncrypt {
-			ubiqCache.updateStructuredKey(cacheKey, key)
+			sC.cache.updateStructuredKey(cacheKey, key)
 		}
 
 		keys[i] = key
@@ -321,11 +316,10 @@ func fetchAllKeys(client *httpClient, host, papi, srsa, name string) (
 	return keys, nil
 }
 
-func flushKey(papi, name *string, n int) {
-	initializationCheck()
-	if config.KeyCaching.Structured {
+func (sC *structuredContext) flushKey(papi, name *string, n int) {
+	if sC.config.KeyCaching.Structured {
 		cacheKey := getStructuredCacheKey(*papi, *name, n)
-		ubiqCache.cache.Delete(cacheKey)
+		sC.cache.cache.Delete(cacheKey)
 	}
 }
 
@@ -470,24 +464,6 @@ func decodeKeyNumber(inp []rune, ocs *structured.Alphabet, sft int) ([]rune, int
 	return inp, n
 }
 
-// retrieve the format information from the server
-func (fc *structuredContext) getDatasetInfo(name string) (dataset datasetInfo, err error) {
-	return fetchDataset(&fc.client, fc.host, fc.papi, name)
-}
-
-// retrieve the key from the server
-func (fc *structuredContext) getKey(datasetName string, kn int) (key structuredKey, err error) {
-	return fetchKey(&fc.client,
-		fc.host, fc.papi, fc.srsa,
-		datasetName, kn)
-}
-
-func (fc *structuredContext) getAllKeys(datasetName string) (keys []structuredKey, err error) {
-	return fetchAllKeys(&fc.client,
-		fc.host, fc.papi, fc.srsa,
-		datasetName)
-}
-
 func newStructuredContext(c Credentials) (fc *structuredContext, err error) {
 	fc = new(structuredContext)
 
@@ -496,6 +472,8 @@ func newStructuredContext(c Credentials) (fc *structuredContext, err error) {
 	fc.host, _ = c.host()
 	fc.papi, _ = c.papi()
 	fc.srsa, _ = c.srsa()
+	fc.config = c.config
+	fc.cache = &c.cache
 
 	fc.kn = -1
 	return
@@ -530,7 +508,7 @@ func (fc *structuredContext) setAlgorithm(dataset datasetInfo, kn int) (err erro
 		return
 	}
 
-	key, err = fc.getKey(dataset.Name, kn)
+	key, err = fc.fetchKey(dataset.Name, kn)
 	if err != nil {
 		return
 	}
@@ -547,10 +525,13 @@ func (fc *structuredContext) setAlgorithm(dataset datasetInfo, kn int) (err erro
 // can be reused to encrypt multiple plaintexts using the format (and
 // algorithm and key) named by @dataset
 func NewStructuredEncryption(c Credentials) (*StructuredEncryption, error) {
+	var err error
+
 	fc, err := newStructuredContext(c)
 	if err == nil {
-		fc.tracking = newTrackingContext(fc.client, fc.host)
+		fc.tracking = newTrackingContext(fc.client, fc.host, c.config)
 	}
+
 	return (*StructuredEncryption)(fc), err
 }
 
@@ -560,7 +541,7 @@ func NewStructuredEncryption(c Credentials) (*StructuredEncryption, error) {
 // @twk may be nil, in which case, the default will be used
 func (fe *StructuredEncryption) Cipher(datasetName, pt string, twk []byte) (
 	ct string, err error) {
-	dataset, err := ((*structuredContext)(fe)).getDatasetInfo(datasetName)
+	dataset, err := ((*structuredContext)(fe)).fetchDataset(datasetName)
 	fe.dataset = dataset
 	if err != nil {
 		return
@@ -631,7 +612,7 @@ func (fe *StructuredEncryption) CipherForSearch(datasetName, pt string, twk []by
 		return
 	}
 
-	keys, err := ((*structuredContext)(fe)).getAllKeys(datasetName)
+	keys, err := ((*structuredContext)(fe)).fetchAllKeys(datasetName)
 	if err != nil {
 		return
 	}
@@ -685,6 +666,7 @@ func (fe *StructuredEncryption) CipherForSearch(datasetName, pt string, twk []by
 
 func (fe *StructuredEncryption) Close() {
 	fe.tracking.Close()
+	fe.cache = nil
 }
 
 // Attach metadata to usage information reported by the application.
@@ -695,11 +677,14 @@ func (fe *StructuredEncryption) AddUserDefinedMetadata(data string) error {
 // Create a new format preserving decryption object. The returned object
 // can be reused to decrypt multiple ciphertexts using the format (and
 // algorithm and key) named by @dataset
+// Uses default configuration
 func NewStructuredDecryption(c Credentials) (*StructuredDecryption, error) {
+	var err error
 	fc, err := newStructuredContext(c)
 	if err == nil {
-		fc.tracking = newTrackingContext(fc.client, fc.host)
+		fc.tracking = newTrackingContext(fc.client, fc.host, c.config)
 	}
+
 	return (*StructuredDecryption)(fc), err
 }
 
@@ -755,9 +740,34 @@ func (fd *StructuredDecryption) Cipher(datasetName, ct string, twk []byte) (
 
 func (fd *StructuredDecryption) Close() {
 	fd.tracking.Close()
+	fd.cache = nil
 }
 
 // Attach metadata to usage information reported by the application.
 func (fd *StructuredDecryption) AddUserDefinedMetadata(data string) error {
 	return fd.tracking.AddUserDefinedMetadata(data)
+}
+
+func (sC *structuredContext) ListCacheValues() error {
+	iter := sC.cache.cache.Iterator()
+	var isNext bool
+	isNext = iter.SetNext()
+	for isNext {
+		entry, err := iter.Value()
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(os.Stdout, "%v - size: %v\n", entry.Key(), len(entry.Value()))
+		isNext = iter.SetNext()
+	}
+
+	return nil
+}
+
+func (fd *StructuredDecryption) ListCacheValues() error {
+	return (*structuredContext)(fd).ListCacheValues()
+}
+
+func (fe *StructuredEncryption) ListCacheValues() error {
+	return (*structuredContext)(fe).ListCacheValues()
 }

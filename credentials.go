@@ -2,11 +2,13 @@ package ubiq
 
 import (
 	"errors"
-	"github.com/go-ini/ini"
+	"fmt"
 	"os"
 	"os/user"
 	"path/filepath"
 	"strings"
+
+	"github.com/go-ini/ini"
 )
 
 const (
@@ -30,6 +32,9 @@ const (
 // function.
 type Credentials struct {
 	params map[string]string
+
+	config *Configuration
+	cache  cache
 }
 
 // internal function to initialize a Credentials object
@@ -243,6 +248,10 @@ func (c *Credentials) set(papi, sapi, srsa string, args ...string) error {
 	return nil
 }
 
+func (c *Credentials) Close() {
+	c.cache.cache.Close()
+}
+
 // NewCredentials creats a Credentials object and populates it with the
 // caller's credentials according to the number of arguments passed to it.
 //
@@ -274,14 +283,91 @@ func NewCredentials(args ...string) (Credentials, error) {
 	case 0:
 		err = c.init()
 	case 1:
+		// file
 		err = c.load(args[0])
 	case 2:
+		// file, profile
 		err = c.load(args[0], args[1])
 	case 3:
+		// papi, sapi, srsa
 		err = c.set(args[0], args[1], args[2])
 	case 4:
+		// papi, sapi, srsa, host
 		err = c.set(args[0], args[1], args[2], args[3])
 	}
+
+	if err != nil {
+		return c, err
+	}
+
+	// Intialize default configuration
+	config, err := NewConfiguration()
+	if err != nil {
+		return c, err
+	}
+	c.config = &config
+
+	// Initialize cache
+	c.cache, err = initializeCache(c.config)
+
+	return c, err
+}
+
+type CredentialsParams struct {
+	AccessKeyId           string
+	SecretSigningKey      string
+	SecretCryptoAccessKey string
+
+	Host string
+
+	CredentialsFile string
+	Profile         string
+
+	Config *Configuration
+}
+
+type CredentialBuilder interface {
+	Build()
+}
+
+func (params *CredentialsParams) Build() (Credentials, error) {
+	var err error
+	c := newCredentials()
+
+	if params.AccessKeyId != "" && params.CredentialsFile != "" {
+		return c, fmt.Errorf("only one, credentials values or credentials file, should be set")
+	}
+
+	if params.AccessKeyId != "" && params.SecretSigningKey != "" && params.SecretCryptoAccessKey != "" {
+		// Load from individual values
+		err = c.set(params.AccessKeyId, params.SecretSigningKey, params.SecretCryptoAccessKey, params.Host)
+	} else if params.CredentialsFile != "" {
+		// Load from file/profile
+		err = c.load(params.CredentialsFile, params.Profile)
+	} else {
+		// Load from ENV variables
+		err = c.init()
+	}
+
+	if err != nil {
+		return c, err
+	}
+
+	if params.Config == nil {
+		// Load default configuration
+		config, err := NewConfiguration()
+
+		if err != nil {
+			return c, err
+		}
+
+		c.config = &config
+	} else {
+		c.config = params.Config
+	}
+
+	// Create cache for storing data
+	c.cache, err = initializeCache(params.Config)
 
 	return c, err
 }

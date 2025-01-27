@@ -11,10 +11,7 @@ import (
 )
 
 func TestGetDataset(t *testing.T) {
-	credentials, err := NewCredentials()
-	if err != nil {
-		t.Fatal(err)
-	}
+	initializeCreds()
 
 	enc, err := NewStructuredEncryption(credentials)
 	if err != nil {
@@ -28,22 +25,16 @@ func TestGetDataset(t *testing.T) {
 }
 
 func testStructured(t *testing.T, dataset, pt string) {
-	c, err := NewCredentials()
+	initializeCreds()
+	enc, err := NewStructuredEncryption(credentials)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	enc, err := NewStructuredEncryption(c)
+	dec, err := NewStructuredDecryption(credentials)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer enc.Close()
-
-	dec, err := NewStructuredDecryption(c)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer dec.Close()
 
 	ct, err := enc.Cipher(dataset, pt, nil)
 	if err != nil {
@@ -58,6 +49,9 @@ func testStructured(t *testing.T, dataset, pt string) {
 	if pt != rt {
 		t.Fatalf("bad recovered plaintext: \"%s\" vs. \"%s\"", pt, rt)
 	}
+
+	enc.Close()
+	dec.Close()
 }
 
 func TestStructuredAlnumSSN(t *testing.T) {
@@ -79,18 +73,14 @@ func TestStructuredUTF8Complex(t *testing.T) {
 }
 
 func testStructuredForSearchLocal(t *testing.T, dataset, pt string) {
-	c, err := NewCredentials()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	enc, err := NewStructuredEncryption(c)
+	initializeCreds()
+	enc, err := NewStructuredEncryption(credentials)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer enc.Close()
 
-	dec, err := NewStructuredDecryption(c)
+	dec, err := NewStructuredDecryption(credentials)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -140,18 +130,15 @@ func testStructuredForSearchRemote(t *testing.T, dataset, pt, expected_ct string
 		t.Skip()
 	}
 
-	c, err := NewCredentials()
-	if err != nil {
-		t.Fatal(err)
-	}
+	initializeCreds()
 
-	enc, err := NewStructuredEncryption(c)
+	enc, err := NewStructuredEncryption(credentials)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer enc.Close()
 
-	dec, err := NewStructuredDecryption(c)
+	dec, err := NewStructuredDecryption(credentials)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -249,18 +236,15 @@ func TestStructured125k(t *testing.T) {
 		t.Skip(err)
 	}
 
-	creds, err := NewCredentials()
-	if err != nil {
-		t.Fatal(err)
-	}
+	initializeCreds()
 
-	enc, err := NewStructuredEncryption(creds)
+	enc, err := NewStructuredEncryption(credentials)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer enc.Close()
 
-	dec, err := NewStructuredDecryption(creds)
+	dec, err := NewStructuredDecryption(credentials)
 	if err != nil {
 		t.Fatal(err)
 	}

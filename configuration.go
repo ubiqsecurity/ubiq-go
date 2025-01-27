@@ -71,3 +71,12 @@ func NewConfiguration(args ...string) (Configuration, error) {
 
 	return config, err
 }
+
+func NewConfigurationFromJson(jsonConfig string) (Configuration, error) {
+	config := Configuration{}
+	config.setDefaults()
+
+	err := json.Unmarshal([]byte(jsonConfig), &config)
+
+	return config, err
+}

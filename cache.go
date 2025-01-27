@@ -17,11 +17,12 @@ var (
 )
 
 type cache struct {
-	cache *bigcache.BigCache
+	cache  *bigcache.BigCache
+	config *Configuration
 }
 
-func NewCache(ttl_seconds int) (cache, error) {
-	ttlDuration := time.Duration(ttl_seconds) * time.Second
+func NewCache(cfg *Configuration) (cache, error) {
+	ttlDuration := time.Duration(cfg.KeyCaching.TTLSeconds) * time.Second
 	Cache, err := bigcache.New(context.Background(), bigcache.DefaultConfig(ttlDuration))
 
 	if err != nil {
@@ -29,7 +30,8 @@ func NewCache(ttl_seconds int) (cache, error) {
 	}
 
 	return cache{
-		cache: Cache,
+		cache:  Cache,
+		config: cfg,
 	}, err
 }
 
@@ -47,7 +49,7 @@ func getUnstructuredCacheKey(edk []byte, algo int) string {
 }
 
 func (kC *cache) updateStructuredKey(key string, value structuredKey) error {
-	if config.Logging.Verbose {
+	if kC.config.Logging.Verbose {
 		fmt.Fprintf(os.Stdout, "Storing key in cache %v \n", key)
 	}
 	v, err := json.Marshal(&value)
@@ -60,7 +62,7 @@ func (kC *cache) updateStructuredKey(key string, value structuredKey) error {
 }
 
 func (kC *cache) readStructuredKey(key string) (structuredKey, error) {
-	if config.Logging.Verbose {
+	if kC.config.Logging.Verbose {
 		fmt.Fprintf(os.Stdout, "Reading structured key from cache %v \n", key)
 	}
 	v, err := kC.cache.Get(key)
@@ -80,7 +82,7 @@ func (kC *cache) readStructuredKey(key string) (structuredKey, error) {
 }
 
 func (kC *cache) updateDataset(key string, value datasetInfo) error {
-	if config.Logging.Verbose {
+	if kC.config.Logging.Verbose {
 		fmt.Fprintf(os.Stdout, "Storing dataset in cache %v \n", key)
 	}
 	v, err := json.Marshal(&value)
@@ -93,7 +95,7 @@ func (kC *cache) updateDataset(key string, value datasetInfo) error {
 }
 
 func (kC *cache) readDataset(key string) (datasetInfo, error) {
-	if config.Logging.Verbose {
+	if kC.config.Logging.Verbose {
 		fmt.Fprintf(os.Stdout, "Reading dataset from cache %v \n", key)
 	}
 	v, err := kC.cache.Get(key)
@@ -114,7 +116,7 @@ func (kC *cache) readDataset(key string) (datasetInfo, error) {
 }
 
 func (dC *cache) updateUnstructuredKey(key string, value decryptionKey) error {
-	if config.Logging.Verbose {
+	if dC.config.Logging.Verbose {
 		fmt.Fprintf(os.Stdout, "Storing unstructured key in cache %v \n", key)
 	}
 	v, err := json.Marshal(&value)
@@ -127,7 +129,7 @@ func (dC *cache) updateUnstructuredKey(key string, value decryptionKey) error {
 }
 
 func (dC *cache) readUnstructuredKey(key string) (decryptionKey, error) {
-	if config.Logging.Verbose {
+	if dC.config.Logging.Verbose {
 		fmt.Fprintf(os.Stdout, "Reading unstructured key from cache %v \n", key)
 	}
 	v, err := dC.cache.Get(key)
@@ -146,24 +148,10 @@ func (dC *cache) readUnstructuredKey(key string) (decryptionKey, error) {
 	return decryptKey, err
 }
 
-var ubiqCache cache
-var config Configuration
-
-func initializationCheck() error {
-	var err error
-	if config == (Configuration{}) {
-		config, err = NewConfiguration()
-		if err != nil {
-			return err
-		}
+func initializeCache(cfg *Configuration) (ubiqCache cache, err error) {
+	if cfg.KeyCaching.Structured && ubiqCache.cache == nil {
+		return NewCache(cfg)
 	}
 
-	if config.KeyCaching.Structured && ubiqCache.cache == nil {
-		ubiqCache, err = NewCache(config.KeyCaching.TTLSeconds)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return ubiqCache, err
 }
