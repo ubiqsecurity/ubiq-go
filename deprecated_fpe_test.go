@@ -11,10 +11,7 @@ import (
 )
 
 func TestDeprecatedGetFFS(t *testing.T) {
-	credentials, err := NewCredentials()
-	if err != nil {
-		t.Fatal(err)
-	}
+	initializeCreds()
 
 	enc, err := NewFPEncryption(credentials, "ALPHANUM_SSN")
 	if err != nil {
@@ -24,17 +21,14 @@ func TestDeprecatedGetFFS(t *testing.T) {
 }
 
 func testDeprecatedFPE(t *testing.T, ffs, pt string) {
-	c, err := NewCredentials()
+	initializeCreds()
+
+	ct, err := FPEncrypt(credentials, ffs, pt, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	ct, err := FPEncrypt(c, ffs, pt, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	rt, err := FPDecrypt(c, ffs, ct, nil)
+	rt, err := FPDecrypt(credentials, ffs, ct, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,18 +57,15 @@ func TestDeprecatedFPEUTF8Complex(t *testing.T) {
 }
 
 func testDeprecatedFPEForSearchLocal(t *testing.T, ffs, pt string) {
-	c, err := NewCredentials()
-	if err != nil {
-		t.Fatal(err)
-	}
+	initializeCreds()
 
-	ct, err := FPEncryptForSearch(c, ffs, pt, nil)
+	ct, err := FPEncryptForSearch(credentials, ffs, pt, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	for i := range ct {
-		rt, err := FPDecrypt(c, ffs, ct[i], nil)
+		rt, err := FPDecrypt(credentials, ffs, ct[i], nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -112,19 +103,16 @@ func testFPEForSearchRemote(t *testing.T, ffs, pt, expected_ct string) {
 		t.Skip()
 	}
 
-	c, err := NewCredentials()
-	if err != nil {
-		t.Fatal(err)
-	}
+	initializeCreds()
 
-	ct, err := FPEncryptForSearch(c, ffs, pt, nil)
+	ct, err := FPEncryptForSearch(credentials, ffs, pt, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	var found bool = false
 	for i := range ct {
-		rt, err := FPDecrypt(c, ffs, ct[i], nil)
+		rt, err := FPDecrypt(credentials, ffs, ct[i], nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -212,26 +200,23 @@ func TestDeprecatedFPE1M(t *testing.T) {
 		t.Skip(err)
 	}
 
-	creds, err := NewCredentials()
-	if err != nil {
-		t.Fatal(err)
-	}
+	initializeCreds()
 
 	var ops map[string]*FPEOperations = make(map[string]*FPEOperations)
-	for i, _ := range records {
+	for i := range records {
 		rec := &records[i]
 
 		op, ok := ops[rec.Dataset]
 		if !ok {
 			var _op FPEOperations
 
-			_op.enc, err = NewFPEncryption(creds, rec.Dataset)
+			_op.enc, err = NewFPEncryption(credentials, rec.Dataset)
 			if err != nil {
 				t.Fatal(err)
 			}
 			defer _op.enc.Close()
 
-			_op.dec, err = NewFPDecryption(creds, rec.Dataset)
+			_op.dec, err = NewFPDecryption(credentials, rec.Dataset)
 			if err != nil {
 				t.Fatal(err)
 			}

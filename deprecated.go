@@ -19,28 +19,19 @@ type FPEncryption StructuredEncryption
 type FPDecryption StructuredEncryption
 
 // Deprecated: Replaced by fetchDataset
-func fetchFFS(client *httpClient, host, papi, name string) (ffsInfo, error) {
-	info, err := fetchDataset(client, host, papi, name)
-	return ffsInfo(info), err
-}
-
-// Deprecated: Replaced by flushDataset
-func flushFFS(papi, name *string) {
-	flushDataset(papi, name)
-}
-
-// Deprecated: Replaced by fetchDataset
 func (fc *fpeContext) getFFSInfo(name string) (ffs ffsInfo, err error) {
-	info, err := fetchDataset(&fc.client, fc.host, fc.papi, name)
+	info, err := ((*structuredContext)(fc)).fetchDataset(name)
 	return ffsInfo(info), err
 }
 
-func newFPEContext(c Credentials, dataset string) (fc *fpeContext, err error) {
+func newFPEContext(c Credentials, ffs string) (fc *fpeContext, err error) {
+
 	sC, err := newStructuredContext(c)
 	if err != nil {
 		return &fpeContext{}, err
 	}
-	sC.dataset, err = sC.getDatasetInfo(dataset)
+
+	sC.dataset, err = sC.fetchDataset(ffs)
 	fpeC := fpeContext(*sC)
 	fc = &fpeC
 	return
@@ -52,9 +43,9 @@ func newFPEContext(c Credentials, dataset string) (fc *fpeContext, err error) {
 func NewFPEncryption(c Credentials, ffs string) (*FPEncryption, error) {
 	fc, err := newFPEContext(c, ffs)
 	if err == nil {
-		fc.tracking = newTrackingContext(fc.client, fc.host)
+		fc.tracking = newTrackingContext(fc.client, fc.host, c.config)
 	}
-	fc.dataset, err = ((*structuredContext)(fc)).getDatasetInfo(ffs)
+	fc.dataset, err = ((*structuredContext)(fc)).fetchDataset(ffs)
 	return (*FPEncryption)(fc), err
 }
 
@@ -79,9 +70,9 @@ func (fd *FPEncryption) Cipher(pt string, twk []byte) (ct string, err error) {
 func NewFPDecryption(c Credentials, ffs string) (*FPDecryption, error) {
 	fc, err := newFPEContext(c, ffs)
 	if err == nil {
-		fc.tracking = newTrackingContext(fc.client, fc.host)
+		fc.tracking = newTrackingContext(fc.client, fc.host, c.config)
 	}
-	fc.dataset, err = ((*structuredContext)(fc)).getDatasetInfo(ffs)
+	fc.dataset, err = ((*structuredContext)(fc)).fetchDataset(ffs)
 	return (*FPDecryption)(fc), err
 }
 
@@ -175,4 +166,8 @@ func FPDecrypt(c Credentials, ffs, pt string, twk []byte) (string, error) {
 		ct, err = enc.Cipher(ffs, pt, twk)
 	}
 	return ct, err
+}
+
+func (sC *structuredContext) getDatasetInfo(dataset string) (datasetInfo, error) {
+	return sC.fetchDataset(dataset)
 }

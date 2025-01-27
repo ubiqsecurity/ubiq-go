@@ -5,10 +5,7 @@ import (
 )
 
 func TestNoEncryption(t *testing.T) {
-	credentials, err := NewCredentials()
-	if err != nil {
-		t.Fatal(err)
-	}
+	initializeCreds()
 
 	encryption, err := NewEncryption(credentials, 1)
 	if encryption != nil {
@@ -20,10 +17,8 @@ func TestNoEncryption(t *testing.T) {
 }
 
 func TestSimpleEncryption(t *testing.T) {
-	credentials, err := NewCredentials()
-	if err != nil {
-		t.Fatal(err)
-	}
+	var err error
+	initializeCreds()
 
 	_, err = Encrypt(credentials, []byte("abc"))
 	if err != nil {
@@ -32,10 +27,8 @@ func TestSimpleEncryption(t *testing.T) {
 }
 
 func TestSingleEncryption(t *testing.T) {
-	credentials, err := NewCredentials()
-	if err != nil {
-		t.Fatal(err)
-	}
+	var err error
+	initializeCreds()
 
 	encryption, err := NewEncryption(credentials, 1)
 	if encryption != nil {
@@ -62,10 +55,8 @@ func TestSingleEncryption(t *testing.T) {
 }
 
 func TestTooManyEncryption(t *testing.T) {
-	credentials, err := NewCredentials()
-	if err != nil {
-		t.Fatal(err)
-	}
+	var err error
+	initializeCreds()
 
 	encryption, err := NewEncryption(credentials, 1)
 	if encryption != nil {

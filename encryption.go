@@ -150,7 +150,7 @@ func NewEncryption(c Credentials, uses uint) (*Encryption, error) {
 	}
 
 	if err == nil {
-		enc.tracking = newTrackingContext(enc.client, enc.host)
+		enc.tracking = newTrackingContext(enc.client, enc.host, c.config)
 	} else {
 		enc = Encryption{}
 	}

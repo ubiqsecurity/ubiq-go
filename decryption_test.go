@@ -6,10 +6,8 @@ import (
 )
 
 func TestNoDecryption(t *testing.T) {
-	credentials, err := NewCredentials()
-	if err != nil {
-		t.Fatal(err)
-	}
+	var err error
+	initializeCreds()
 
 	decryption, err := NewDecryption(credentials)
 	if decryption != nil {
@@ -23,10 +21,8 @@ func TestNoDecryption(t *testing.T) {
 func TestSimpleDecryption(t *testing.T) {
 	var pt []byte = []byte("abc")
 
-	credentials, err := NewCredentials()
-	if err != nil {
-		t.Fatal(err)
-	}
+	var err error
+	initializeCreds()
 
 	ct, err := Encrypt(credentials, pt)
 	if err != nil {
@@ -44,10 +40,8 @@ func TestSimpleDecryption(t *testing.T) {
 }
 
 func TestSingleDecryption(t *testing.T) {
-	credentials, err := NewCredentials()
-	if err != nil {
-		t.Fatal(err)
-	}
+	var err error
+	initializeCreds()
 
 	encryption, err := NewEncryption(credentials, 1)
 	if encryption != nil {
