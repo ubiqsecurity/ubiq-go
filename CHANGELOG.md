@@ -1,5 +1,8 @@
 # Changelog
 
+# 2.2.1 - 2025-01-27
+* Add support for a dynamic/non-default configuration file or configuration object
+
 ## 2.2.0 - 2024-05-29
 * Add partial encryption support
 
