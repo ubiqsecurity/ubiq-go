@@ -126,6 +126,10 @@ credentials, err := ubiq.NewCredentials(
     "..." /* Ubiq API server, may omit this parameter */)
 ```
 
+## Ubiq Unstructured Encryption/Decryption
+
+Unstructured encryption takes in data and returns a `[]byte` array. 
+It is suitable for encrypting files, images, or other miscellaneous data.
 
 ### Simple encryption and decryption
 
@@ -203,10 +207,41 @@ t, _ := decryption.End()
 pt = append(pt, t...)
 ```
 
-### Structured Encryption
+### Encrypt and Decrypt with Reuse
+
+To reuse the encryption/decryption objects, initialize them with the credentials object and store them in a variable. Encryption takes an extra parameter, the number of separate encryptions the caller wishes to perform with the key. This number may be limited by the server. 
+
+```go
+  encryptor, _ := ubiq.NewEncryption(credentials, 1)
+	decryptor, _ := ubiq.NewDecryption(credentials)
+
+	raw_data := [6]string{"alligator", "otter", "eagle owl", "armadillo", "dormouse", "ground hog"}
+	bytearr := [][]byte{}
+	encrypted_data := bytearr[:]
+
+	for i := range raw_data {
+		enc, err := encryptor.Begin()
+		t, err := encryptor.Update([]byte(raw_data[i]))
+		enc = append(enc, t...)
+		t, err = encryptor.End()
+		enc = append(enc, t...)
+		encrypted_data = append(encrypted_data, enc)
+	}
+
+	for i := range encrypted_data {
+		decrypted, err := decryptor.Begin()
+		t, err := decryptor.Update(encrypted_data[i])
+		decrypted = append(decrypted, t...)
+		t, err = decryptor.End()
+		decrypted = append(decrypted, t...)
+		fmt.Fprintf(os.Stdout, "Decrypted: %s \n", string(decrypted[:]))
+	}
+```
+
+## Ubiq Structured Encryption
 This library incorporates Ubiq Structured Encryption.
 
-#### Encrypt
+### Encrypt
 
 Pass credentials, the name of a structured dataaset, and data into the encryption function.
 The encrypted data will be returned.
@@ -227,7 +262,7 @@ fmt.Fprintf(os.Stdout, "ENCRYPTED cipher= %s \n", cipherText)
 return err
 ```
 
-#### Encrypt for Search
+### Encrypt for Search
 
 The same plaintext data will result in different cipher text when encrypted using different data keys. The Encrypt For Search function will encrypt the same plain text for a given dataset using all previously used data keys. This will provide a collection of cipher text values that can be used when searching for existing records where the data was encrypted and the specific version of the data key is not known in advance.
 
@@ -248,7 +283,7 @@ fmt.Fprintf(os.Stdout, "ENCRYPTED cipher= %v \n", cipherTextArr)
 // ENCRYPTED cipher= ["000-03-OJMp", "100-0B-dnKG", "200-12-NOx5", "300-0j-esgH"]
 ```
 
-#### Decrypt
+### Decrypt
 
 Pass credentials, the name of a structured dataset, and data into the decryption function.
 The decrypted data will be returned.
@@ -269,7 +304,7 @@ if err != nil {
 fmt.Fprintf(os.Stdout, "DECRYPTED decrypted_text= %s \n", plainText)
 ```
 
-### Configuration File
+## Configuration File
 
 A sample configuration file is shown below.  The configuration is in JSON format.  
 
@@ -296,7 +331,7 @@ By default, configuration is loaded in from `~/.ubiq/configuration`. If the file
 }
 ```
 
-#### Event Reporting
+### Event Reporting
 The <b>event_reporting</b> section contains values to control how often the usage is reported.  
 
 - <b>wake_interval</b> indicates the number of seconds to sleep before waking to determine if there has been enough activity to report usage (default: 10 seconds)
@@ -319,7 +354,7 @@ The <b>event_reporting</b> section contains values to control how often the usag
   - "DAYS"  
     - values are reported to the day
 
-#### Key Caching
+### Key Caching
 The <b>key_caching</b> section contains values to control how and when keys are cached.
 
 - <b>unstructured</b> indicates whether keys will be cached when doing unstructured decryption. (default: true)
@@ -327,7 +362,7 @@ The <b>key_caching</b> section contains values to control how and when keys are 
 - <b>encrypt</b> indicates if keys should be stored encrypted. If keys are encrypted, they will be harder to access via memory, but require them to be decrypted with each use. (default: false)
 - <b>ttl_seconds</b> how many seconds before cache entries should expire and be re-retrieved (default: 1800 seconds)
 
-#### Logging
+### Logging
 The <b>logging</b> section contains values to control logging levels.
 
 - <b>verbose</b> enables and disables logging output like event processing and caching. (default: false)
