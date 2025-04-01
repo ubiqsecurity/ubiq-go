@@ -28,6 +28,14 @@ type Configuration struct {
 		Encrypt      bool `json:"encrypt"`
 		TTLSeconds   int  `json:"ttl_seconds"`
 	} `json:"key_caching"`
+
+	Idp struct {
+		Provider         string `json:"provider"`
+		CustomerId       string `json:"ubiq_customer_id"`
+		TokenEndpointUrl string `json:"idp_token_endpoint_url"`
+		TenantId         string `json:"idp_tenant_id"`
+		ClientSecret     string `json:"idp_client_secret"`
+	}
 }
 
 func (config *Configuration) setDefaults() {
@@ -43,6 +51,13 @@ func (config *Configuration) setDefaults() {
 	config.KeyCaching.Unstructured = true
 	config.KeyCaching.Encrypt = false
 	config.KeyCaching.TTLSeconds = 1800
+
+	config.Idp.Provider = ""
+	config.Idp.CustomerId = ""
+	config.Idp.TokenEndpointUrl = ""
+	config.Idp.TenantId = ""
+	config.Idp.ClientSecret = ""
+
 }
 
 func NewConfiguration(args ...string) (Configuration, error) {

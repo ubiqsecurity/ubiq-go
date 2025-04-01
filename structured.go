@@ -76,6 +76,7 @@ type structuredContext struct {
 	host, papi, srsa string
 	config           *Configuration
 	cache            *cache
+	creds            *Credentials
 
 	// information about the format of the data
 	dataset datasetInfo
@@ -201,16 +202,29 @@ func (sC *structuredContext) fetchKey(name string, n int) (
 		if sC.config.Logging.Verbose {
 			fmt.Fprintf(os.Stdout, "EXPENSIVE --- Fetching Key %v %v From API\n", name, n)
 		}
-		var query = "ffs_name=" + url.QueryEscape(name) + "&" +
-			"papi=" + url.QueryEscape(sC.papi)
+		query := url.Values{}
+		query.Set("ffs_name", name)
+		query.Set("papi", sC.papi)
 
 		var rsp *http.Response
 
 		if n >= 0 {
-			query += "&key_number=" + strconv.Itoa(n)
+			query.Set("key_number", strconv.Itoa((n)))
 		}
 
-		rsp, err = sC.client.Get(sC.host + "/api/v0/fpe/key?" + query)
+		isIdp, err := sC.creds.isIdp()
+
+		if err != nil {
+			return structuredKey{}, err
+		}
+
+		if isIdp {
+			// IDP mode requires passing the idp cert to the server
+			sC.creds.renewIdpCert()
+			query.Set("payload_cert", sC.creds.idpBase64Cert)
+		}
+
+		rsp, err = sC.client.Get(sC.host + "/api/v0/fpe/key?" + query.Encode())
 		if err != nil {
 			return structuredKey{}, err
 		}
@@ -226,7 +240,12 @@ func (sC *structuredContext) fetchKey(name string, n int) (
 			return structuredKey{}, err
 		}
 		key = new(structuredKey)
-		key.EPK = obj.EPK
+		if isIdp {
+			// IDP mode has a local private key, need to override that key since nothing will be returned from server
+			key.EPK = sC.creds.idpEncryptedPrivateKey
+		} else {
+			key.EPK = obj.EPK
+		}
 		key.WDK = obj.WDK
 		key.Num, _ = strconv.Atoi(obj.Num)
 	}
@@ -263,12 +282,26 @@ func (sC *structuredContext) fetchKey(name string, n int) (
 // Retrieve all keys from the server
 func (sC *structuredContext) fetchAllKeys(name string) (
 	keys []structuredKey, err error) {
-	var query = "ffs_name=" + url.QueryEscape(name) + "&" +
-		"papi=" + url.QueryEscape(sC.papi)
+
+	query := url.Values{}
+	query.Set("ffs_name", name)
+	query.Set("papi", sC.papi)
+
+	isIdp, err := sC.creds.isIdp()
+
+	if err != nil {
+		return nil, err
+	}
+
+	if isIdp {
+		// IDP mode requires passing the idp cert to the server
+		sC.creds.renewIdpCert()
+		query.Set("payload_cert", sC.creds.idpBase64Cert)
+	}
 
 	var rsp *http.Response
 
-	rsp, err = sC.client.Get(sC.host + "/api/v0/fpe/def_keys?" + query)
+	rsp, err = sC.client.Get(sC.host + "/api/v0/fpe/def_keys?" + query.Encode())
 	if err != nil {
 		return nil, err
 	}
@@ -277,7 +310,15 @@ func (sC *structuredContext) fetchAllKeys(name string) (
 	js := make(map[string]defKeys)
 	json.NewDecoder(rsp.Body).Decode(&js)
 
-	pk, err := decryptPrivateKey(js[name].EncryptedPrivateKey, sC.srsa)
+	var epk string
+	if isIdp {
+		// IDP mode has a local private key, need to override that key since nothing will be returned from server
+		epk = sC.creds.idpEncryptedPrivateKey
+	} else {
+		epk = js[name].EncryptedPrivateKey
+	}
+
+	pk, err := decryptPrivateKey(epk, sC.srsa)
 	if err != nil {
 		return nil, err
 	}
@@ -290,7 +331,7 @@ func (sC *structuredContext) fetchAllKeys(name string) (
 		var key structuredKey
 
 		key.Num = i
-		key.EPK = js[name].EncryptedPrivateKey
+		key.EPK = epk
 		key.WDK = js[name].EncryptedDataKeys[i]
 
 		cacheKey := getStructuredCacheKey(sC.papi, name, i)
@@ -474,6 +515,7 @@ func newStructuredContext(c Credentials) (fc *structuredContext, err error) {
 	fc.srsa, _ = c.srsa()
 	fc.config = c.config
 	fc.cache = &c.cache
+	fc.creds = &c
 
 	fc.kn = -1
 	return
@@ -748,7 +790,7 @@ func (fd *StructuredDecryption) AddUserDefinedMetadata(data string) error {
 	return fd.tracking.AddUserDefinedMetadata(data)
 }
 
-func (sC *structuredContext) ListCacheValues() error {
+func (sC *structuredContext) listCacheValues() error {
 	iter := sC.cache.cache.Iterator()
 	var isNext bool
 	isNext = iter.SetNext()
@@ -762,12 +804,4 @@ func (sC *structuredContext) ListCacheValues() error {
 	}
 
 	return nil
-}
-
-func (fd *StructuredDecryption) ListCacheValues() error {
-	return (*structuredContext)(fd).ListCacheValues()
-}
-
-func (fe *StructuredEncryption) ListCacheValues() error {
-	return (*structuredContext)(fe).ListCacheValues()
 }
