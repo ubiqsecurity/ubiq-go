@@ -84,7 +84,7 @@ credParams := ubiq.CredentialsParams{
 // (UBIQ_ACCESS_KEY_ID, UBIQ_SECRET_SIGNING_KEY, UBIQ_SECRET_CRYPTO_ACCESS_KEY)
 // or default file/profile
 credParams := ubiq.CredentialsParams{
-  config: &config,
+  Config: &config,
 }
 
 // Build the credentials object!
@@ -125,6 +125,46 @@ credentials, err := ubiq.NewCredentials(
     "..." /* secret crypto access key */,
     "..." /* Ubiq API server, may omit this parameter */)
 ```
+
+### IDP Integration
+
+Ubiq currently supports both Okta and Entra IDP integration.  Instead of using the credentials provided when creating the API Key, the username (email) and password will be used to authenticate with the IDP and provide access to the Ubiq platform.
+
+Additional server information will be needed in the configuration file, see the [Configuration - IDP Specific Parameters](#idp-specific-parameters) section for more information.
+
+To use IDP, you must use the `CredentialsParam.Build()` method, otherwise your credentials object will not be fully initialized.
+
+#### Examples
+```go
+// in the credentials file
+// [profile-name]
+// IDP_USERNAME = ***
+// IDP_PASSWORD = ***
+credParams := ubiq.CredentialsParams{
+  CredentialsFile: "/path/to/credentials",
+  Profile: "profile-name",
+  Config: &config,
+}
+
+
+// Environment Variables
+// UBIQ_IDP_USERNAME
+// UBIQ_IDP_PASSWORD
+credParams := ubiq.CredentialsParams{
+  Config: &config,
+}
+
+// Explicitly set credentials
+credParams := ubiq.CredentialsParams{
+  Config: &config,
+  IdpUsername: "***",
+  IdpPassword: "***"
+}
+
+credentials, err := credParams.Build()
+
+```
+
 
 ## Ubiq Unstructured Encryption/Decryption
 
@@ -327,6 +367,13 @@ By default, configuration is loaded in from `~/.ubiq/configuration`. If the file
   },
   "logging": {
     "verbose": true
+  },
+  "idp": {
+    "provider": "okta",
+    "ubiq_customer_id": "f6f.....08c5",
+    "idp_token_endpoint_url": " https://dev-<domain>.okta.com/oauth2/v1/token",
+    "idp_tenant_id": "0o....d7",
+    "idp_client_secret": "yro.....2Db"
   }
 }
 ```
@@ -367,6 +414,12 @@ The <b>logging</b> section contains values to control logging levels.
 
 - <b>verbose</b> enables and disables logging output like event processing and caching. (default: false)
 
+### IDP specific parameters
+- <b>provider</b> indicates the IDP provider, either <b>okta</b> or <b>entra</b>
+- <b>ubiq_customer_id</b> The UUID for this customer.  Will be provided by Ubiq.
+- <b>idp_token_endpoint_url</b> The endpoint needed to authenticate the user credentials, provided by Okta or Entra
+- <b>idp_tenant_id</b> contains the tenant value provided by Okta or Entra
+- <b>idp_client_secret</b> contains the client secret value provided by Okta or Entra
 
 ### Custom Metadata for Usage Reporting
 There are cases where a developer would like to attach metadata to usage information reported by the application.  Both the structured and unstructured interfaces allow user_defined metadata to be sent with the usage information reported by the libraries.

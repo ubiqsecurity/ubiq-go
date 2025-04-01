@@ -7,20 +7,25 @@ import (
 	"os/user"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/go-ini/ini"
 )
 
 const (
-	credentialsPapiId = "ACCESS_KEY_ID"
-	credentialsSapiId = "SECRET_SIGNING_KEY"
-	credentialsSrsaId = "SECRET_CRYPTO_ACCESS_KEY"
-	credentialsHostId = "SERVER"
+	credentialsPapiId        = "ACCESS_KEY_ID"
+	credentialsSapiId        = "SECRET_SIGNING_KEY"
+	credentialsSrsaId        = "SECRET_CRYPTO_ACCESS_KEY"
+	credentialsHostId        = "SERVER"
+	credentialsIdpUsernameId = "IDP_USERNAME"
+	credentialsIdpPasswordId = "IDP_PASSWORD"
 
-	credentialsPapiEnvId = "UBIQ_" + credentialsPapiId
-	credentialsSapiEnvId = "UBIQ_" + credentialsSapiId
-	credentialsSrsaEnvId = "UBIQ_" + credentialsSrsaId
-	credentialsHostEnvId = "UBIQ_" + credentialsHostId
+	credentialsPapiEnvId        = "UBIQ_" + credentialsPapiId
+	credentialsSapiEnvId        = "UBIQ_" + credentialsSapiId
+	credentialsSrsaEnvId        = "UBIQ_" + credentialsSrsaId
+	credentialsHostEnvId        = "UBIQ_" + credentialsHostId
+	credentialsIdpUsernameEnvId = "UBIQ_" + credentialsIdpUsernameId
+	credentialsIdpPasswordEnvId = "UBIQ_" + credentialsIdpPasswordId
 
 	credentialsDefaultProfileId = "default"
 	credentialsDefaultHost      = "api.ubiqsecurity.com"
@@ -35,11 +40,17 @@ type Credentials struct {
 
 	config *Configuration
 	cache  cache
+
+	idpCsr                 string
+	idpBase64Cert          string
+	idpCertExpires         time.Time
+	idpEncryptedPrivateKey string
+	initialized            bool
 }
 
 // internal function to initialize a Credentials object
 func newCredentials() Credentials {
-	return Credentials{params: make(map[string]string)}
+	return Credentials{params: make(map[string]string), initialized: false}
 }
 
 func (c Credentials) papi() (string, bool) {
@@ -62,6 +73,16 @@ func (c Credentials) host() (string, bool) {
 	return val, ok
 }
 
+func (c Credentials) idpUsername() (string, bool) {
+	val, ok := c.params[credentialsIdpUsernameId]
+	return val, ok
+}
+
+func (c Credentials) idpPassword() (string, bool) {
+	val, ok := c.params[credentialsIdpPasswordId]
+	return val, ok
+}
+
 // viable indicates that the Credentials are not valid but
 // will be with only the addition of the host
 func (c Credentials) viable() bool {
@@ -70,6 +91,10 @@ func (c Credentials) viable() bool {
 			if _, ok := c.srsa(); ok {
 				return true
 			}
+		}
+	} else if _, ok := c.idpUsername(); ok {
+		if _, ok := c.idpPassword(); ok {
+			return true
 		}
 	}
 
@@ -117,6 +142,10 @@ func loadCredentials(args ...string) (map[string]Credentials, error) {
 				case credentialsSrsaId:
 					fallthrough
 				case credentialsHostId:
+					fallthrough
+				case credentialsIdpUsernameId:
+					fallthrough
+				case credentialsIdpPasswordId:
 					c.params[k.Name()] = k.Value()
 				}
 			}
@@ -151,6 +180,14 @@ func (c *Credentials) merge(other Credentials) {
 	if _, ok := c.host(); !ok {
 		c.params[credentialsHostId] =
 			other.params[credentialsHostId]
+	}
+	if _, ok := c.idpUsername(); !ok {
+		c.params[credentialsIdpUsernameId] =
+			other.params[credentialsIdpUsernameId]
+	}
+	if _, ok := c.idpPassword(); !ok {
+		c.params[credentialsIdpPasswordId] =
+			other.params[credentialsIdpPasswordId]
 	}
 }
 
@@ -188,6 +225,12 @@ func (c *Credentials) init() error {
 	}
 	if val, ok := os.LookupEnv(credentialsHostEnvId); ok {
 		c.params[credentialsHostId] = val
+	}
+	if val, ok := os.LookupEnv(credentialsIdpUsernameEnvId); ok {
+		c.params[credentialsIdpUsernameId] = val
+	}
+	if val, ok := os.LookupEnv(credentialsIdpPasswordEnvId); ok {
+		c.params[credentialsIdpPasswordId] = val
 	}
 
 	m, _ := loadCredentials()
@@ -318,6 +361,9 @@ type CredentialsParams struct {
 	SecretSigningKey      string
 	SecretCryptoAccessKey string
 
+	IdpUsername string
+	IdpPassword string
+
 	Host string
 
 	CredentialsFile string
@@ -368,6 +414,10 @@ func (params *CredentialsParams) Build() (Credentials, error) {
 
 	// Create cache for storing data
 	c.cache, err = initializeCache(params.Config)
+
+	if len(c.params[credentialsIdpUsernameId]) > 0 {
+		err = c.initIdp()
+	}
 
 	return c, err
 }

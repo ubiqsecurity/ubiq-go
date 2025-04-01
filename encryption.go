@@ -29,7 +29,8 @@ type newEncryptionResponse struct {
 }
 
 type newEncryptionRequest struct {
-	Uses uint `json:"uses"`
+	Uses        uint   `json:"uses"`
+	PayloadCert string `json:"payload_cert"`
 }
 
 // Encryption holds the context of a chunked encryption operation.
@@ -125,8 +126,16 @@ func NewEncryption(c Credentials, uses uint) (*Encryption, error) {
 	enc.host, _ = c.host()
 
 	endp := enc.host + "/api/v0/encryption/key"
+	request := newEncryptionRequest{Uses: uses}
 
-	body, _ := json.Marshal(newEncryptionRequest{Uses: uses})
+	isIdp, _ := c.isIdp()
+	if isIdp {
+		// IDP mode requires passing the idp cert to the server
+		c.renewIdpCert()
+		request.PayloadCert = c.idpBase64Cert
+	}
+
+	body, _ := json.Marshal(request)
 	rsp, err := enc.client.Post(endp, "application/json", bytes.NewReader(body))
 
 	if rsp != nil {
@@ -145,6 +154,10 @@ func NewEncryption(c Credentials, uses uint) (*Encryption, error) {
 
 		if err == nil {
 			srsa, _ := c.srsa()
+			if isIdp {
+				// IDP mode has a local private key, need to override that key since nothing will be returned from server
+				ne.EPK = c.idpEncryptedPrivateKey
+			}
 			err = enc.init(ne, srsa)
 		}
 	}

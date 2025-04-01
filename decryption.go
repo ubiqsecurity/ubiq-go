@@ -16,7 +16,8 @@ type newDecryptionResponse struct {
 }
 
 type newDecryptionRequest struct {
-	EDK string `json:"encrypted_data_key"`
+	EDK         string `json:"encrypted_data_key"`
+	PayloadCert string `json:"payload_cert"`
 }
 
 // Decryption holds the context of a chunked decryption operation.
@@ -29,6 +30,7 @@ type Decryption struct {
 	client httpClient
 	host   string
 
+	creds  *Credentials
 	config *Configuration
 	cache  *cache
 
@@ -97,9 +99,18 @@ func (d *Decryption) newSession(edk []byte, algo int) error {
 	if !usingCachedKey || err != nil {
 		endp := d.host
 		endp += "/api/v0/decryption/key"
+		request := newDecryptionRequest{
+			EDK: base64.StdEncoding.EncodeToString(edk),
+		}
 
-		body, _ := json.Marshal(newDecryptionRequest{
-			EDK: base64.StdEncoding.EncodeToString(edk)})
+		isIdp, _ := d.creds.isIdp()
+		if isIdp {
+			// IDP mode requires passing the idp cert to the server
+			d.creds.renewIdpCert()
+			request.PayloadCert = d.creds.idpBase64Cert
+		}
+
+		body, _ := json.Marshal(request)
 		rsp, err = d.client.Post(
 			endp, "application/json", bytes.NewReader(body))
 		if rsp != nil {
@@ -118,7 +129,12 @@ func (d *Decryption) newSession(edk []byte, algo int) error {
 					d.key.Algo, err = getAlgorithmById(algo)
 
 					d.key.Wdk = nd.WDK
-					d.key.Epk = nd.EPK
+					if isIdp {
+						// IDP mode has a local private key, need to override that key since nothing will be returned from server
+						d.key.Epk = d.creds.idpEncryptedPrivateKey
+					} else {
+						d.key.Epk = nd.EPK
+					}
 				}
 			} else {
 				err = errors.New(
@@ -163,6 +179,7 @@ func NewDecryption(c Credentials) (*Decryption, error) {
 
 	dec.config = c.config
 	dec.cache = &c.cache
+	dec.creds = &c
 
 	return &dec, err
 }
