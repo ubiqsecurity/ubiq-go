@@ -1,4 +1,4 @@
-module gitlab.com/ubiqsecurity/ubiq-go
+module gitlab.com/ubiqsecurity/ubiq-go/v2
 
 go 1.18
 
@@ -10,6 +10,6 @@ require (
 )
 
 require (
-	github.com/stretchr/testify v1.8.4 // indirect
+	github.com/stretchr/testify v1.5.1 // indirect
 	golang.org/x/crypto v0.9.0 // indirect
 )

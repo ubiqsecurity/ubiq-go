@@ -13,7 +13,7 @@ import (
 	"sort"
 	"strconv"
 
-	"gitlab.com/ubiqsecurity/ubiq-go/structured"
+	"gitlab.com/ubiqsecurity/ubiq-go/v2/structured"
 )
 
 type datasetInfo struct {

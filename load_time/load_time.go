@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"gitlab.com/ubiqsecurity/ubiq-go"
+	"gitlab.com/ubiqsecurity/ubiq-go/v2"
 )
 
 const (
