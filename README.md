@@ -21,10 +21,12 @@ code which can be viewed using the `go doc` tool.
 
 Import the Ubiq Go library in your source files:
 ```go
-import "gitlab.com/ubiqsecurity/ubiq-go"
+import "gitlab.com/ubiqsecurity/ubiq-go/v2"
 ```
 
 Available symbols are in the `ubiq` namespace/package.
+
+>**Note:** If you don't include the `/v2`, you will get the v1 of this library that does not support Structured Encryption. Check your references/imports.
 
 ### Requirements
 
