@@ -50,7 +50,7 @@ func getUnstructuredCacheKey(edk []byte, algo int) string {
 
 func (kC *cache) updateStructuredKey(key string, value structuredKey) error {
 	if kC.config.Logging.Verbose {
-		fmt.Fprintf(os.Stdout, "Storing key in cache %v \n", key)
+		fmt.Fprintf(os.Stdout, "Storing key in cache %.10s... \n", key)
 	}
 	v, err := json.Marshal(&value)
 
@@ -63,7 +63,7 @@ func (kC *cache) updateStructuredKey(key string, value structuredKey) error {
 
 func (kC *cache) readStructuredKey(key string) (structuredKey, error) {
 	if kC.config.Logging.Verbose {
-		fmt.Fprintf(os.Stdout, "Reading structured key from cache %v \n", key)
+		fmt.Fprintf(os.Stdout, "Reading structured key from cache %.10s... \n", key)
 	}
 	v, err := kC.cache.Get(key)
 	if err != nil {
@@ -83,7 +83,7 @@ func (kC *cache) readStructuredKey(key string) (structuredKey, error) {
 
 func (kC *cache) updateDataset(key string, value datasetInfo) error {
 	if kC.config.Logging.Verbose {
-		fmt.Fprintf(os.Stdout, "Storing dataset in cache %v \n", key)
+		fmt.Fprintf(os.Stdout, "Storing dataset in cache %.10s... \n", key)
 	}
 	v, err := json.Marshal(&value)
 
@@ -96,7 +96,7 @@ func (kC *cache) updateDataset(key string, value datasetInfo) error {
 
 func (kC *cache) readDataset(key string) (datasetInfo, error) {
 	if kC.config.Logging.Verbose {
-		fmt.Fprintf(os.Stdout, "Reading dataset from cache %v \n", key)
+		fmt.Fprintf(os.Stdout, "Reading dataset from cache %.10s... \n", key)
 	}
 	v, err := kC.cache.Get(key)
 	if err != nil {
@@ -117,7 +117,7 @@ func (kC *cache) readDataset(key string) (datasetInfo, error) {
 
 func (dC *cache) updateUnstructuredKey(key string, value decryptionKey) error {
 	if dC.config.Logging.Verbose {
-		fmt.Fprintf(os.Stdout, "Storing unstructured key in cache %v \n", key)
+		fmt.Fprintf(os.Stdout, "Storing unstructured key in cache %.10s... \n", key)
 	}
 	v, err := json.Marshal(&value)
 
@@ -130,7 +130,7 @@ func (dC *cache) updateUnstructuredKey(key string, value decryptionKey) error {
 
 func (dC *cache) readUnstructuredKey(key string) (decryptionKey, error) {
 	if dC.config.Logging.Verbose {
-		fmt.Fprintf(os.Stdout, "Reading unstructured key from cache %v \n", key)
+		fmt.Fprintf(os.Stdout, "Reading unstructured key from cache \n")
 	}
 	v, err := dC.cache.Get(key)
 	if err != nil {

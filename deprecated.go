@@ -24,6 +24,7 @@ func (fc *fpeContext) getFFSInfo(name string) (ffs ffsInfo, err error) {
 	return ffsInfo(info), err
 }
 
+// Deprecated: Replaced by newStructuredContext
 func newFPEContext(c Credentials, ffs string) (fc *fpeContext, err error) {
 
 	sC, err := newStructuredContext(c)

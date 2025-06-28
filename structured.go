@@ -79,13 +79,14 @@ type structuredContext struct {
 	creds            *Credentials
 
 	// information about the format of the data
+	// DEPRECATED: Do not use, only here for legacy FPE compatibility
 	dataset datasetInfo
 
 	// the key number and algorithm
 	// a key number of -1 indicates that the key
 	// number and algorithm are not set
-	kn   int
-	algo structuredAlgorithm
+	// kn   int
+	// algo structuredAlgorithm
 
 	tracking trackingContext
 }
@@ -516,8 +517,6 @@ func newStructuredContext(c Credentials) (fc *structuredContext, err error) {
 	fc.config = c.config
 	fc.cache = &c.cache
 	fc.creds = &c
-
-	fc.kn = -1
 	return
 }
 
@@ -541,7 +540,7 @@ func (fc *structuredContext) getAlgorithm(dataset datasetInfo, key, twk []byte) 
 // for encryption this can be done right away as the key number is
 // unknown. for decryption, it can't be done until the ciphertext
 // has been presented and the key number decoded from it
-func (fc *structuredContext) setAlgorithm(dataset datasetInfo, kn int) (err error) {
+func (fc *structuredContext) setAlgorithm(dataset datasetInfo, kn int) (algo structuredAlgorithm, currKeyNum int, err error) {
 	var twk []byte
 	var key structuredKey
 
@@ -555,11 +554,10 @@ func (fc *structuredContext) setAlgorithm(dataset datasetInfo, kn int) (err erro
 		return
 	}
 
-	fc.algo, err = fc.getAlgorithm(dataset, key.Key, twk)
+	algo, err = fc.getAlgorithm(dataset, key.Key, twk)
 	if err == nil {
-		fc.kn = key.Num
+		currKeyNum = key.Num
 	}
-
 	return
 }
 
@@ -584,11 +582,11 @@ func NewStructuredEncryption(c Credentials) (*StructuredEncryption, error) {
 func (fe *StructuredEncryption) Cipher(datasetName, pt string, twk []byte) (
 	ct string, err error) {
 	dataset, err := ((*structuredContext)(fe)).fetchDataset(datasetName)
-	fe.dataset = dataset
+	// fe.dataset = dataset
 	if err != nil {
 		return
 	}
-	err = ((*structuredContext)(fe)).setAlgorithm(dataset, -1)
+	algo, kn, err := ((*structuredContext)(fe)).setAlgorithm(dataset, -1)
 	if err != nil {
 		return
 	}
@@ -611,7 +609,7 @@ func (fe *StructuredEncryption) Cipher(datasetName, pt string, twk []byte) (
 		return
 	}
 
-	ctr, err = fe.algo.EncryptRunes(ptr, twk)
+	ctr, err = algo.EncryptRunes(ptr, twk)
 	if err != nil {
 		return
 	}
@@ -619,11 +617,11 @@ func (fe *StructuredEncryption) Cipher(datasetName, pt string, twk []byte) (
 	fe.tracking.AddEvent(
 		fe.papi, dataset.Name, "",
 		trackingActionEncrypt,
-		1, fe.kn)
+		1, kn)
 
 	ctr = convertRadix(ctr, &dataset.InputAlphabet, &dataset.OutputAlphabet)
 	ctr = encodeKeyNumber(
-		ctr, &dataset.OutputAlphabet, fe.kn, dataset.NumEncodingBits)
+		ctr, &dataset.OutputAlphabet, kn, dataset.NumEncodingBits)
 	ctr, err = formatOutput(fmtr, ctr, &dataset.PassthroughAlphabet, rules)
 
 	return string(ctr), err
@@ -641,10 +639,11 @@ func (fe *StructuredEncryption) CipherForSearch(datasetName, pt string, twk []by
 	if err != nil {
 		return
 	}
-	err = ((*structuredContext)(fe)).setAlgorithm(dataset, -1)
-	if err != nil {
-		return
-	}
+
+	// algo, kn, err := ((*structuredContext)(fe)).setAlgorithm(dataset, -1)
+	// if err != nil {
+	// 	return
+	// }
 
 	var fmtr, ptr, ctr []rune
 	var rules []passthroughRule
@@ -758,14 +757,14 @@ func (fd *StructuredDecryption) Cipher(datasetName, ct string, twk []byte) (
 	}
 
 	ctr, kn = decodeKeyNumber(ctr, &dataset.OutputAlphabet, dataset.NumEncodingBits)
-	err = (*structuredContext)(fd).setAlgorithm(dataset, kn)
+	algo, retKn, err := (*structuredContext)(fd).setAlgorithm(dataset, kn)
 	if err != nil {
 		return
 	}
 
 	ctr = convertRadix(ctr, &dataset.OutputAlphabet, &dataset.InputAlphabet)
 
-	ptr, err := fd.algo.DecryptRunes(ctr, twk)
+	ptr, err := algo.DecryptRunes(ctr, twk)
 	if err != nil {
 		return
 	}
@@ -773,7 +772,7 @@ func (fd *StructuredDecryption) Cipher(datasetName, ct string, twk []byte) (
 	fd.tracking.AddEvent(
 		fd.papi, dataset.Name, "",
 		trackingActionDecrypt,
-		1, fd.kn)
+		1, retKn)
 
 	ptr, err = formatOutput(fmtr, ptr, &dataset.PassthroughAlphabet, rules)
 

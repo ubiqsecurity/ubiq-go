@@ -10,27 +10,18 @@ import (
 	"os"
 )
 
-type newDecryptionResponse struct {
-	EPK               string `json:"encrypted_private_key"`
-	EncryptionSession string `json:"encryption_session"`
-	KeyFingerprint    string `json:"key_fingerprint"`
-	WDK               string `json:"wrapped_data_key"`
-}
-
-type newDecryptionRequest struct {
-	EDK         string `json:"encrypted_data_key"`
-	PayloadCert string `json:"payload_cert"`
-}
-
-// Decryption holds the context of a chunked decryption operation.
-// Use NewDecryption() to create/initialize an Decryption object.
+// DecryptionTS is a thread-safe version of an Unstructured decryption object.
+// It holds the context of a chunked decryption operation.
+// Use NewDecryptionTS() to create/initialize an Decryption object.
 //
 // The caller should use the Begin(), Update()..., End() sequence of
 // calls to decrypt data. When decryption is complete, the caller
 // should call Close().
 //
-// Deprecated: This is not thread-safe, use DecryptionTS instead.
-type Decryption struct {
+// To maintain thread safety, Session data unique to the current
+// decryption will be returned as part of each call in the sequence
+// and need passed in as your data is handled.
+type DecryptionTS struct {
 	client httpClient
 	host   string
 
@@ -40,47 +31,24 @@ type Decryption struct {
 
 	srsa string
 
+	tracking trackingContext
+}
+
+// Holds all the stateful information associated with doing
+// a Decryption operation. This should be used alongside any data
+// and not used with irrelevant data.
+type DecryptionSession struct {
 	key decryptionKey
 
 	cipher *cipher
 
 	buf []byte
-
-	tracking trackingContext
-}
-
-type decryptionKey struct {
-	Algo        algorithm `json:"algorithm"`
-	AlgorithmId int
-	Raw         []byte `json:"unwrapped_data_key"`
-	Wdk         string `json:"wrapped_data_key"`
-	Epk         string `json:"encrypted_private_key"`
-	Enc         []byte `json:"encrypted_data_key"`
-	Fingerprint string `json:"key_fingerprint"`
-	Uses        uint   `json:"uses"`
-	Session     string `json:"encryption_session"`
-}
-
-func (d *Decryption) resetSession() error {
-	d.key.Session = ""
-
-	d.key.Raw = nil
-	d.key.Wdk = ""
-	d.key.Epk = ""
-	d.key.Enc = nil
-	d.key.Fingerprint = ""
-	d.key.Uses = 0
-
-	d.key.Algo = algorithm{}
-	d.cipher = nil
-
-	return nil
 }
 
 // request that the server decrypt a data key associated with a cipher text.
 // this opens a new "session", meaning that the key can be reused if
 // the next cipher text decrypted uses the same data key
-func (d *Decryption) newSession(edk []byte, algo int) error {
+func (d *DecryptionTS) initializeSession(session *DecryptionSession, edk []byte, algo int) error {
 	var rsp *http.Response
 	var err error
 
@@ -128,59 +96,58 @@ func (d *Decryption) newSession(edk []byte, algo int) error {
 
 				err = json.NewDecoder(rsp.Body).Decode(&nd)
 				if err == nil {
-					d.key.Session = nd.EncryptionSession
-					d.key.Fingerprint = nd.KeyFingerprint
-					d.key.Enc = edk
-					d.key.Uses = 0
-					d.key.AlgorithmId = algo
-					d.key.Algo, err = getAlgorithmById(algo)
+					session.key.Session = nd.EncryptionSession
+					session.key.Fingerprint = nd.KeyFingerprint
+					session.key.Enc = edk
+					session.key.Uses = 0
+					session.key.Algo, err = getAlgorithmById(algo)
+					session.key.AlgorithmId = algo
 
-					d.key.Wdk = nd.WDK
+					session.key.Wdk = nd.WDK
 					if isIdp {
 						// IDP mode has a local private key, need to override that key since nothing will be returned from server
-						d.key.Epk = d.creds.idpEncryptedPrivateKey
+						session.key.Epk = d.creds.idpEncryptedPrivateKey
 					} else {
-						d.key.Epk = nd.EPK
+						session.key.Epk = nd.EPK
 					}
 				}
 			} else {
 				err = errors.New(
 					"unexpected http response " + rsp.Status)
+				return err
 			}
 		}
+
 		if d.config.KeyCaching.Unstructured && d.config.KeyCaching.Encrypt {
-			d.cache.updateUnstructuredKey(cacheKey, d.key)
+			d.cache.updateUnstructuredKey(cacheKey, session.key)
 		}
 	} else {
-		d.key.Session = keyFromCache.Session
-		d.key.Fingerprint = keyFromCache.Fingerprint
-		d.key.Enc = edk
-		d.key.Raw = keyFromCache.Raw
-		d.key.Wdk = keyFromCache.Wdk
-		d.key.Epk = keyFromCache.Epk
-		d.key.Uses = keyFromCache.Uses
-		d.key.AlgorithmId = keyFromCache.AlgorithmId
-		d.key.Algo, err = getAlgorithmById(keyFromCache.AlgorithmId)
+		session.key.AlgorithmId = keyFromCache.AlgorithmId
+		session.key.Algo, err = getAlgorithmById(keyFromCache.AlgorithmId)
+		session.key.Raw = keyFromCache.Raw
+		session.key.Wdk = keyFromCache.Wdk
+		session.key.Epk = keyFromCache.Epk
+		session.key.Enc = edk
+		session.key.Fingerprint = keyFromCache.Fingerprint
+		session.key.Uses = keyFromCache.Uses
+		session.key.Session = keyFromCache.Session
 	}
 
-	if d.key.Raw == nil {
-		d.key.Raw, err = unwrapDataKey(
-			d.key.Wdk, d.key.Epk, d.srsa)
+	if session.key.Raw == nil {
+		session.key.Raw, err = unwrapDataKey(
+			session.key.Wdk, session.key.Epk, d.srsa)
 	}
 
 	if d.config.KeyCaching.Unstructured && !d.config.KeyCaching.Encrypt && !usingCachedKey {
-		d.cache.updateUnstructuredKey(cacheKey, d.key)
+		d.cache.updateUnstructuredKey(cacheKey, session.key)
 	}
 
 	return err
 }
 
-// NewDecryption creates a new Decryption object which holds the context
-// of a decryption while it is in process.
-//
-// Deprecated: This is not thread-safe, use NewDecryptionTS instead.
-func NewDecryption(c Credentials) (*Decryption, error) {
-	dec := Decryption{}
+// NewDecryption creates a new thread-safe Decryption object
+func NewDecryptionTS(c Credentials) (*DecryptionTS, error) {
+	dec := DecryptionTS{}
 	var err error
 
 	dec.client = newHttpClient(c)
@@ -197,24 +164,14 @@ func NewDecryption(c Credentials) (*Decryption, error) {
 	return &dec, err
 }
 
-// Begin starts a new decryption operation. The Decryption object
-// must be newly created by the NewDecryption object, or the previous
-// decryption performed by it must have been ended with the End()
-// function.
-//
-// error is nil upon success. No data is returned by this call; however,
-// a slice is returned to maintain the same function signature as the
-// corresponding Encryption call.
-//
-// Deprecated: This is not thread-safe, use DecryptionTS instead.
-func (d *Decryption) Begin() ([]byte, error) {
-	var err error
+// Begin starts a new decryption operation. Returns a new
+// DecryptionSession object. This object contains the state of
+// the current decryption in process and should not be used across
+// multiple decryptions.
+func (d *DecryptionTS) Begin() ([]byte, *DecryptionSession) {
+	var session DecryptionSession
 
-	if d.cipher != nil {
-		err = errors.New("decryption already in progress")
-	}
-
-	return nil, err
+	return nil, &session
 }
 
 // Update passes cipher text into the Decryption object for decryption.
@@ -228,27 +185,25 @@ func (d *Decryption) Begin() ([]byte, error) {
 //
 // Note that even though plain text may be returned by this function, it
 // should not be trusted until End() has returned successfully.
-//
-// Deprecated: This is not thread-safe, use DecryptionTS instead.
-func (d *Decryption) Update(ciphertext []byte) ([]byte, error) {
+func (d *DecryptionTS) Update(session *DecryptionSession, ciphertext []byte) ([]byte, error) {
 	var plaintext []byte
 	var err error
 
 	// incoming data goes into the internal buffer.
 	// data is sliced off the front as it is used/decrypted.
-	d.buf = append(d.buf, ciphertext...)
+	session.buf = append(session.buf, ciphertext...)
 
 	// cipher is nil until we have a complete, valid header
 	// that can be decoded to obtain the key, iv, and algorithm
-	if d.cipher == nil {
-		hdrlen := headerValid(d.buf)
+	if session.cipher == nil {
+		hdrlen := headerValid(session.buf)
 
 		if hdrlen < 0 {
 			// header is invalid and can't be parsed/recovered
 			err = errors.New("invalid encryption header")
 		} else if hdrlen > 0 {
 			// header is valid and contains `hdrlen` bytes
-			hdr := newHeader(d.buf)
+			hdr := newHeader(session.buf)
 			if hdr.version != 0 {
 				err = errors.New(
 					"unsupported encryption header")
@@ -257,16 +212,20 @@ func (d *Decryption) Update(ciphertext []byte) ([]byte, error) {
 			if err == nil {
 				// if a session exists, but it has a different
 				// key, get rid of it
-				if len(d.key.Session) > 0 &&
+				if len(session.key.Session) > 0 &&
 					!bytes.Equal(
-						d.key.Enc, hdr.v0.key) {
-					d.resetSession()
+						session.key.Enc, hdr.v0.key) {
+					err = errors.New("Invalid session provided.")
 				}
 
 				// if no session exists, create a new one
-				if len(d.key.Session) == 0 {
-					err = d.newSession(
+				if len(session.key.Session) == 0 {
+					err = d.initializeSession(session,
 						hdr.v0.key, int(hdr.v0.algo))
+
+					if err != nil {
+						return plaintext, err
+					}
 				}
 			}
 
@@ -280,12 +239,12 @@ func (d *Decryption) Update(ciphertext []byte) ([]byte, error) {
 				// header is authenticated, pass it to the
 				// cipher creation function
 				if (hdr.v0.flags & headerV0FlagAAD) != 0 {
-					c, err = d.key.Algo.newCipher(
-						d.key.Raw, hdr.v0.iv,
-						d.buf[:hdrlen])
+					c, err = session.key.Algo.newCipher(
+						session.key.Raw, hdr.v0.iv,
+						session.buf[:hdrlen])
 				} else {
-					c, err = d.key.Algo.newCipher(
-						d.key.Raw, hdr.v0.iv)
+					c, err = session.key.Algo.newCipher(
+						session.key.Raw, hdr.v0.iv)
 				}
 
 				if err == nil {
@@ -294,9 +253,9 @@ func (d *Decryption) Update(ciphertext []byte) ([]byte, error) {
 						trackingActionDecrypt,
 						1, 0)
 					// all is well, slice off the header
-					d.cipher = &c
-					d.key.Uses++
-					d.buf = d.buf[hdrlen:]
+					session.cipher = &c
+					session.key.Uses++
+					session.buf = session.buf[hdrlen:]
 				}
 			}
 		}
@@ -305,17 +264,17 @@ func (d *Decryption) Update(ciphertext []byte) ([]byte, error) {
 		//   more data is necessary
 	}
 
-	if d.cipher != nil {
+	if session.cipher != nil {
 		// determine how much data is in the buffer,
 		// being careful to always leave enough data in
 		// the buffer to act as the authentication tag
-		sz := len(d.buf) - d.key.Algo.len.tag
+		sz := len(session.buf) - session.key.Algo.len.tag
 		if sz > 0 {
 			// decrypt whatever data is not part of the
 			// data reserved for the tag, and slice it
 			// off the internal buffer
-			plaintext = d.cipher.decipher(d.buf[:sz])
-			d.buf = d.buf[sz:]
+			plaintext = session.cipher.decipher(session.buf[:sz])
+			session.buf = session.buf[sz:]
 		}
 	}
 
@@ -329,14 +288,12 @@ func (d *Decryption) Update(ciphertext []byte) ([]byte, error) {
 // error is nil upon success and the byte slice may or may not contain
 // any remaining plain text. If error is non-nil, any previously decrypted
 // plain text should be discarded.
-//
-// Deprecated: This is not thread-safe, use DecryptionTS instead.
-func (d *Decryption) End() ([]byte, error) {
+func (d *DecryptionTS) End(session *DecryptionSession) ([]byte, error) {
 	var res []byte
 	var err error
 
-	if d.cipher != nil {
-		sz := len(d.buf) - d.key.Algo.len.tag
+	if session.cipher != nil {
+		sz := len(session.buf) - session.key.Algo.len.tag
 
 		if sz > 0 {
 			// once the cipher has been created, the Update
@@ -354,16 +311,16 @@ func (d *Decryption) End() ([]byte, error) {
 			// number of bytes in the buffer is equal to
 			// the size of the tag
 
-			if d.key.Algo.len.tag == 0 {
+			if session.key.Algo.len.tag == 0 {
 				// pass nil to indicate no tag
-				res, err = d.cipher.close(nil)
+				res, err = session.cipher.close(nil)
 			} else {
-				res, err = d.cipher.close(d.buf)
+				res, err = session.cipher.close(session.buf)
 			}
 		}
 
-		d.cipher = nil
-		d.buf = nil
+		session.cipher = nil
+		session.buf = nil
 	}
 
 	return res, err
@@ -372,48 +329,12 @@ func (d *Decryption) End() ([]byte, error) {
 // Close cleans up the Decryption object and resets it to its default values.
 // An error returned by this function is a result of a miscommunication with
 // the server, and the object is reset regardless.
-//
-// Deprecated: This is not thread-safe, use DecryptionTS instead.
-func (d *Decryption) Close() error {
-	err := d.resetSession()
+func (d *DecryptionTS) Close() {
 	d.tracking.Close()
-	*d = Decryption{}
-	return err
+	*d = DecryptionTS{}
 }
 
 // Attach metadata to usage information reported by the application.
-// Deprecated: This is not thread-safe, use DecryptionTS instead.
-func (d *Decryption) AddUserDefinedMetadata(data string) error {
+func (d *DecryptionTS) AddUserDefinedMetadata(data string) error {
 	return d.tracking.AddUserDefinedMetadata(data)
-}
-
-// Decrypt decrypts a single ciphertext message. The credentials
-// must be associated with the key used to encrypt the cipher text.
-//
-// Upon success, error is nil, and the plain text is returned. If an
-// error occurs, it will be indicated by the error return value.
-func Decrypt(c Credentials, ciphertext []byte) ([]byte, error) {
-	var err error
-	var plaintext, tmp []byte
-
-	dec, err := NewDecryption(c)
-	if dec != nil {
-		defer dec.Close()
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	dec.Begin()
-	plaintext, err = dec.Update(ciphertext)
-	if err != nil {
-		return nil, err
-	}
-
-	tmp, err = dec.End()
-	if err != nil {
-		return nil, err
-	}
-
-	return append(plaintext, tmp...), nil
 }

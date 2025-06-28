@@ -1,5 +1,10 @@
 # Changelog
 
+# 2.2.4 - 2025-06-26
+* Fixed caching error when decrypting unstructured data
+* Updated Structured encryption to be thread-safe
+* Added thread-safe version of Unstructured encryption
+
 # 2.2.3 - 2025-06-05
 * Refined project files for future releases
 
