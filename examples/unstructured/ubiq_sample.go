@@ -163,7 +163,7 @@ func chunkingEncrypt(c ubiq.Credentials, ifp, ofp *os.File) error {
 	var pt, ct []byte = make([]byte, 128*1024), []byte{}
 
 	// new encryption object
-	enc, err := ubiq.NewEncryption(c, 1)
+	enc, err := ubiq.NewEncryptionTS(c, 1)
 	if err != nil {
 		return err
 	}
@@ -171,7 +171,7 @@ func chunkingEncrypt(c ubiq.Credentials, ifp, ofp *os.File) error {
 
 	// start the new encryption and write out
 	// any cipher text produced
-	ct, err = enc.Begin()
+	ct, session, err := enc.Begin()
 	if err != nil {
 		return err
 	}
@@ -184,7 +184,7 @@ func chunkingEncrypt(c ubiq.Credentials, ifp, ofp *os.File) error {
 
 		n, err = ifp.Read(pt)
 		if err == nil {
-			ct, err = enc.Update(pt[:n])
+			ct, err = enc.Update(session, pt[:n])
 			if err == nil {
 				_, err = ofp.Write(ct)
 			}
@@ -197,7 +197,7 @@ func chunkingEncrypt(c ubiq.Credentials, ifp, ofp *os.File) error {
 	// finalize the encryption, writing any
 	// remaining cipher text to the output file
 	if err == nil {
-		ct, err = enc.End()
+		ct, err = enc.End(session)
 		if err == nil {
 			_, err = ofp.Write(ct)
 		}
@@ -229,7 +229,7 @@ func chunkingDecrypt(c ubiq.Credentials, ifp, ofp *os.File) error {
 	var ct, pt []byte = make([]byte, 128*1024), []byte{}
 
 	// new decryption object
-	dec, err := ubiq.NewDecryption(c)
+	dec, err := ubiq.NewDecryptionTS(c)
 	if err != nil {
 		return err
 	}
@@ -237,10 +237,7 @@ func chunkingDecrypt(c ubiq.Credentials, ifp, ofp *os.File) error {
 
 	// start the new decryption and write out
 	// any plain text produced
-	pt, err = dec.Begin()
-	if err != nil {
-		return err
-	}
+	pt, session := dec.Begin()
 	_, err = ofp.Write(pt)
 
 	// read chunks of data and decrypt them,
@@ -250,7 +247,7 @@ func chunkingDecrypt(c ubiq.Credentials, ifp, ofp *os.File) error {
 
 		n, err = ifp.Read(ct)
 		if err == nil {
-			pt, err = dec.Update(ct[:n])
+			pt, err = dec.Update(session, ct[:n])
 			if err == nil {
 				_, err = ofp.Write(pt)
 			}
@@ -263,7 +260,7 @@ func chunkingDecrypt(c ubiq.Credentials, ifp, ofp *os.File) error {
 	// finalize the decryption, writing any
 	// remaining plain text to the output file
 	if err == nil {
-		pt, err = dec.End()
+		pt, err = dec.End(session)
 		if err == nil {
 			_, err = ofp.Write(pt)
 		}

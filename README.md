@@ -207,19 +207,19 @@ pt, err := ubiq.Decrypt(credentials, ct)
 ```go
 var pt []byte = make([]byte, 128*1024)
 
-encryption, _ := ubiq.NewEncryption(credentials, 1)
+encryption, _ := ubiq.NewEncryptionTS(credentials, 1)
 defer encryption.Close()
 
-ct, _ := encryption.Begin()
+ct, session, _ := encryption.Begin()
 for {
     n, e := infile.Read(pt)
     if e == io.EOF {
         break
     }
-    t, _ := encryption.Update(pt[:n])
+    t, _ := encryption.Update(session, pt[:n])
     ct = append(ct, t...)
 }
-t, _ := encryption.End()
+t, _ := encryption.End(session)
 ct = append(ct, t...)
 ```
 
@@ -233,19 +233,19 @@ ct = append(ct, t...)
 ```go
 var ct []byte = make([]byte, 128*1024)
 
-decryption, _ := ubiq.NewDecryption(credentials)
+decryption, _ := ubiq.NewDecryptionTS(credentials)
 defer decryption.Close()
 
-pt, _ := decryption.Begin()
+pt, session := decryption.Begin()
 for {
     n, e := infile.Read(ct)
     if e == io.EOF {
         break
     }
-    t, _ := decryption.Update(ct[:n])
+    t, _ := decryption.Update(session, ct[:n])
     pt = append(pt, t...)
 }
-t, _ := decryption.End()
+t, _ := decryption.End(session)
 pt = append(pt, t...)
 ```
 
@@ -254,27 +254,27 @@ pt = append(pt, t...)
 To reuse the encryption/decryption objects, initialize them with the credentials object and store them in a variable. Encryption takes an extra parameter, the number of separate encryptions the caller wishes to perform with the key. This number may be limited by the server. 
 
 ```go
-  encryptor, _ := ubiq.NewEncryption(credentials, 1)
-	decryptor, _ := ubiq.NewDecryption(credentials)
+  encryptor, _ := ubiq.NewEncryptionTS(credentials, 1)
+	decryptor, _ := ubiq.NewDecryptionTS(credentials)
 
 	raw_data := [6]string{"alligator", "otter", "eagle owl", "armadillo", "dormouse", "ground hog"}
 	bytearr := [][]byte{}
 	encrypted_data := bytearr[:]
 
 	for i := range raw_data {
-		enc, err := encryptor.Begin()
-		t, err := encryptor.Update([]byte(raw_data[i]))
+		enc, enc_session, err := encryptor.Begin()
+		t, err := encryptor.Update(enc_session, []byte(raw_data[i]))
 		enc = append(enc, t...)
-		t, err = encryptor.End()
+		t, err = encryptor.End(enc_session)
 		enc = append(enc, t...)
 		encrypted_data = append(encrypted_data, enc)
 	}
 
 	for i := range encrypted_data {
-		decrypted, err := decryptor.Begin()
-		t, err := decryptor.Update(encrypted_data[i])
+		decrypted, dec_session := decryptor.Begin()
+		t, err := decryptor.Update(dec_session, encrypted_data[i])
 		decrypted = append(decrypted, t...)
-		t, err = decryptor.End()
+		t, err = decryptor.End(dec_session)
 		decrypted = append(decrypted, t...)
 		fmt.Fprintf(os.Stdout, "Decrypted: %s \n", string(decrypted[:]))
 	}

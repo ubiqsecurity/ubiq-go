@@ -3,46 +3,28 @@ package ubiq
 import (
 	"bytes"
 	"crypto/rand"
-	"crypto/rsa"
-	"crypto/sha1"
 	"encoding/base64"
 	"encoding/json"
-	"encoding/pem"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
-
-	"github.com/youmark/pkcs8"
+	"os"
 )
 
-type newEncryptionResponse struct {
-	EPK               string `json:"encrypted_private_key"`
-	EncryptionSession string `json:"encryption_session"`
-	KeyFingerprint    string `json:"key_fingerprint"`
-	WDK               string `json:"wrapped_data_key"`
-	EDK               string `json:"encrypted_data_key"`
-	MaxUses           int    `json:"max_uses"`
-	SecurityModel     struct {
-		Algorithm     string `json:"algorithm"`
-		Fragmentation bool   `json:"enable_data_fragmentation"`
-	} `json:"security_model"`
-}
-
-type newEncryptionRequest struct {
-	Uses        uint   `json:"uses"`
-	PayloadCert string `json:"payload_cert"`
-}
-
-// Encryption holds the context of a chunked encryption operation.
-// Use NewEncryption() to create/initialize an Encryption object.
+// EncryptionTS is a thread-safe version of an Encryption object.
+// It holds the context of a chunked encryption operation.
+// Use NewEncryptionTS() to create/initialize an Encryption object.
 //
 // After creating an Encryption object, the caller should use the
 // Begin(), Update()..., End() sequence of calls for as many separate
 // encryptions need to be performed using the key associated with the
 // Encryption object. When all encryptions are complete, call Close().
 //
-// Deprecated: This is not thread-safe, use EncryptionTS instead.
-type Encryption struct {
+// To maintain thread safety, Session data unique to the current
+// encryption will be returned as part of each call in the sequence
+// and need passed in as your data is handled.
+type EncryptionTS struct {
 	client httpClient
 	host   string
 
@@ -57,46 +39,22 @@ type Encryption struct {
 		}
 	}
 
-	algo   algorithm
-	cipher *cipher
+	algo algorithm
 
 	tracking trackingContext
 }
 
-func decryptPrivateKey(epk, srsa string) (pk *rsa.PrivateKey, err error) {
-	block, rem := pem.Decode([]byte(epk))
-	if len(rem) == 0 {
-		pk, err = pkcs8.ParsePKCS8PrivateKeyRSA(
-			block.Bytes, []byte(srsa))
-	} else {
-		err = errors.New("unrecognized key format")
-	}
-
-	return
+// Contains any stateful information associated with doing a chunked
+// encryption operation. Should not be used across threads or different
+// encryptions.
+type EncryptionSession struct {
+	cipher *cipher
 }
 
-func decryptDataKey(wdk string, pk *rsa.PrivateKey) ([]byte, error) {
-	wdkbytes, err := base64.StdEncoding.DecodeString(wdk)
-	if err != nil {
-		return nil, err
-	}
-
-	return rsa.DecryptOAEP(sha1.New(), nil, pk, wdkbytes, nil)
-}
-
-func unwrapDataKey(wdk, epk, srsa string) ([]byte, error) {
-	pk, err := decryptPrivateKey(epk, srsa)
-	if err != nil {
-		return nil, err
-	}
-
-	return decryptDataKey(wdk, pk)
-}
-
-// init initializes the Encryption object using the encryption response
+// init initializes the EncryptionTS object using the encryption response
 // received from the server containing the wrapped data key, algorithm,
 // session, etc.
-func (e *Encryption) init(rsp newEncryptionResponse, srsa string) error {
+func (e *EncryptionTS) init(rsp newEncryptionResponse, srsa string) error {
 	var err error
 
 	e.session = rsp.EncryptionSession
@@ -118,13 +76,12 @@ func (e *Encryption) init(rsp newEncryptionResponse, srsa string) error {
 	return err
 }
 
-// NewEncryption creates a new Encryption object with a new key that can
-// be used, at most, the specified number of times. (The actual number
-// may be less, depending on security settings at the server.)
-//
-// Deprecated: This is not thread-safe, use NewEncryptionTS instead.
-func NewEncryption(c Credentials, uses uint) (*Encryption, error) {
-	enc := Encryption{}
+// NewEncryptionTS creates a new thread-safe Encryption object with a
+// new key that can be used, at most, the specified number of times.
+// (The actual number may be less, depending on security settings at
+// the server.)
+func NewEncryptionTS(c Credentials, uses uint) (*EncryptionTS, error) {
+	enc := EncryptionTS{}
 
 	enc.client = newHttpClient(c)
 	enc.host, _ = c.host()
@@ -140,6 +97,9 @@ func NewEncryption(c Credentials, uses uint) (*Encryption, error) {
 	}
 
 	body, _ := json.Marshal(request)
+	if c.config.Logging.Verbose {
+		fmt.Fprintf(os.Stdout, "****** PERFORMING EXPENSIVE CALL ----- fetchEncryptKey \n")
+	}
 	rsp, err := enc.client.Post(endp, "application/json", bytes.NewReader(body))
 
 	if rsp != nil {
@@ -169,7 +129,7 @@ func NewEncryption(c Credentials, uses uint) (*Encryption, error) {
 	if err == nil {
 		enc.tracking = newTrackingContext(enc.client, enc.host, c.config)
 	} else {
-		enc = Encryption{}
+		enc = EncryptionTS{}
 	}
 
 	return &enc, err
@@ -182,15 +142,15 @@ func NewEncryption(c Credentials, uses uint) (*Encryption, error) {
 //
 // error is nil upon success. Information about the encryption is
 // returned on success and must be treated as part of the cipher text
-//
-// Deprecated: This is not thread-safe, use EncryptionTS instead.
-func (e *Encryption) Begin() ([]byte, error) {
+func (e *EncryptionTS) Begin() ([]byte, *EncryptionSession, error) {
 	var hdr []byte
 	var h header
 	var err error
 
-	if e.cipher != nil {
-		return nil, errors.New("encryption already in progress")
+	var session EncryptionSession
+
+	if session.cipher != nil {
+		return nil, &session, errors.New("encryption already in progress")
 	}
 
 	e.tracking.AddEvent(
@@ -223,12 +183,12 @@ func (e *Encryption) Begin() ([]byte, error) {
 				e.key.raw, h.v0.iv)
 		}
 		if err == nil {
-			e.cipher = &c
+			session.cipher = &c
 			e.key.uses.cur++
 		}
 	}
 
-	return hdr, err
+	return hdr, &session, err
 }
 
 // Update passes plain text into the Encryption object for encryption.
@@ -237,10 +197,8 @@ func (e *Encryption) Begin() ([]byte, error) {
 // not return any data.
 //
 // error is nil on success and the slice may or may not contain cipher text.
-//
-// Deprecated: This is not thread-safe, use EncryptionTS instead.
-func (e *Encryption) Update(plaintext []byte) ([]byte, error) {
-	return e.cipher.encipher(plaintext), nil
+func (e *EncryptionTS) Update(session *EncryptionSession, plaintext []byte) ([]byte, error) {
+	return session.cipher.encipher(plaintext), nil
 }
 
 // End completes the encryption of a plain text message. For certain
@@ -250,57 +208,23 @@ func (e *Encryption) Update(plaintext []byte) ([]byte, error) {
 // error is nil upon success and the byte slice may or may not contain
 // any remaining plain text. If error is non-nil, any previously decrypted
 // plain text should be discarded.
-//
-// Deprecated: This is not thread-safe, use EncryptionTS instead.
-func (e *Encryption) End() ([]byte, error) {
-	res, err := e.cipher.close()
-	e.cipher = nil
+func (e *EncryptionTS) End(session *EncryptionSession) ([]byte, error) {
+	res, err := session.cipher.close()
+	session.cipher = nil
 	return res, err
 }
 
 // Close cleans up the Encryption object and resets it to its default values.
 // An error returned by this function is a result of a miscommunication with
 // the server, and the object is reset regardless.
-//
-// Deprecated: This is not thread-safe, use EncryptionTS instead.
-func (e *Encryption) Close() error {
+func (e *EncryptionTS) Close() error {
 	e.tracking.Close()
-	*e = Encryption{}
+	*e = EncryptionTS{}
 
 	return nil
 }
 
 // Attach metadata to usage information reported by the application.
-func (e *Encryption) AddUserDefinedMetadata(data string) error {
+func (e *EncryptionTS) AddUserDefinedMetadata(data string) error {
 	return e.tracking.AddUserDefinedMetadata(data)
-}
-
-// Encrypt encrypts a single plain text message using a new key
-// and the algorithm associated with the specified credentials.
-//
-// Upon success, error is nil, and the cipher text is returned. If
-// an error occurs, it will be indicated by the error return value.
-func Encrypt(c Credentials, plaintext []byte) ([]byte, error) {
-	var err error
-	var ciphertext, tmp []byte
-
-	enc, err := NewEncryption(c, 1)
-	if enc != nil {
-		defer enc.Close()
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	ciphertext, err = enc.Begin()
-	if err != nil {
-		return nil, err
-	}
-
-	tmp, _ = enc.Update(plaintext)
-	ciphertext = append(ciphertext, tmp...)
-
-	tmp, _ = enc.End()
-
-	return append(ciphertext, tmp...), nil
 }

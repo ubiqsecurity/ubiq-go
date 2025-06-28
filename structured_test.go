@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 )
@@ -295,4 +296,78 @@ func TestStructured125k(t *testing.T) {
 			time.Duration(int64(op.perf.Duration.Decrypt)/
 				int64(op.perf.Count)))
 	}
+}
+
+func TestStructuredThreadSafety(t *testing.T) {
+	file, err := os.Open("load_time/DATA/100.json")
+	if err != nil {
+		t.Skip(err)
+	}
+	defer file.Close()
+
+	raw, err := io.ReadAll(file)
+	if err != nil {
+		t.Skip(err)
+	}
+
+	var records []StructuredTestRecord
+	err = json.Unmarshal([]byte(raw), &records)
+	if err != nil {
+		t.Skip(err)
+	}
+
+	initializeCreds()
+
+	enc, err := NewStructuredEncryption(credentials)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer enc.Close()
+
+	dec, err := NewStructuredDecryption(credentials)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer dec.Close()
+
+	var wg sync.WaitGroup
+	parallel := 50
+
+	wg.Add(parallel)
+
+	for i := 0; i < parallel; i++ {
+		go func(i int) {
+			defer wg.Done()
+			rec := records[i]
+
+			ct, err := enc.Cipher(rec.Dataset, rec.Plaintext, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if ct != rec.Ciphertext {
+				t.Fatalf("encryption(%v): %v != %v",
+					i, ct, rec.Ciphertext)
+			}
+		}(i)
+	}
+	wg.Wait()
+
+	wg.Add(parallel)
+	for i := 0; i < parallel; i++ {
+		go func(i int) {
+			defer wg.Done()
+			rec := records[i]
+
+			pt, err := dec.Cipher(rec.Dataset, rec.Ciphertext, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if pt != rec.Plaintext {
+				t.Fatalf("decryption(%v): %v != %v",
+					i, pt, rec.Plaintext)
+			}
+		}(i)
+	}
+	wg.Wait()
+
 }
