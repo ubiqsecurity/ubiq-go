@@ -370,6 +370,9 @@ By default, configuration is loaded in from `~/.ubiq/configuration`. If the file
   "logging": {
     "verbose": true
   },
+  "golang": {
+    "cache_hard_max_size_mb": 0
+  },
   "idp": {
     "provider": "okta",
     "ubiq_customer_id": "f6f.....08c5",
@@ -415,6 +418,11 @@ The <b>key_caching</b> section contains values to control how and when keys are 
 The <b>logging</b> section contains values to control logging levels.
 
 - <b>verbose</b> enables and disables logging output like event processing and caching. (default: false)
+
+### Golang Specific
+This section contains configuration controls available only to golang.
+
+- <b>cache_hard_max_size_mb</b> (exposed from [BigCache](https://github.com/allegro/bigcache)) is hard limit for cache memory allocation, in MB. If value is reached, older entries will be overwritten to make room for new ones. 0 means no size limit. (default: 0)
 
 ### IDP specific parameters
 - <b>provider</b> indicates the IDP provider, either <b>okta</b> or <b>entra</b>
