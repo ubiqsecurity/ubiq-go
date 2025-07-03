@@ -14,7 +14,7 @@ import (
 
 const (
 	// The Ubiq Go library version.
-	Version = "2.2.4"
+	Version = "2.2.5"
 )
 
 // httpClient is a relatively thin wrapper around Go's http.Client

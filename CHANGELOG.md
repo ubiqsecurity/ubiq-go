@@ -1,5 +1,8 @@
 # Changelog
 
+# 2.2.5 - 2025-07-02
+* Add configuration for max cache size
+
 # 2.2.4 - 2025-06-26
 * Fixed caching error when decrypting unstructured data
 * Updated Structured encryption to be thread-safe

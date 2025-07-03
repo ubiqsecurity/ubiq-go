@@ -35,7 +35,21 @@ type Configuration struct {
 		TokenEndpointUrl string `json:"idp_token_endpoint_url"`
 		TenantId         string `json:"idp_tenant_id"`
 		ClientSecret     string `json:"idp_client_secret"`
-	}
+	} `json:"idp"`
+
+	Golang struct {
+		// Size in MB
+		CacheHardMaxSizeMB int `json:"cache_hard_max_size_mb"`
+		// In Seconds
+		CacheCleanWindowS int `json:"cache_clean_window_s"`
+		// # of Shards
+		CacheShards int `json:"cache_shards"`
+		// # of Entries
+		CacheMaxEntriesInWindow int `json:"cache_max_entries_in_window"`
+		// Cache math is MaxEntriesInWindow * MaxEntrySize (500)
+		// This changes if you have enough shards that Entries/Shards < 10
+		// then it's Shards * 10 * MaxEntrySize
+	} `json:"golang"`
 }
 
 func (config *Configuration) setDefaults() {
@@ -58,6 +72,10 @@ func (config *Configuration) setDefaults() {
 	config.Idp.TenantId = ""
 	config.Idp.ClientSecret = ""
 
+	config.Golang.CacheHardMaxSizeMB = 0
+	config.Golang.CacheCleanWindowS = 1
+	config.Golang.CacheShards = 1024
+	config.Golang.CacheMaxEntriesInWindow = 1000 * 10 * 60
 }
 
 func NewConfiguration(args ...string) (Configuration, error) {

@@ -23,7 +23,23 @@ type cache struct {
 
 func NewCache(cfg *Configuration) (cache, error) {
 	ttlDuration := time.Duration(cfg.KeyCaching.TTLSeconds) * time.Second
-	Cache, err := bigcache.New(context.Background(), bigcache.DefaultConfig(ttlDuration))
+
+	if cfg.Golang.CacheShards <= 0 || (cfg.Golang.CacheShards & (cfg.Golang.CacheShards - 1)) != 0 {
+		return cache{}, fmt.Errorf("configuration error - cache_shards must be a power of 2 and greater than 0 (current value: %v)", cfg.Golang.CacheShards)
+	}
+
+	// Modify the default configuration (Fully custom leaves some uninitialized)
+	CacheConfig := bigcache.DefaultConfig(ttlDuration)
+
+	CacheConfig.HardMaxCacheSize = cfg.Golang.CacheHardMaxSizeMB
+
+	CacheConfig.Shards = cfg.Golang.CacheShards
+	// If less than 0, cache will never evict.
+	CacheConfig.CleanWindow = time.Duration(cfg.Golang.CacheCleanWindowS)
+	CacheConfig.Verbose = cfg.Logging.Verbose
+	CacheConfig.MaxEntriesInWindow = cfg.Golang.CacheMaxEntriesInWindow
+
+	Cache, err := bigcache.New(context.Background(), CacheConfig)
 
 	if err != nil {
 		return cache{}, err
