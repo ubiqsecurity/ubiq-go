@@ -35,7 +35,7 @@ func NewCache(cfg *Configuration) (cache, error) {
 
 	CacheConfig.Shards = cfg.Golang.CacheShards
 	// If less than 0, cache will never evict.
-	CacheConfig.CleanWindow = time.Duration(cfg.Golang.CacheCleanWindowS)
+	CacheConfig.CleanWindow = time.Duration(cfg.Golang.CacheCleanWindowS) * time.Second
 	CacheConfig.Verbose = cfg.Logging.Verbose
 	CacheConfig.MaxEntriesInWindow = cfg.Golang.CacheMaxEntriesInWindow
 

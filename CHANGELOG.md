@@ -1,5 +1,8 @@
 # Changelog
 
+# 2.2.6 - 2025-09-16
+* Adjust Cache implemenmtation for better stability
+
 # 2.2.5 - 2025-07-02
 * Add configuration for max cache size
 
