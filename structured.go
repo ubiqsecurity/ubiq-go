@@ -416,7 +416,7 @@ func formatInput(inp []rune, pth *structured.Alphabet, icr *structured.Alphabet,
 			prefix := int(rule.Value.(float64))
 			if prefix > 0 {
 				// Store removed portion in rule.
-				rule.Buffer = out[0:prefix]
+				rule.Buffer = out[0:prefix:prefix]
 				updatedRules[idx] = rule
 				out = out[prefix:]
 			}
@@ -425,7 +425,7 @@ func formatInput(inp []rune, pth *structured.Alphabet, icr *structured.Alphabet,
 			if suf > 0 {
 				suffix := len(out) - suf
 				// Store removed portion in rule.
-				rule.Buffer = out[suffix:]
+				rule.Buffer = out[suffix:len(out):len(out)]
 				updatedRules[idx] = rule
 				out = out[:suffix]
 			}
