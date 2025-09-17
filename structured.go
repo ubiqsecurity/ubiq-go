@@ -431,7 +431,7 @@ func formatInput(inp []rune, pth *structured.Alphabet, icr *structured.Alphabet,
 				suffix := len(out) - suf
 
 				// Store removed portion in rule.
-				rule.Buffer = make([]rune, len(out))
+				rule.Buffer = make([]rune, len(out)-suffix)
 				copy(rule.Buffer, out[suffix:len(out):len(out)])
 
 				updatedRules[idx] = rule
@@ -669,6 +669,7 @@ func (fe *StructuredEncryption) CipherForSearch(datasetName, pt string, twk []by
 		return
 	}
 
+	// format, plaintext representation, rules, error
 	fmtr, ptr, rules, err = formatInput(
 		[]rune(pt),
 		&dataset.PassthroughAlphabet,
@@ -684,7 +685,6 @@ func (fe *StructuredEncryption) CipherForSearch(datasetName, pt string, twk []by
 	}
 
 	ct = make([]string, len(keys))
-	_ptr := make([]rune, len(ptr))
 	for i := range keys {
 		var alg structuredAlgorithm
 
@@ -693,7 +693,10 @@ func (fe *StructuredEncryption) CipherForSearch(datasetName, pt string, twk []by
 			return
 		}
 
+		// Initialize a copy of the plaintext
+		_ptr := make([]rune, len(ptr))
 		copy(_ptr, ptr)
+
 		ctr, err = alg.EncryptRunes(_ptr, twk)
 		if err != nil {
 			return
