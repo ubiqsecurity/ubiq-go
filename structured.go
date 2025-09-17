@@ -391,7 +391,10 @@ func formatInput(inp []rune, pth *structured.Alphabet, icr *structured.Alphabet,
 	sort.Slice(updatedRules[:], func(i, j int) bool {
 		return updatedRules[i].Priority < updatedRules[j].Priority
 	})
-	out = []rune(inp)
+
+	// Make copy to avoid issues with manipulating the original input
+	out = make([]rune, len(inp))
+	copy(out, inp)
 
 	for idx, rule := range updatedRules {
 		switch rule.Type {
@@ -416,7 +419,9 @@ func formatInput(inp []rune, pth *structured.Alphabet, icr *structured.Alphabet,
 			prefix := int(rule.Value.(float64))
 			if prefix > 0 {
 				// Store removed portion in rule.
-				rule.Buffer = out[0:prefix:prefix]
+				rule.Buffer = make([]rune, prefix)
+				copy(rule.Buffer, out[0:prefix:prefix])
+
 				updatedRules[idx] = rule
 				out = out[prefix:]
 			}
@@ -424,8 +429,11 @@ func formatInput(inp []rune, pth *structured.Alphabet, icr *structured.Alphabet,
 			suf := int(rule.Value.(float64))
 			if suf > 0 {
 				suffix := len(out) - suf
+
 				// Store removed portion in rule.
-				rule.Buffer = out[suffix:len(out):len(out)]
+				rule.Buffer = make([]rune, len(out))
+				copy(rule.Buffer, out[suffix:len(out):len(out)])
+
 				updatedRules[idx] = rule
 				out = out[:suffix]
 			}
@@ -458,7 +466,10 @@ func formatOutput(fmtr []rune, inp []rune, pth *structured.Alphabet, rules []pas
 		return rules[i].Priority > rules[j].Priority
 	})
 
-	out = []rune(inp)
+	// Make copy to avoid issues with manipulating the original input
+	out = make([]rune, len(inp))
+	copy(out, inp)
+
 	for _, rule := range rules {
 		switch rule.Type {
 		case "passthrough":
