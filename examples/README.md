@@ -1,6 +1,6 @@
 # Ubiq Security Sample Application using Go Library
 
-This sample application will demonstrate how to encrypt and decrypt data using the different APIs.
+This sample applications will demonstrate how to perform both structured and unstructured encrypt and decrypt data using the different APIs.
 
 ### Documentation
 
@@ -29,13 +29,15 @@ SECRET_SIGNING_KEY = ...
 SECRET_CRYPTO_ACCESS_KEY = ...  
 </pre>
 
-## Build the examples
+## Examples
 
-Create a local directory and compile the example application
+There are separate examples for structured encryption and unstructured encryption.  Each example is within its own directory.
+
+### Unstructured Encryption
 
 ```sh
 $ git clone https://gitlab.com/ubiqsecurity/ubiq-go.git
-$ cd ubiq-go/examples
+$ cd ubiq-go/examples/unstructured
 $ go get
 $ go build ubiq_sample.go
 ```
@@ -47,7 +49,7 @@ go get: no install location for directory /path/to/ubiq-go/examples outside GOPA
 ```
 This can be safely ignored for the purpose of building the example.
 
-## View Program Options
+### View Program Options
 
 From within the examples directory
 
@@ -99,4 +101,63 @@ $ ./ubiq_sample -i README.md -o /tmp/readme.enc -e -p -c ./credentials
 
 ```sh
 $ ./ubiq_sample -i /tmp/readme.enc -o /tmp/README.out -d -p -c ./credentials
+```
+
+### Structured Encryption
+
+```sh
+$ git clone https://gitlab.com/ubiqsecurity/ubiq-go.git
+$ cd ubiq-go/examples/structured
+$ go get
+$ go build ubiq_structured_sample.go
+```
+
+Older versions of Go may produce a message like the following:
+```
+go get: no install location for directory /path/to/ubiq-go/examples outside GOPATH
+	For more details see: 'go help gopath'
+```
+This can be safely ignored for the purpose of building the example.
+
+### View Program Options
+
+From within the examples directory
+
+```sh
+$ ./ubiq_structured_sample -h
+```
+<pre>
+Encrypt or decrypt text using the Ubiq service
+ Options:
+  -h, -help               Show this help message and exit
+  -V, -version            Show program's version number and exit
+  -e, -encrypttext        Set the field text value to encrypt and will
+                            return the encrypted cipher text.
+  -d, -decrypttext        Set the cipher text value to decrypt and will
+                            return the decrypted text.
+  -n, -datasetName        Set the name of the dataset, for example SSN.
+  -c CREDENTIALS, -creds CREDENTIALS
+                          Set the file name with the API credentials
+                            (default: ~/.ubiq/credentials)
+  -P PROFILE, -profile PROFILE
+                          Identify the profile within the credentials file
+  -s, -search            Perform an Encrypt For Search.  Only compatible with the -e option
+</pre>
+
+#### Example encrypting a simple text string using the SSN dataset and returning the ciphertext
+
+```sh
+$ ./ubiq_structured_sample -c ./credentials -P default -n SSN -e 123-45-6789
+```
+
+#### Example decrypting a ciphertext string using the SSN dataset and returning the original plaintext
+
+```sh
+$ ./ubiq_structured_sample -c credentials -P unittest -n SSN -d 200-0N-nphF
+```
+
+#### Example encrypting a simple text string using the SSN dataset and the EncryptForSearch capability and returning different ciphertexts
+
+```sh
+$ ./ubiq_structured_sample -c ./credentials -P default -n SSN -e 123-45-6789 -s
 ```

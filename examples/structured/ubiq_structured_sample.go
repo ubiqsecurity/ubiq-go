@@ -23,6 +23,7 @@ const (
 // parameters is used to convey command line
 // options to the main function
 type parameters struct {
+	search                                           bool
 	mode                                             mode
 	encrypt, decrypt, credfile, profile, datasetName string
 }
@@ -34,9 +35,9 @@ func usage(args ...string) {
 		status = exitFailure
 	}
 
-	fmt.Fprintf(os.Stderr, "Usage: %s -e|-d -s|-p -i INFILE -o OUTFILE\n", os.Args[0])
-	fmt.Fprintf(os.Stderr, "Encrypt or decrypt files using the Ubiq service\n")
-	fmt.Fprintf(os.Stderr, "\n")
+	fmt.Fprintf(os.Stderr, "Usage: %s \n", os.Args[0])
+	fmt.Fprintf(os.Stderr, "Encrypt or decrypt text using the Ubiq service\n")
+	fmt.Fprintf(os.Stderr, "Options:\n")
 	fmt.Fprintf(os.Stderr, "  -h, -help               Show this help message and exit\n")
 	fmt.Fprintf(os.Stderr, "  -V, -version            Show program's version number and exit\n")
 	fmt.Fprintf(os.Stderr, "  -e, -encrypttext        Set the field text value to encrypt and will\n")
@@ -49,6 +50,7 @@ func usage(args ...string) {
 	fmt.Fprintf(os.Stderr, "                            (default: ~/.ubiq/credentials)\n")
 	fmt.Fprintf(os.Stderr, "  -P PROFILE, -profile PROFILE\n")
 	fmt.Fprintf(os.Stderr, "                          Identify the profile within the credentials file\n")
+	fmt.Fprintf(os.Stderr, "  -s, -search            Perform an Encrypt For Search.  Only compatible with the -e option\n")
 
 	os.Exit(status)
 }
@@ -63,6 +65,9 @@ func getopts() parameters {
 	f.BoolVar(&help, "help", false, "")
 	f.BoolVar(&version, "V", false, "")
 	f.BoolVar(&version, "version", false, "")
+
+	f.BoolVar(&params.search, "s", false, "")
+	f.BoolVar(&params.search, "search", false, "")
 
 	f.StringVar(&params.encrypt, "e", "", "")
 	f.StringVar(&params.encrypt, "encrypttext", "", "")
@@ -94,6 +99,11 @@ func getopts() parameters {
 		params.mode = modeDecrypt
 	}
 
+	if (params.search && modeDecrypt == params.mode) {
+		usage("Encrypt For Search can only be used with encryption")
+	}
+
+
 	return params
 }
 
@@ -107,6 +117,23 @@ func encrypt(creds ubiq.Credentials, datasetName string, plainText string) error
 		return err
 	}
 	fmt.Fprintf(os.Stdout, "ENCRYPTED cipher= %s \n", cipherText)
+	return err
+}
+
+func encryptForSearch(creds ubiq.Credentials, datasetName string, plainText string) error {
+	enc, err := ubiq.NewStructuredEncryption(creds)
+	if err != nil {
+		return err
+	}
+	cipherText, err := enc.CipherForSearch(datasetName, plainText, nil)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(os.Stdout, "EncryptForSearch results:\n")
+	for _, value := range cipherText {
+		fmt.Fprintf(os.Stdout, "\t %s\n", value)
+	}
 	return err
 }
 
@@ -134,7 +161,11 @@ func _main(params parameters) error {
 
 	// encrypt or decrypt using the specified method
 	if params.mode == modeEncrypt {
-		err = encrypt(credentials, params.datasetName, params.encrypt)
+		if (params.search) {
+			err = encryptForSearch(credentials, params.datasetName, params.encrypt)
+		} else {
+			err = encrypt(credentials, params.datasetName, params.encrypt)
+		}
 	} else /* decrypt */ {
 		err = decrypt(credentials, params.datasetName, params.decrypt)
 	}
