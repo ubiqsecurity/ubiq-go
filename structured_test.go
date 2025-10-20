@@ -371,3 +371,239 @@ func TestStructuredThreadSafety(t *testing.T) {
 	wg.Wait()
 
 }
+
+func TestLoadCache(t *testing.T) {
+	initializeCreds()
+
+	enc, err := NewStructuredEncryption(credentials)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer enc.Close()
+
+	// Test loading a specific dataset
+	err = enc.LoadCache([]string{"ALPHANUM_SSN"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Test that we can encrypt without additional API calls (data should be cached)
+	pt := "123-45-6789"
+	ct, err := enc.Cipher("ALPHANUM_SSN", pt, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(ct) == 0 {
+		t.Fatal("encryption returned empty string")
+	}
+
+	// Verify we can decrypt
+	dec, err := NewStructuredDecryption(credentials)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer dec.Close()
+
+	rt, err := dec.Cipher("ALPHANUM_SSN", ct, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if pt != rt {
+		t.Fatalf("plaintext mismatch: %v != %v", pt, rt)
+	}
+}
+
+func TestLoadCacheMultipleDatasets(t *testing.T) {
+	initializeCreds()
+
+	enc, err := NewStructuredEncryption(credentials)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer enc.Close()
+
+	// Test loading multiple datasets
+	err = enc.LoadCache([]string{"ALPHANUM_SSN", "BIRTH_DATE"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Test encryption on first dataset
+	ct1, err := enc.Cipher("ALPHANUM_SSN", "123-45-6789", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(ct1) == 0 {
+		t.Fatal("encryption returned empty string for ALPHANUM_SSN")
+	}
+
+	// Test encryption on second dataset
+	ct2, err := enc.Cipher("BIRTH_DATE", "01-15-1990", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(ct2) == 0 {
+		t.Fatal("encryption returned empty string for BIRTH_DATE")
+	}
+}
+
+func TestLoadCacheAllDatasets(t *testing.T) {
+	initializeCreds()
+
+	enc, err := NewStructuredEncryption(credentials)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer enc.Close()
+
+	// Test loading all datasets (empty slice)
+	err = enc.LoadCache([]string{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Should be able to encrypt with any dataset now
+	ct, err := enc.Cipher("ALPHANUM_SSN", "123-45-6789", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(ct) == 0 {
+		t.Fatal("encryption returned empty string")
+	}
+}
+
+func TestLoadCacheDecryption(t *testing.T) {
+	initializeCreds()
+
+	dec, err := NewStructuredDecryption(credentials)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer dec.Close()
+
+	// Test loading cache on decryption object
+	err = dec.LoadCache([]string{"ALPHANUM_SSN"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// First encrypt something
+	enc, err := NewStructuredEncryption(credentials)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer enc.Close()
+
+	pt := "987-65-4321"
+	ct, err := enc.Cipher("ALPHANUM_SSN", pt, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Decrypt using the pre-cached decryption object
+	rt, err := dec.Cipher("ALPHANUM_SSN", ct, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if pt != rt {
+		t.Fatalf("plaintext mismatch: %v != %v", pt, rt)
+	}
+}
+
+func TestLoadCacheTTLRefresh(t *testing.T) {
+	// Test that LoadCache properly resets TTL for cached items
+	// This mirrors the Java test that validates TTL refresh behavior
+
+	initializeCreds()
+	
+	// Use a test-specific config with short TTL
+	config, err := NewConfiguration()
+	if err != nil {
+		t.Fatal(err)
+	}
+	config.KeyCaching.Structured = true
+	config.KeyCaching.TTLSeconds = 3 // 3 second TTL (matches Java test)
+	config.KeyCaching.Encrypt = false
+	
+	// Create new credentials with custom config
+	testCreds := credentials
+	testCreds.config = &config
+	
+	// Initialize cache with new TTL
+	testCreds.cache, err = NewCache(&config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	enc, err := NewStructuredEncryption(testCreds)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer enc.Close()
+
+	datasetName := "ALPHANUM_SSN"
+
+	// First load - cache is cold
+	t.Log("First LoadCache call - cache is cold")
+	err = enc.LoadCache([]string{datasetName})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Second load - should reuse cached values and reset TTL
+	t.Log("Second LoadCache call - cache is warm, TTL should reset")
+	err = enc.LoadCache([]string{datasetName})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Sleep 6 seconds - cache should expire (TTL = 3 seconds)
+	t.Log("Sleep 6 seconds - cache should be expired")
+	time.Sleep(6 * time.Second)
+	err = enc.LoadCache([]string{datasetName})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Sleep 2 seconds and load - TTL should reset (total time < 3 seconds)
+	t.Log("Sleep 2 seconds - cache TTL should reset")
+	time.Sleep(2 * time.Second)
+	err = enc.LoadCache([]string{datasetName})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Sleep 2 seconds and load - TTL should reset again
+	t.Log("Sleep 2 seconds - cache TTL should reset")
+	time.Sleep(2 * time.Second)
+	err = enc.LoadCache([]string{datasetName})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Sleep 2 seconds and load - TTL should reset again
+	t.Log("Sleep 2 seconds - cache TTL should reset")
+	time.Sleep(2 * time.Second)
+	err = enc.LoadCache([]string{datasetName})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Sleep 4 seconds - cache should expire (no LoadCache call)
+	t.Log("Sleep 4 seconds - cache should be expired")
+	time.Sleep(4 * time.Second)
+	err = enc.LoadCache([]string{datasetName})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Log("TTL test completed successfully")
+	// Note: Like Java test, this requires verbose logging enabled to verify cache behavior
+	// The test validates that LoadCache doesn't error during TTL refresh scenarios
+}
