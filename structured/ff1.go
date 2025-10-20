@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"math"
+	"math/big"
 )
 
 // This implementation conforms (as best as possible) to Draft SP 800-38G Rev. 1
@@ -61,9 +61,11 @@ func (this *FF1) cipher(X []rune, T []byte, enc bool) ([]rune, error) {
 	n := len(X)
 	u := n / 2
 	v := n - u
-
-	b := int(math.Ceil(math.Log2(
-		float64(radix))*float64(v))+7) / 8
+	var t big.Int
+	t.Exp(big.NewInt(int64(radix)), big.NewInt(int64(v)), nil)
+	t.Sub(&t, big.NewInt(1))
+	bl := t.BitLen()
+	b := (bl + 7) / 8
 	d := 4*((b+3)/4) + 4
 
 	// use default tweak if none is specified
