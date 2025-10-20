@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"math"
 	"math/big"
 )
 
@@ -66,7 +65,7 @@ func (this *FF1) cipher(X []rune, T []byte, enc bool) ([]rune, error) {
 	t.Exp(big.NewInt(int64(radix)), big.NewInt(int64(v)), nil)
 	t.Sub(&t, big.NewInt(1))
 	bl := t.BitLen()
-	b := int(math.Ceil(float64(bl) + 7) / 8)
+	b := (bl + 7) / 8
 	d := 4*((b+3)/4) + 4
 
 	// use default tweak if none is specified
