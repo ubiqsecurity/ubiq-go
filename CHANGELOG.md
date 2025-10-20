@@ -1,5 +1,8 @@
 # Changelog
 
+# 2.2.7 - 2025-10-16
+* Added LoadCache method to pre-load and refresh structured encryption and decryption cache on demand
+
 # 2.2.6 - 2025-09-16
 * Adjust Cache implemenmtation for better stability
 

@@ -346,6 +346,18 @@ if err != nil {
 fmt.Fprintf(os.Stdout, "DECRYPTED decrypted_text= %s \n", plainText)
 ```
 
+### Loading the cache
+
+The library automatically populates the cache on first use of a dataset. To pre-load the cache for better performance, use `LoadCache()` on either encryption or decryption objects. Calling `LoadCache()` will also reset the TTL for already-cached datasets, which is useful for keeping frequently-used datasets in cache.
+
+```go
+// From encryption object - load specific datasets
+enc.LoadCache([]string{"SSN", "BIRTH_DATE"})
+
+// From decryption object - load all datasets
+dec.LoadCache([]string{})
+```
+
 ## Configuration File
 
 A sample configuration file is shown below.  The configuration is in JSON format.  

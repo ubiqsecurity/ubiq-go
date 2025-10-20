@@ -1,6 +1,7 @@
 package ubiq
 
 import (
+	"crypto/rsa"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -12,6 +13,7 @@ import (
 	"os"
 	"sort"
 	"strconv"
+	"strings"
 
 	"gitlab.com/ubiqsecurity/ubiq-go/v2/structured"
 )
@@ -358,11 +360,266 @@ func (sC *structuredContext) fetchAllKeys(name string) (
 	return keys, nil
 }
 
+// Retrieve dataset definitions and all keys for multiple datasets from the server
+// If datasets is empty, retrieves all datasets for the API key
+func (sC *structuredContext) fetchDefKeys(datasets []string) (map[string]defKeys, error) {
+	query := url.Values{}
+	query.Set("papi", sC.papi)
+
+	// If datasets are specified, add them as comma-separated list
+	if len(datasets) > 0 {
+		query.Set("ffs_name", strings.Join(datasets, ","))
+	}
+
+	isIdp, err := sC.creds.isIdp()
+	if err != nil {
+		return nil, err
+	}
+
+	if isIdp {
+		// IDP mode requires passing the idp cert to the server
+		sC.creds.renewIdpCert()
+		query.Set("payload_cert", sC.creds.idpBase64Cert)
+	}
+
+	var rsp *http.Response
+	rsp, err = sC.client.Get(sC.host + "/api/v0/fpe/def_keys?" + query.Encode())
+	if err != nil {
+		return nil, err
+	}
+	defer rsp.Body.Close()
+
+	if rsp.StatusCode != http.StatusOK {
+		errMsg, _ := io.ReadAll(rsp.Body)
+		return nil, fmt.Errorf("unexpected response: %s", string(errMsg))
+	}
+
+	js := make(map[string]defKeys)
+	err = json.NewDecoder(rsp.Body).Decode(&js)
+	if err != nil {
+		return nil, err
+	}
+
+	// If IDP mode, replace encrypted_private_key in all datasets
+	if isIdp {
+		for name := range js {
+			dk := js[name]
+			dk.EncryptedPrivateKey = sC.creds.idpEncryptedPrivateKey
+			js[name] = dk
+		}
+	}
+
+	return js, nil
+}
+
 func (sC *structuredContext) flushKey(papi, name *string, n int) {
 	if sC.config.KeyCaching.Structured {
 		cacheKey := getStructuredCacheKey(*papi, *name, n)
 		sC.cache.cache.Delete(cacheKey)
 	}
+}
+
+// loadCache loads dataset definitions and encryption keys into the cache.
+// If datasets is empty, loads all datasets for the API key.
+// Removes cached datasets that are no longer accessible.
+func (sC *structuredContext) loadCache(datasets []string) error {
+	if !sC.config.KeyCaching.Structured {
+		return nil // Caching is disabled, nothing to do
+	}
+
+	// Fetch dataset definitions and keys from the server
+	defKeysMap, err := sC.fetchDefKeys(datasets)
+	if err != nil {
+		return err
+	}
+
+	// Track which datasets were requested/returned
+	var requestedDatasets []string
+	if len(datasets) == 0 {
+		// All datasets were requested, so use what was returned
+		requestedDatasets = make([]string, 0, len(defKeysMap))
+		for name := range defKeysMap {
+			requestedDatasets = append(requestedDatasets, name)
+		}
+	} else {
+		requestedDatasets = datasets
+	}
+
+	// Track datasets to remove (those that were cached but not returned)
+	datasetsToRemove := make([]string, 0)
+
+	// If we requested all datasets (empty input), check existing cache
+	if len(datasets) == 0 {
+		// Get all currently cached dataset keys
+		iter := sC.cache.cache.Iterator()
+		cachedDatasets := make(map[string]bool)
+
+		for iter.SetNext() {
+			entry, err := iter.Value()
+			if err != nil {
+				continue
+			}
+			key := entry.Key()
+			// Filter for dataset cache keys only (format: "papi-datasetname")
+			// Exclude encryption key entries (format: "papi-datasetname-N" or "papi-datasetname--1")
+			// Dataset keys split into exactly 2 parts when split by hyphen
+			if strings.HasPrefix(key, sC.papi+"-") {
+				parts := strings.Split(key, "-")
+				if len(parts) == 2 {
+					cachedDatasets[parts[1]] = true
+				}
+			}
+		}
+
+		// Find datasets that are cached but not in the returned set
+		for cachedName := range cachedDatasets {
+			if _, exists := defKeysMap[cachedName]; !exists {
+				datasetsToRemove = append(datasetsToRemove, cachedName)
+			}
+		}
+	}
+
+	// Process each returned dataset
+	for datasetName, defKeys := range defKeysMap {
+		// Store/update dataset definition
+		dataset := defKeys.Dataset
+
+		// Convert character sets to alphabets
+		dataset.PassthroughAlphabet, _ = structured.NewAlphabet(dataset.PassthroughCharacterSet)
+		dataset.OutputAlphabet, _ = structured.NewAlphabet(dataset.OutputCharacterSet)
+		dataset.InputAlphabet, _ = structured.NewAlphabet(dataset.InputCharacterSet)
+
+		datasetCacheKey := getStructuredDatasetKey(sC.papi, datasetName)
+		if err := sC.cache.updateDataset(datasetCacheKey, dataset); err != nil {
+			return fmt.Errorf("failed to cache dataset %s: %w", datasetName, err)
+		}
+
+		// Decrypt the private key once for all data keys (only if needed)
+		var pk *rsa.PrivateKey
+		var pkDecrypted bool
+
+		shouldEncrypt := sC.config.KeyCaching.Encrypt
+
+		// Process each encryption key
+		for i, wdk := range defKeys.EncryptedDataKeys {
+			keyCacheKey := getStructuredCacheKey(sC.papi, datasetName, i)
+
+			// Check if key already exists in cache
+			existingKey, err := sC.cache.readStructuredKey(keyCacheKey)
+			keyExists := (err == nil)
+
+			var key structuredKey
+
+			if !keyExists {
+				// Key doesn't exist - need to decrypt it
+				// Decrypt private key if not already done
+				if !pkDecrypted {
+					pk, err = decryptPrivateKey(defKeys.EncryptedPrivateKey, sC.srsa)
+					if err != nil {
+						return fmt.Errorf("failed to decrypt private key for %s: %w", datasetName, err)
+					}
+					pkDecrypted = true
+				}
+
+				key.Num = i
+				key.EPK = defKeys.EncryptedPrivateKey
+				key.WDK = wdk
+
+				// Decrypt the data key
+				key.Key, err = decryptDataKey(wdk, pk)
+				if err != nil {
+					return fmt.Errorf("failed to decrypt data key %d for %s: %w", i, datasetName, err)
+				}
+			} else {
+				// Key exists - just refresh TTL by re-setting the existing value
+				key = existingKey
+			}
+
+			// Store/update the key in cache (this resets TTL in BigCache)
+			if shouldEncrypt && !keyExists {
+				// For encrypted cache, store without decrypted key
+				encryptedKey := structuredKey{
+					Num: key.Num,
+					EPK: key.EPK,
+					WDK: key.WDK,
+					Key: nil, // Don't store decrypted key
+				}
+				if err := sC.cache.updateStructuredKey(keyCacheKey, encryptedKey); err != nil {
+					return fmt.Errorf("failed to cache key %d for %s: %w", i, datasetName, err)
+				}
+			} else {
+				// For unencrypted cache or existing keys, store as-is
+				if err := sC.cache.updateStructuredKey(keyCacheKey, key); err != nil {
+					return fmt.Errorf("failed to cache key %d for %s: %w", i, datasetName, err)
+				}
+			}
+
+			// Also cache/refresh the current key (key number -1 maps to current key)
+			if i == defKeys.CurrentKeyNum {
+				currentKeyCacheKey := getStructuredCacheKey(sC.papi, datasetName, -1)
+
+				// Check if current key exists
+				existingCurrentKey, err := sC.cache.readStructuredKey(currentKeyCacheKey)
+				currentKeyExists := (err == nil)
+
+				if currentKeyExists {
+					// Just refresh TTL with existing value
+					if err := sC.cache.updateStructuredKey(currentKeyCacheKey, existingCurrentKey); err != nil {
+						return fmt.Errorf("failed to refresh current key for %s: %w", datasetName, err)
+					}
+				} else {
+					// Store new current key
+					if shouldEncrypt {
+						encryptedKey := structuredKey{
+							Num: key.Num,
+							EPK: key.EPK,
+							WDK: key.WDK,
+							Key: nil,
+						}
+						if err := sC.cache.updateStructuredKey(currentKeyCacheKey, encryptedKey); err != nil {
+							return fmt.Errorf("failed to cache current key for %s: %w", datasetName, err)
+						}
+					} else {
+						if err := sC.cache.updateStructuredKey(currentKeyCacheKey, key); err != nil {
+							return fmt.Errorf("failed to cache current key for %s: %w", datasetName, err)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Check if any requested datasets were not returned (removed/no permission)
+	for _, requestedName := range requestedDatasets {
+		if _, exists := defKeysMap[requestedName]; !exists {
+			datasetsToRemove = append(datasetsToRemove, requestedName)
+		}
+	}
+
+	// Remove datasets that are no longer accessible
+	for _, datasetName := range datasetsToRemove {
+		// Remove dataset definition
+		datasetCacheKey := getStructuredDatasetKey(sC.papi, datasetName)
+		sC.cache.cache.Delete(datasetCacheKey)
+
+		// Remove all keys for this dataset
+		// We need to iterate through cache to find all keys for this dataset
+		iter := sC.cache.cache.Iterator()
+		for iter.SetNext() {
+			entry, err := iter.Value()
+			if err != nil {
+				continue
+			}
+			key := entry.Key()
+			// Key format: "papi-datasetname-keynumber"
+			prefix := sC.papi + "-" + datasetName + "-"
+			if strings.HasPrefix(key, prefix) {
+				sC.cache.cache.Delete(key)
+			}
+		}
+	}
+
+	return nil
 }
 
 // convert a string representation of a number (@inp) in the radix/alphabet
@@ -729,6 +986,17 @@ func (fe *StructuredEncryption) AddUserDefinedMetadata(data string) error {
 	return fe.tracking.AddUserDefinedMetadata(data)
 }
 
+// LoadCache loads the cache for specific datasets or all datasets if empty slice provided.
+// This method retrieves dataset definitions and all encryption keys from the server
+// and populates the local cache. If datasets slice is empty, all datasets associated
+// with the credentials will be loaded.
+//
+// Datasets that were previously cached but are no longer returned by the API
+// (e.g., due to permission changes) will be removed from the cache.
+func (fe *StructuredEncryption) LoadCache(datasets []string) error {
+	return ((*structuredContext)(fe)).loadCache(datasets)
+}
+
 // Create a new format preserving decryption object. The returned object
 // can be reused to decrypt multiple ciphertexts using the format (and
 // algorithm and key) named by @dataset
@@ -801,6 +1069,17 @@ func (fd *StructuredDecryption) Close() {
 // Attach metadata to usage information reported by the application.
 func (fd *StructuredDecryption) AddUserDefinedMetadata(data string) error {
 	return fd.tracking.AddUserDefinedMetadata(data)
+}
+
+// LoadCache loads the cache for specific datasets or all datasets if empty slice provided.
+// This method retrieves dataset definitions and all encryption keys from the server
+// and populates the local cache. If datasets slice is empty, all datasets associated
+// with the credentials will be loaded.
+//
+// Datasets that were previously cached but are no longer returned by the API
+// (e.g., due to permission changes) will be removed from the cache.
+func (fd *StructuredDecryption) LoadCache(datasets []string) error {
+	return ((*structuredContext)(fd)).loadCache(datasets)
 }
 
 func (sC *structuredContext) listCacheValues() error {
