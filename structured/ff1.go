@@ -167,9 +167,18 @@ func (this *FF1) cipher(X []rune, T []byte, enc bool) ([]rune, error) {
 		ctx.nA, ctx.nB = ctx.nB, ctx.nA
 	}
 
+	ctxnA, err := BigIntToRunes(&ctx.alpha, ctx.nA, u)
+	if err != nil {
+		return nil, err
+	}
+
+	ctxnB, err := BigIntToRunes(&ctx.alpha, ctx.nB, v)
+	if err != nil {
+		return nil, err
+	}
 	return append(
-			BigIntToRunes(&ctx.alpha, ctx.nA, u),
-			BigIntToRunes(&ctx.alpha, ctx.nB, v)...),
+			ctxnA,
+			ctxnB...),
 		nil
 }
 

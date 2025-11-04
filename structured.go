@@ -624,7 +624,7 @@ func (sC *structuredContext) loadCache(datasets []string) error {
 
 // convert a string representation of a number (@inp) in the radix/alphabet
 // described by @ics to the radix/alphabet described by @ocs
-func convertRadix(inp []rune, ics, ocs *structured.Alphabet) []rune {
+func convertRadix(inp []rune, ics, ocs *structured.Alphabet) ([]rune, error) {
 	var n *big.Int = big.NewInt(0)
 	return structured.BigIntToRunes(ocs,
 		structured.RunesToBigInt(n, ics, inp), len(inp))
@@ -887,7 +887,10 @@ func (fe *StructuredEncryption) Cipher(datasetName, pt string, twk []byte) (
 		trackingActionEncrypt,
 		1, kn)
 
-	ctr = convertRadix(ctr, &dataset.InputAlphabet, &dataset.OutputAlphabet)
+	ctr, err = convertRadix(ctr, &dataset.InputAlphabet, &dataset.OutputAlphabet)
+	if err != nil {
+		return "", err
+	}
 	ctr = encodeKeyNumber(
 		ctr, &dataset.OutputAlphabet, kn, dataset.NumEncodingBits)
 	ctr, err = formatOutput(fmtr, ctr, &dataset.PassthroughAlphabet, rules)
@@ -961,7 +964,11 @@ func (fe *StructuredEncryption) CipherForSearch(datasetName, pt string, twk []by
 
 		fe.tracking.AddEvent(fe.papi, dataset.Name, "", trackingActionEncrypt, 1, i)
 
-		ctr = convertRadix(ctr, &dataset.InputAlphabet, &dataset.OutputAlphabet)
+		ctr, err = convertRadix(ctr, &dataset.InputAlphabet, &dataset.OutputAlphabet)
+		if err != nil {
+			return
+		}
+
 		ctr = encodeKeyNumber(
 			ctr, &dataset.OutputAlphabet, i, dataset.NumEncodingBits)
 		ctr, err = formatOutput(fmtr, ctr, &dataset.PassthroughAlphabet, rules)
@@ -1044,7 +1051,11 @@ func (fd *StructuredDecryption) Cipher(datasetName, ct string, twk []byte) (
 		return
 	}
 
-	ctr = convertRadix(ctr, &dataset.OutputAlphabet, &dataset.InputAlphabet)
+	ctr, err = convertRadix(ctr, &dataset.OutputAlphabet, &dataset.InputAlphabet)
+
+	if err != nil {
+		return "", errors.New("an error occured. Please ensure input is a decryptable string.")
+	}
 
 	ptr, err := algo.DecryptRunes(ctr, twk)
 	if err != nil {
