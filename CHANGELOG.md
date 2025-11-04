@@ -1,5 +1,8 @@
 # Changelog
 
+# 2.2.8 - 2025-11-04
+* Improved error handling for issues when decrypting invalid strings
+
 # 2.2.7 - 2025-10-16
 * Added LoadCache method to pre-load and refresh structured encryption and decryption cache on demand
 * Updated structured encryption to match algorithms in Second Public Draft - https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-38Gr1.2pd.pdf
