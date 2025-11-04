@@ -127,7 +127,7 @@ func (this *ffx) ciph(d, s []byte) error {
 
 // convert a big integer to an array of runes in the specified radix,
 // padding the output to the left with 0's
-func BigIntToRunes(alpha *Alphabet, _n *big.Int, l int) []rune {
+func BigIntToRunes(alpha *Alphabet, _n *big.Int, l int) ([]rune, error) {
 	var R []rune
 	var i int
 
@@ -135,6 +135,12 @@ func BigIntToRunes(alpha *Alphabet, _n *big.Int, l int) []rune {
 
 	if alpha.Len() <= defaultAlphabet.Len() {
 		s := _n.Text(alpha.Len())
+
+		// If len(s) > l, R[len(s)-i-1] will panic.
+		// Input string is probably invalid for this alphabet.
+		if len(s) > l {
+			return R, errors.New("invalid input string")
+		}
 
 		for i = 0; i < len(s); i++ {
 			if alpha.IsDef() {
@@ -161,7 +167,7 @@ func BigIntToRunes(alpha *Alphabet, _n *big.Int, l int) []rune {
 	}
 
 	_revr(R, R)
-	return R
+	return R, nil
 }
 
 func RunesToBigInt(n *big.Int, alpha *Alphabet, s []rune) *big.Int {
