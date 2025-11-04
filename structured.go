@@ -1054,7 +1054,7 @@ func (fd *StructuredDecryption) Cipher(datasetName, ct string, twk []byte) (
 	ctr, err = convertRadix(ctr, &dataset.OutputAlphabet, &dataset.InputAlphabet)
 
 	if err != nil {
-		return "", errors.New("an error occured. Please ensure this is a decryptable string.")
+		return "", errors.New("an error occured. Please ensure input is a decryptable string.")
 	}
 
 	ptr, err := algo.DecryptRunes(ctr, twk)
