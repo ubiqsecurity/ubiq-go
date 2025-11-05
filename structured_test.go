@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"sync"
 	"testing"
+	"path/filepath"
 	"time"
 )
 
@@ -126,11 +127,7 @@ func TestStructuredUTF8ComplexForSearchLocal(t *testing.T) {
 		"ÑÒÓķĸĹϺϻϼϽϾÔÕϿは世界abcdefghijklmnopqrstuvwxyzこんにちÊʑʒʓËÌÍÎÏðñòóôĵĶʔʕ")
 }
 
-func testStructuredForSearchRemote(t *testing.T, dataset, pt, expected_ct string) {
-	if val, ok := os.LookupEnv("CI"); !ok || val != "true" {
-		t.Skip()
-	}
-
+func testStructuredForSearchRemote(t *testing.T, dataset, pt string) {
 	initializeCreds()
 
 	enc, err := NewStructuredEncryption(credentials)
@@ -144,6 +141,11 @@ func testStructuredForSearchRemote(t *testing.T, dataset, pt, expected_ct string
 		t.Fatal(err)
 	}
 	defer dec.Close()
+
+	encryptedText, err := enc.Cipher(dataset, pt, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ct, err := enc.CipherForSearch(dataset, pt, nil)
 	if err != nil {
@@ -163,7 +165,7 @@ func testStructuredForSearchRemote(t *testing.T, dataset, pt, expected_ct string
 				pt, rt)
 		}
 
-		found = found || (expected_ct == ct[i])
+		found = found || (encryptedText == ct[i])
 	}
 
 	if !found {
@@ -176,29 +178,25 @@ func TestStructuredAlnumSSNForSearchRemote(t *testing.T) {
 	testStructuredForSearchRemote(
 		t,
 		"ALPHANUM_SSN",
-		";0123456-789ABCDEF|",
-		";!!!E7`+-ai1ykOp8r|")
+		";0123456-789ABCDEF|")
 }
 func TestStructuredBirthdateForSearchRemote(t *testing.T) {
 	testStructuredForSearchRemote(
 		t,
 		"BIRTH_DATE",
-		";01\\02-1960|",
-		";!!\\!!-oKzi|")
+		";01\\02-1960|")
 }
 func TestStructuredSSNForSearchRemote(t *testing.T) {
 	testStructuredForSearchRemote(
 		t,
 		"SSN",
-		"-0-1-2-3-4-5-6-7-8-9-",
-		"-0-0-0-0-1-I-L-8-j-D-")
+		"-0-1-2-3-4-5-6-7-8-9-")
 }
 func TestStructuredUTF8ComplexForSearchRemote(t *testing.T) {
 	testStructuredForSearchRemote(
 		t,
 		"UTF8_STRING_COMPLEX",
-		"ÑÒÓķĸĹϺϻϼϽϾÔÕϿは世界abcdefghijklmnopqrstuvwxyzこんにちÊʑʒʓËÌÍÎÏðñòóôĵĶʔʕ",
-		"ÑÒÓにΪΪΪΪΪΪ3ÔÕoeϽΫAÛMĸOZphßÚdyÌô0ÝϼPtĸTtSKにVÊϾέÛはʑʒʓÏRϼĶufÝK3MXaʔʕ")
+		"ÑÒÓķĸĹϺϻϼϽϾÔÕϿは世界abcdefghijklmnopqrstuvwxyzこんにちÊʑʒʓËÌÍÎÏðñòóôĵĶʔʕ")
 }
 
 type StructuredTestRecord struct {
@@ -219,22 +217,18 @@ type StructuredOperations struct {
 	perf StructuredPerformanceCounter
 }
 
-func TestStructured125k(t *testing.T) {
-	file, err := os.Open("load_time/DATA/125k_a.json")
-	if err != nil {
-		t.Skip(err)
-	}
-	defer file.Close()
-
-	raw, err := io.ReadAll(file)
-	if err != nil {
-		t.Skip(err)
+func TestStructuredFiles(t *testing.T) {
+  var foundFiles []string
+	filename := os.Getenv("UBIQ_TEST_DATA_FILE")
+	if filename[len(filename)-1:] == "/" {
+		foundFiles, _= filepath.Glob(fmt.Sprintf("%v*", filename))
+	} else {
+		foundFiles, _ = filepath.Glob(filename)
 	}
 
-	var records []StructuredTestRecord
-	err = json.Unmarshal([]byte(raw), &records)
-	if err != nil {
-		t.Skip(err)
+	if len(foundFiles) == 0 || foundFiles == nil {
+		err := fmt.Errorf("unable to find any files with the pattern: %v", filename)
+		t.Fatal(err)
 	}
 
 	initializeCreds()
@@ -250,41 +244,65 @@ func TestStructured125k(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer dec.Close()
-
 	var ops map[string]*StructuredOperations = make(map[string]*StructuredOperations)
-	for i := range records {
-		rec := &records[i]
 
-		op, ok := ops[rec.Dataset]
-		if !ok {
-			var _op StructuredOperations
-			ops[rec.Dataset] = &_op
-			op = &_op
-		}
+	for _, infile := range foundFiles {
+		fmt.Printf("Loading file: %v\n", infile)
 
-		beg := time.Now()
-		ct, err := enc.Cipher(rec.Dataset, rec.Plaintext, nil)
+		file, err := os.Open(infile)
 		if err != nil {
-			t.Fatal(err)
+			t.Skip(err)
 		}
-		if ct != rec.Ciphertext {
-			t.Fatalf("encryption(%v): %v != %v",
-				i, ct, rec.Ciphertext)
-		}
-		op.perf.Duration.Encrypt += time.Since(beg)
+		defer file.Close()
 
-		beg = time.Now()
-		pt, err := dec.Cipher(rec.Dataset, rec.Ciphertext, nil)
+		raw, err := io.ReadAll(file)
 		if err != nil {
-			t.Fatal(err)
+			t.Skip(err)
 		}
-		if pt != rec.Plaintext {
-			t.Fatalf("decryption(%v): %v != %v",
-				i, pt, rec.Plaintext)
-		}
-		op.perf.Duration.Decrypt += time.Since(beg)
 
-		op.perf.Count++
+		var records []StructuredTestRecord
+		err = json.Unmarshal([]byte(raw), &records)
+		if err != nil {
+			t.Skip(err)
+		}
+
+		for i := range records {
+			rec := &records[i]
+
+			op, ok := ops[rec.Dataset]
+			if !ok {
+				var _op StructuredOperations
+				ops[rec.Dataset] = &_op
+				op = &_op
+				// Perform encrypt / decrypt for the dataset just to hydrate the cache without the timer
+				enc.Cipher(rec.Dataset, rec.Plaintext, nil)
+				dec.Cipher(rec.Dataset, rec.Ciphertext, nil)
+			}
+
+			beg := time.Now()
+			ct, err := enc.Cipher(rec.Dataset, rec.Plaintext, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if ct != rec.Ciphertext {
+				t.Fatalf("encryption(%v): %v != %v",
+					i, ct, rec.Ciphertext)
+			}
+			op.perf.Duration.Encrypt += time.Since(beg)
+
+			beg = time.Now()
+			pt, err := dec.Cipher(rec.Dataset, rec.Ciphertext, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if pt != rec.Plaintext {
+				t.Fatalf("decryption(%v): %v != %v",
+					i, pt, rec.Plaintext)
+			}
+			op.perf.Duration.Decrypt += time.Since(beg)
+
+			op.perf.Count++
+		}
 	}
 
 	for dset, op := range ops {
@@ -299,7 +317,8 @@ func TestStructured125k(t *testing.T) {
 }
 
 func TestStructuredThreadSafety(t *testing.T) {
-	file, err := os.Open("load_time/DATA/100.json")
+	filename := os.Getenv("UBIQ_100_FILE")
+	file, err := os.Open(filename)
 	if err != nil {
 		t.Skip(err)
 	}

@@ -10,7 +10,7 @@ image:
 stages:
     - test
 
-test:
+.test:
     stage: test
     before_script:
         - apt -y update
@@ -19,6 +19,24 @@ test:
         - go test -v
         - go build examples/unstructured/ubiq_sample.go
         - go build examples/structured/ubiq_structured_sample.go
+
+test_dev:
+    extends: .test
+    rules:
+    - if: $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE != 'merge_request_event'
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == 'schedule'
+    environment: ubs-usw2-dvc
+
+test_prod:
+    extends: .test
+    rules:
+    - if: $CI_COMMIT_REF_NAME == $CI_DEFAULT_BRANCH
+      when: on_success
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+      when: on_success
+    - if: $CI_PIPELINE_SOURCE == 'schedule'
+      when: on_success
+    environment: ubs-usw2-prcv3
 
 sast:
   stage: test

@@ -98,12 +98,10 @@ func TestDeprecatedFPEUTF8ComplexForSearchLocal(t *testing.T) {
 		"ÑÒÓķĸĹϺϻϼϽϾÔÕϿは世界abcdefghijklmnopqrstuvwxyzこんにちÊʑʒʓËÌÍÎÏðñòóôĵĶʔʕ")
 }
 
-func testFPEForSearchRemote(t *testing.T, ffs, pt, expected_ct string) {
-	if val, ok := os.LookupEnv("CI"); !ok || val != "true" {
-		t.Skip()
-	}
-
+func testFPEForSearchRemote(t *testing.T, ffs, pt string) {
 	initializeCreds()
+
+	encryptedText, err := FPEncrypt(credentials, ffs, pt, nil)
 
 	ct, err := FPEncryptForSearch(credentials, ffs, pt, nil)
 	if err != nil {
@@ -123,7 +121,7 @@ func testFPEForSearchRemote(t *testing.T, ffs, pt, expected_ct string) {
 				pt, rt)
 		}
 
-		found = found || (expected_ct == ct[i])
+		found = found || (encryptedText == ct[i])
 	}
 
 	if !found {
@@ -136,29 +134,25 @@ func TestDeprecatedFPEAlnumSSNForSearchRemote(t *testing.T) {
 	testFPEForSearchRemote(
 		t,
 		"ALPHANUM_SSN",
-		";0123456-789ABCDEF|",
-		";!!!E7`+-ai1ykOp8r|")
+		";0123456-789ABCDEF|")
 }
 func TestDeprecatedFPEBirthdateForSearchRemote(t *testing.T) {
 	testFPEForSearchRemote(
 		t,
 		"BIRTH_DATE",
-		";01\\02-1960|",
-		";!!\\!!-oKzi|")
+		";01\\02-1960|")
 }
 func TestDeprecatedFPESSNForSearchRemote(t *testing.T) {
 	testFPEForSearchRemote(
 		t,
 		"SSN",
-		"-0-1-2-3-4-5-6-7-8-9-",
-		"-0-0-0-0-1-I-L-8-j-D-")
+		"-0-1-2-3-4-5-6-7-8-9-")
 }
 func TestDeprecatedFPEUTF8ComplexForSearchRemote(t *testing.T) {
 	testFPEForSearchRemote(
 		t,
 		"UTF8_STRING_COMPLEX",
-		"ÑÒÓķĸĹϺϻϼϽϾÔÕϿは世界abcdefghijklmnopqrstuvwxyzこんにちÊʑʒʓËÌÍÎÏðñòóôĵĶʔʕ",
-		"ÑÒÓにΪΪΪΪΪΪ3ÔÕoeϽΫAÛMĸOZphßÚdyÌô0ÝϼPtĸTtSKにVÊϾέÛはʑʒʓÏRϼĶufÝK3MXaʔʕ")
+		"ÑÒÓķĸĹϺϻϼϽϾÔÕϿは世界abcdefghijklmnopqrstuvwxyzこんにちÊʑʒʓËÌÍÎÏðñòóôĵĶʔʕ")
 }
 
 type FPETestRecord struct {
