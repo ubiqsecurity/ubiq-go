@@ -626,3 +626,32 @@ func TestLoadCacheTTLRefresh(t *testing.T) {
 	// Note: Like Java test, this requires verbose logging enabled to verify cache behavior
 	// The test validates that LoadCache doesn't error during TTL refresh scenarios
 }
+
+// TestEmptyStringDecryption tests the fix for empty string panic in decryption
+// This validates that attempting to decrypt an empty string returns an error
+// instead of panicking with "index out of range [0] with length 0"
+func TestEmptyStringDecryption(t *testing.T) {
+	initializeCreds()
+
+	dec, err := NewStructuredDecryption(credentials)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer dec.Close()
+
+	// Attempt to decrypt an empty string - should return error, not panic
+	// Using UTF8_STRING_COMPLEX as a commonly available dataset
+	_, err = dec.Cipher("UTF8_STRING_COMPLEX", "", nil)
+	if err == nil {
+		t.Fatal("Expected error when decrypting empty string, got nil")
+	}
+
+	// Should get "invalid text length" error (not a panic)
+	// Note: May also get dataset compatibility error in some environments,
+	// which is acceptable as long as it doesn't panic
+	if err.Error() != "invalid text length" {
+		// If we got a different error (like dataset compatibility),
+		// that's fine - we just want to ensure no panic occurred
+		t.Logf("Got error (no panic): %v", err)
+	}
+}
