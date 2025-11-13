@@ -1,5 +1,9 @@
 # Changelog
 
+# 2.2.9 - 2025-11-12
+* Fixed panic when decrypting invalid strings with large alphabet datasets (>62 characters)
+* Fixed panic when decrypting empty strings
+
 # 2.2.8 - 2025-11-04
 * Improved error handling for issues when decrypting invalid strings
 

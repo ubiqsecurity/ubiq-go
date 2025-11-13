@@ -767,6 +767,11 @@ func encodeKeyNumber(inp []rune, ocs *structured.Alphabet, n, sft int) []rune {
 
 // recover the key number from a ciphertext
 func decodeKeyNumber(inp []rune, ocs *structured.Alphabet, sft int) ([]rune, int) {
+	// Validate input is not empty before accessing inp[0]
+	if len(inp) == 0 {
+		return inp, 0
+	}
+
 	c := ocs.PosOf(inp[0])
 	n := c >> sft
 
