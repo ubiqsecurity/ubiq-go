@@ -31,7 +31,6 @@ func TestNewFFXKeyLength(t *testing.T) {
 	}
 }
 
-// TestBigIntToRunesInvalidInputSmallAlphabet tests Bug #1 fix:
 // Invalid input strings that would cause index out of range with small alphabets (<=62 chars)
 func TestBigIntToRunesInvalidInputSmallAlphabet(t *testing.T) {
 	// Create a small alphabet (<=62 characters)
@@ -55,7 +54,6 @@ func TestBigIntToRunesInvalidInputSmallAlphabet(t *testing.T) {
 	}
 }
 
-// TestBigIntToRunesInvalidInputLargeAlphabet tests Bug #2 fix:
 // Invalid input strings that would cause index out of range with large alphabets (>62 chars)
 func TestBigIntToRunesInvalidInputLargeAlphabet(t *testing.T) {
 	// Create a large alphabet (>62 characters) to trigger the large alphabet code path
