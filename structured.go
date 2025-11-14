@@ -1045,6 +1045,11 @@ func (fd *StructuredDecryption) Cipher(datasetName, ct string, twk []byte) (
 		return
 	}
 
+	// Validate ctr is not empty before decoding key number
+	if len(ctr) == 0 {
+		return "", errors.New("invalid text length")
+	}
+
 	ctr, kn = decodeKeyNumber(ctr, &dataset.OutputAlphabet, dataset.NumEncodingBits)
 	algo, retKn, err := (*structuredContext)(fd).setAlgorithm(dataset, kn)
 	if err != nil {

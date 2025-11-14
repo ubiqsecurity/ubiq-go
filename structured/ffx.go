@@ -156,6 +156,23 @@ func BigIntToRunes(alpha *Alphabet, _n *big.Int, l int) ([]rune, error) {
 		var t *big.Int = big.NewInt(int64(alpha.Len()))
 
 		n.Set(_n)
+
+		// Calculate how many digits are required in this radix
+		// to prevent writing past the end of R
+		tempN := big.NewInt(0)
+		tempN.Set(_n)
+		requiredDigits := 0
+		for !tempN.IsInt64() || tempN.Int64() != 0 {
+			tempN.Div(tempN, t)
+			requiredDigits++
+		}
+
+		// If requiredDigits > l, R[requiredDigits-1] will panic.
+		// Input string is probably invalid for this alphabet.
+		if requiredDigits > l {
+			return R, errors.New("invalid input string")
+		}
+
 		for i = 0; !n.IsInt64() || n.Int64() != 0; i++ {
 			n.DivMod(n, t, r)
 			R[i] = alpha.ValAt(int(r.Int64()))
