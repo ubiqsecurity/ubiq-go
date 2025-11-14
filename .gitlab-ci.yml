@@ -22,6 +22,10 @@ stages:
 
 test_dev:
     extends: .test
+    script:
+        - go test -v -skip TestStructuredFiles
+        - go build examples/unstructured/ubiq_sample.go
+        - go build examples/structured/ubiq_structured_sample.go
     rules:
     - if: $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE != 'merge_request_event'
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == 'schedule'
