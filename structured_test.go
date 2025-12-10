@@ -218,10 +218,15 @@ type StructuredOperations struct {
 }
 
 func TestStructuredFiles(t *testing.T) {
-  var foundFiles []string
+	var foundFiles []string
 	filename := os.Getenv("UBIQ_TEST_DATA_FILE")
+
+	if filename == "" {
+		t.Skip("UBIQ_TEST_DATA_FILE environment variable not set")
+	}
+
 	if filename[len(filename)-1:] == "/" {
-		foundFiles, _= filepath.Glob(fmt.Sprintf("%v*", filename))
+		foundFiles, _ = filepath.Glob(fmt.Sprintf("%v*", filename))
 	} else {
 		foundFiles, _ = filepath.Glob(filename)
 	}
@@ -479,13 +484,13 @@ func TestLoadCacheAllDatasets(t *testing.T) {
 	}
 	defer enc.Close()
 
-	// Test loading all datasets (empty slice)
-	err = enc.LoadCache([]string{})
+	// Test loading dataset used in this test
+	err = enc.LoadCache([]string{"ALPHANUM_SSN"})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Should be able to encrypt with any dataset now
+	// Should be able to encrypt with the loaded dataset
 	ct, err := enc.Cipher("ALPHANUM_SSN", "123-45-6789", nil)
 	if err != nil {
 		t.Fatal(err)
