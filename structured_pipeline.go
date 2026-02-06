@@ -22,6 +22,22 @@ func toPipelineDatasetInfo(ds datasetInfo) *pipeline.DatasetInfo {
 		InputAlphabet:         &ds.InputAlphabet,
 		OutputAlphabet:        &ds.OutputAlphabet,
 		PassthroughAlphabet:   &ds.PassthroughAlphabet,
+		// New data type fields
+		InputPadCharacter: ds.InputPadCharacter,
+		InputEncoding:     ds.InputEncoding,
+		DataType:          ds.DataType,
+	}
+
+	// Convert data type config if present
+	if ds.DataTypeConfig != nil {
+		info.DataTypeConfig = &pipeline.DataTypeConfig{
+			Size:             ds.DataTypeConfig.Size,
+			MinInputIntValue: ds.DataTypeConfig.MinInputIntValue,
+			MaxInputIntValue: ds.DataTypeConfig.MaxInputIntValue,
+			Epoch:            ds.DataTypeConfig.Epoch,
+			MinInputDate:     ds.DataTypeConfig.MinInputDate,
+			MaxInputDate:     ds.DataTypeConfig.MaxInputDate,
+		}
 	}
 
 	// Convert passthrough rules

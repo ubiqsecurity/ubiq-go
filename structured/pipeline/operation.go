@@ -72,10 +72,12 @@ type DatasetInfo struct {
 
 // DataTypeConfig holds configuration for non-string data types.
 type DataTypeConfig struct {
-	Size     int    // Bit size (32, 64)
-	Epoch    string // ISO8601 epoch for date/datetime
-	MinValue int64  // Minimum allowed value
-	MaxValue int64  // Maximum allowed value
+	Size             int64  // Bit size (32, 64)
+	MinInputIntValue int64  // Minimum allowed integer value
+	MaxInputIntValue int64  // Maximum allowed integer value
+	Epoch            string // ISO8601 epoch for date/datetime (e.g., "1970-01-01T00:00:00Z")
+	MinInputDate     string // Minimum allowed date (ISO8601)
+	MaxInputDate     string // Maximum allowed date (ISO8601)
 }
 
 // PassthroughRule defines how to handle portions of input that bypass encryption.

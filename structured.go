@@ -38,6 +38,22 @@ type datasetInfo struct {
 	TweakLengthMin          int               `json:"tweak_min_len"`
 	TweakSource             string            `json:"tweak_source"`
 	PassthroughRules        []passthroughRule `json:"passthrough_rules"`
+
+	// New fields for data type support (int32, int64, date, datetime)
+	InputPadCharacter string          `json:"input_pad_character"`
+	InputEncoding     string          `json:"input_encoding"`
+	DataType          string          `json:"data_type"`
+	DataTypeConfig    *dataTypeConfig `json:"data_type_config"`
+}
+
+// dataTypeConfig holds configuration for non-string data types
+type dataTypeConfig struct {
+	Size             int64  `json:"size"`
+	MinInputIntValue int64  `json:"min_input_int_value"`
+	MaxInputIntValue int64  `json:"max_input_int_value"`
+	Epoch            string `json:"epoch"`
+	MinInputDate     string `json:"min_input_date_value"`
+	MaxInputDate     string `json:"max_input_date_value"`
 }
 
 type passthroughRule struct {
@@ -856,6 +872,39 @@ func (fe *StructuredEncryption) Cipher(datasetName, pt string, twk []byte) (
 	}
 
 	algo, kn, err := ((*structuredContext)(fe)).setAlgorithm(dataset, -1)
+	if err != nil {
+		return
+	}
+
+	// Use pipeline architecture for encryption
+	pipelineDataset := toPipelineDatasetInfo(dataset)
+	pipelineAlgo := wrapAlgorithm(algo)
+
+	ct, err = exec.Encrypt(pipelineDataset, pt, twk, kn, pipelineAlgo)
+	if err != nil {
+		return
+	}
+
+	// Track usage
+	fe.tracking.AddEvent(
+		fe.papi, dataset.Name, "",
+		trackingActionEncrypt,
+		1, kn)
+
+	return ct, nil
+}
+
+// CipherWithKeyNumber encrypts a plaintext string using a specific key number.
+// This is useful for encrypting with all keys for searchable encryption.
+// If keyNumber is -1, the current key will be used.
+func (fe *StructuredEncryption) CipherWithKeyNumber(datasetName, pt string, twk []byte, keyNumber int) (
+	ct string, err error) {
+	dataset, err := ((*structuredContext)(fe)).fetchDataset(datasetName)
+	if err != nil {
+		return
+	}
+
+	algo, kn, err := ((*structuredContext)(fe)).setAlgorithm(dataset, keyNumber)
 	if err != nil {
 		return
 	}
