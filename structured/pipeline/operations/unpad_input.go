@@ -1,42 +1,24 @@
 package operations
 
 import (
-	"strconv"
+	"strings"
 
 	"gitlab.com/ubiqsecurity/ubiq-go/v2/structured/pipeline"
 )
 
-// UnpadInputOperation removes padding that was added by PadInputOperation.
-// It uses the stored original length to restore the value.
-type UnpadInputOperation struct{}
-
-// NewUnpadInputOperation creates a new unpad input operation.
-func NewUnpadInputOperation() *UnpadInputOperation {
-	return &UnpadInputOperation{}
+// UnpadInputOperation removes left-padding that was added by PadInputOperation.
+// It strips all leading occurrences of the dataset's InputPadCharacter,
+// matching the .NET TrimStart approach.
+type UnpadInputOperation struct {
+	padChar rune
 }
 
-// Invoke removes left padding based on the stored original length.
+// NewUnpadInputOperation creates a new unpad input operation.
+func NewUnpadInputOperation(padChar rune) *UnpadInputOperation {
+	return &UnpadInputOperation{padChar: padChar}
+}
+
+// Invoke removes leading pad characters from the current value.
 func (op *UnpadInputOperation) Invoke(ctx *pipeline.OperationContext) (string, error) {
-	origLenStr, ok := ctx.Data["OriginalLength"]
-	if !ok || origLenStr == "" {
-		// No padding was applied
-		return ctx.CurrentValue, nil
-	}
-
-	origLen, err := strconv.Atoi(origLenStr)
-	if err != nil {
-		// Invalid stored length, return unchanged
-		return ctx.CurrentValue, nil
-	}
-
-	runes := []rune(ctx.CurrentValue)
-	currentLen := len(runes)
-
-	if currentLen <= origLen {
-		// Current value is already shorter or equal to original
-		return ctx.CurrentValue, nil
-	}
-
-	// Remove left padding (take the rightmost origLen characters)
-	return string(runes[currentLen-origLen:]), nil
+	return strings.TrimLeft(ctx.CurrentValue, string(op.padChar)), nil
 }

@@ -233,8 +233,8 @@ func (sC *structuredContext) encryptDateTime(dataset datasetInfo, plainDateTime 
 		}
 	}
 
-	// Convert datetime to seconds from epoch
-	secondsFromEpoch := int64(utcPlainDateTime.Sub(epoch).Seconds())
+	// Convert datetime to seconds from epoch using Unix seconds to avoid time.Duration overflow
+	secondsFromEpoch := utcPlainDateTime.Unix() - epoch.Unix()
 
 	// Track if negative
 	isNegative := secondsFromEpoch < 0
@@ -265,8 +265,8 @@ func (sC *structuredContext) encryptDateTime(dataset datasetInfo, plainDateTime 
 		return time.Time{}, fmt.Errorf("failed to parse encrypted seconds: %w", err)
 	}
 
-	// Convert encrypted seconds back to datetime
-	encryptedDateTime := epoch.Add(time.Duration(encryptedSeconds) * time.Second)
+	// Convert encrypted seconds back to datetime using Unix to avoid time.Duration overflow
+	encryptedDateTime := time.Unix(epoch.Unix()+encryptedSeconds, 0).UTC()
 
 	// Apply UTC offset to match original timezone
 	localEncryptedDateTime := encryptedDateTime.Add(-utcOffset)
@@ -294,8 +294,8 @@ func (sC *structuredContext) decryptDateTime(dataset datasetInfo, cipherDateTime
 		return time.Time{}, err
 	}
 
-	// Convert datetime to seconds from epoch
-	cipherSecondsFromEpoch := int64(utcCipherDateTime.Sub(epoch).Seconds())
+	// Convert datetime to seconds from epoch using Unix seconds to avoid time.Duration overflow
+	cipherSecondsFromEpoch := utcCipherDateTime.Unix() - epoch.Unix()
 
 	isNegative := cipherSecondsFromEpoch < 0
 	absSeconds := cipherSecondsFromEpoch
@@ -327,8 +327,8 @@ func (sC *structuredContext) decryptDateTime(dataset datasetInfo, cipherDateTime
 		return time.Time{}, fmt.Errorf("failed to parse plain seconds: %w", err)
 	}
 
-	// Convert decrypted seconds back to datetime
-	plainDateTime := epoch.Add(time.Duration(plainSeconds) * time.Second)
+	// Convert decrypted seconds back to datetime using Unix to avoid time.Duration overflow
+	plainDateTime := time.Unix(epoch.Unix()+plainSeconds, 0).UTC()
 
 	// Apply UTC offset
 	localPlainDateTime := plainDateTime.Add(-utcOffset)
@@ -382,8 +382,9 @@ func (sC *structuredContext) encryptDate(dataset datasetInfo, plainDate time.Tim
 		}
 	}
 
-	// Convert date to days from epoch
-	daysFromEpoch := int64(utcPlainDate.Sub(epochDate).Hours() / 24)
+	// Convert date to days from epoch using Unix seconds to avoid time.Duration overflow
+	// (time.Duration is int64 nanoseconds, max ~292 years; dates can span thousands of years)
+	daysFromEpoch := (utcPlainDate.Unix() - epochDate.Unix()) / 86400
 
 	// Track if negative
 	isNegative := daysFromEpoch < 0
@@ -440,8 +441,8 @@ func (sC *structuredContext) decryptDate(dataset datasetInfo, cipherDate time.Ti
 	}
 	epochDate := time.Date(epoch.Year(), epoch.Month(), epoch.Day(), 0, 0, 0, 0, time.UTC)
 
-	// Convert date to days from epoch
-	cipherDaysFromEpoch := int64(cipherDate.Sub(epochDate).Hours() / 24)
+	// Convert date to days from epoch using Unix seconds to avoid time.Duration overflow
+	cipherDaysFromEpoch := (cipherDate.Unix() - epochDate.Unix()) / 86400
 
 	isNegative := cipherDaysFromEpoch < 0
 	absDays := cipherDaysFromEpoch

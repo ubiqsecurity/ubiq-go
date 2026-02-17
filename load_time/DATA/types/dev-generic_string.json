@@ -1,0 +1,502 @@
+[
+    {
+        "ciphertext": "caaaaaaaaGh3-|Ks8r.rVs\"9pC|[ZQ3N&(}$ApwY",
+        "plaintext": "/$C{i_{$;|`Rl09!QQ=PuuW?",
+        "dataset": "GENERIC_STRING_32"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabjQ}Ho>4m`$tU#V^\"'.uFt^y?,vTTRI?A5Xl-lph^a}pcVG 0~(?<\\\"5.:yIwDvh<>UY\"2 NcAX~7L>V!&`'Dyk|woeQsOvK55? '7(CX/VQBl,-,4mkLlh!NX(I/'$E!&,Cn>bgl>hj~Uk)m)N,qYY.:WDv[U%~/~|tVN;Pj)cG).V\"D8v1,#'7FY3$px:~R",
+        "plaintext": "b!3[&C4VF1=K\\O2th{cdVlg'<7BgZf #9aYwOgMXwsG7;9\\;kGJIE';=m9ApS{Yrr\"Jnl`%Jq^$fW@,Z`&mZyg~sWUCM9}IhkfFA>o;LS2sxo%#pevJvQLpHy*H}L-/&$+l/e3p==15n$h!~{8b^oWp=T9o",
+        "dataset": "GENERIC_STRING_32"
+    },
+    {
+        "ciphertext": "caaaaaaaarr/T:'zQg#A0_&a+}M4UL=FR5D1CM?d[4sS8F3*#5~FCi>c+%N3anhY(;cm,jT& URn2!PRY'F@VLUWp$#40-r$M1[zQ`i%W/M|m+~k[sVL",
+        "plaintext": ":sq[g\\|='n>ae#pVWl5b=v:'`Ht@uAfBz|z=UME[ZbE]CDdcWutBErRmg0D.\"a]k\".V#@;tp=Ggefkfo0xUVz[@",
+        "dataset": "GENERIC_STRING_64"
+    },
+    {
+        "ciphertext": "cu|mBiM]jIY{~l}",
+        "plaintext": "nWXD)",
+        "dataset": "GENERIC_STRING_64"
+    },
+    {
+        "ciphertext": "caaaaaaaaaeVP\\$W)S)(@0<D3nZ@bd,YpF\"<+Qw%b\\8B{!)TNjkh3^$vr !7!o#KR^9{&0@M?Wm;C`2j'mFa8x%^Qb7BhGhXR=kiY;_!brW;d\\y<RJny{h{ V*Z[KChgW%86",
+        "plaintext": " i>HG>$ccHFQ(IgG3<1uLs9D%=]7y$G,0hHZwg2jwR Lg2IKc9,~O,c(hZath<2x!u 4~2JrGil%;;;LU3(m)%Z\\e2vSsAXY",
+        "dataset": "GENERIC_STRING_64"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaaah\\(up#e&d;!@8B(R8C/V=d:SXz/@R_?f$ah}Cf_LzEHPDrELkZj`oS_F",
+        "plaintext": "8K;vgkeLKE&MD[\\\"z+KMalc+UO1<_\"1(CYSty=>D",
+        "dataset": "GENERIC_STRING_32"
+    },
+    {
+        "ciphertext": "caaaaO-F,iYN'H[oZ#e/qVu-9na5*$3c)'BBR/*@^`8riY.}6M[CS_V|u{[E{3>A",
+        "plaintext": "Sisn|Vb`E78C<{+X1duQugo5<IV:[bJji})^aVXeZ:]>*V8",
+        "dataset": "GENERIC_STRING_64"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaaaaO\"ee.w\\I>wDYh9:19> $()5*]vllbh|9UCy)Lr![e{\"%@%!#}3;(~5]MV6&o|8z(x/I1i@-/lg?^%!f71j^%$7CML5\\5?dnQ($}0q\\jS3\\+;:Bbz/X76ro_Y|\\^%iJk69:PJWDQ^>:ffuDT109r9^WmKIdP<P_wtJXB6~pre@=Hp\"J/q/Ar[ K3HM9M]r44T_})",
+        "plaintext": "bs*3%!v`-}\"UT$>kr=VF89.T.rgM[m9r{:yOgpRzs3mSi0kdp}gAI;VFM5H}R@&w%;SP/n-m2,,^k2_^OH3po\\mA6LLK'ZJMAwZU}ZI8l(>6[l;Y0=;t+|4%H544z;f4O-,_pvC<_&$zX{tr=?l=[*1dP@[J",
+        "dataset": "GENERIC_STRING_64"
+    },
+    {
+        "ciphertext": "caacX`zmVV;\"}\\Q\\",
+        "plaintext": "b-<qrxS5l",
+        "dataset": "GENERIC_STRING_32"
+    },
+    {
+        "ciphertext": "caaaaaaaabge{ZAhA1tR+J07Gq]F}W@wIp1+y*D.loTV13<zjM2$F'C(<a>I.9[7EJ=O3'wt=duZ@k%=MId_H|qM(\\oK*{#k,mX?6Y:I7Z=Z^<[BK}(#DXX[;~vy",
+        "plaintext": "*v2veoS9m1?)P`hl,RE8^3l:h[X+,y#|.KLKuc2+ic7 6!^@h#MrMdk25-\"+t|>{_`KR*y:r0<|PjMe1V#JMqH#O}VI3",
+        "dataset": "GENERIC_STRING_64"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaaaaaaaaaaaaaaab9GA'D$c2F+f*D/5uK&r@s<(%=C\\f+;kJx*Ru9|o,!q$uM&NRnwM4sIB^mE/g=!el<a:N]q{&Ka+ 86xs]&?C6=qYwvyJ4;:yj`]",
+        "plaintext": "HNBbl5vm}') ?ad%oIho#N4y.j<KZAQ6m!}4'Bek`%'I,W[&XlTF+&^6(M?M(5WJ\"=A9%,2PZ47+DqXV",
+        "dataset": "GENERIC_STRING_32"
+    },
+    {
+        "ciphertext": "cD-!.L;N;p<\/vs8",
+        "plaintext": "BU",
+        "dataset": "GENERIC_STRING_64"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaar)bYB{P.U$;m[4@S55%b!MDKrONL,v`k4;5p1sLuI^U>6+\\,,sYjex3G;TT+CaR@?6.end:~h;T0^CVOZ.b/Q?\\Hh~0II;3?%Dp1|s6=NU@|9)Ewi>J\"BH pE4W!Pukj:O64[(GGQ'Gi<TL*':r",
+        "plaintext": "u.!POq$~TZ\\'W4 #EvEUF~ui;787^t-_Fto+\">2r{d$1tA.R+}3FW%NLi5u*Mpzphc%zY(]LY~^u]3bn0|Z:|YTf@T4gX`\\@Y[&[SNf-/)JtqI;z5t\\qTY",
+        "dataset": "GENERIC_STRING_64"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabe/K<g9a`)8Ats1j`Lb?\"6sl=9k720r/~X4eh)j<hu5o1-A<v)l1D?Y9w9WW!y&T.:!,n|37SkgK`f;^#_y-J@J?XvgTk7,)\"mY481QF}I>g8>^!>Oh?[jNG4~QC\\OTPsqBKw;#j|[( 0 \"m(cE(p;7R<R5w]LU~]_aCCTtT~l(a/12%5L\\e]6ocq|/>:1AI?",
+        "plaintext": "ux@fM<j#Q 1.wwxN^,.fr''/e(f@uh5(k<IPW3 {6UCF.Cf*.\\%W13Gyy{|4U}@i=>X1r|Q~aOE~~*Wy+xs00!1~B$Qx>}^NL~M)^W<Mp/5vG**|TCxqpQf__cE,/eO77[Iz:CC(d54m)c SJ{4Y1bf{18",
+        "dataset": "GENERIC_STRING_32"
+    },
+    {
+        "ciphertext": "caaaaG`ofWPBpjC\"JOC3qg,;vPF-Y1'|9Xo+Po\\ER|&a\\xV&sS`x8jtr Ieyp/bZ",
+        "plaintext": "k@(bTK]f^\"Rr$MbVOw7f]*16=s~]pdb2il12m@OW46wa%dP",
+        "dataset": "GENERIC_STRING_64"
+    },
+    {
+        "ciphertext": "caaaaaaaaaabaiG#(+ !JG}(:X\"5<hw<\\2>Z-(WvT}gA?]ubZT-fGY%|Z\\J1=;wke?Lk`sx5)cV<7_(I?D5J>T03t)/[`~)h')xcb3'qEyDKIq(^*,5V\\C#6Cew& EOhAj)Rw%sj(Qh%g;oPg0?c",
+        "plaintext": "#szJQ+,m3e)om7,%!#+,)Rt,YZQw?:F)e:0g+nEboQ83FL3^\".|PK2Sch~Pwu 'XL1%\\^4qcyUNwAk5+8x}~X%U7ui%(}AR,yV9jk\\1r0Nk<}u",
+        "dataset": "GENERIC_STRING_64"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaadS/*5hrxkOLj|Cfa-9_pT/AUiz e=<9n.&/Ao%;2b?LhlX&9QF->qbuE^TC+k%pV3hwH*O/mC>72$,%&]`Zv$.\"U<Jf,WWu{DZ,1t4d}qfaW=xvV2Em,@Q.Bs/nco5JL~H%\\5q>Sc~?|'Qm!sR5(8AyaLM#",
+        "plaintext": "2!s,d,!8%M)fDjp-}?>31?M'c;,=!!jNn!)p|l]oum8 3q87=Q`pll4w;n6kjxo>V['rB<G}r2~%J#XErjHFtS_f\\=Rt7v714\"GPE4~V>sv:5v/e`hJ39$(p]9/",
+        "dataset": "GENERIC_STRING_64"
+    },
+    {
+        "ciphertext": "caaaaaaaaugq[I>rLLiU_p_C7VP8K?)]YvxAQf#>w#ti/FsEOytEN/;p|aFS\"eyo)>UAD(RZ{`Zvn,wC?E*I\\b1wjbM<%Gk_!haVzWv\\N7!#C>Bx2HHF",
+        "plaintext": "|3x]-+lB)2w,OQof?$n,[W1+j)4#pl7(7b<<*AeWS0z_DGAOK2dT;.njJ*M#lgq@]8Ku4\"o)P=13/pk=18U%y",
+        "dataset": "GENERIC_STRING_64"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaaaaa'pNa4:{oh4ysW'9wk.iFI,`q,v)2 Pr#2b#k8|!Re$;USowz_6f3\\'2a*VtSK>",
+        "plaintext": "Zk~'&)tY~&\"S`Yobze1tj*H`HIIkyZyS,2a0:\\y5FA?M]",
+        "dataset": "GENERIC_STRING_32"
+    },
+    {
+        "ciphertext": "caaaaaau0iU\\'|BTss0))eQsI8B\\E9}X",
+        "plaintext": "np-h\"'J{TIy953!",
+        "dataset": "GENERIC_STRING_32"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaaaaaV^=079f[\"e 5Zg#jFkx#^7.`?jv\\y:hHb=5setBpeqYgZ$\"?\"J+\\S]uBi-I+x_",
+        "plaintext": "]L0Go2>4l F`F-Jz?q[5ig_d,J.;`{0TnY@gRf+O;i1LiFC",
+        "dataset": "GENERIC_STRING_32"
+    },
+    {
+        "ciphertext": "caaaaaaaaaapVBha/603X8M*.\\-?SS\\ljI@u2)j/ilYGQ[GKO`qokrW*n|&` ~*7[t<^aB<j4|:\">}$?*`0yUih-8DvRoQo\\|%OoYeI-8n]sUGt_Yp(uT.Ge('YEwH9nc0:*Aew^sSa3",
+        "plaintext": ";!5P{A}i5\"+a5#VFguT;]9<2Fc*P7Z{meu,pi~^6zSUKvT.XE\"qc5'w5Tott8%Pe)9$naz:[L|pvI3un&6+p'<CpACatBcx_\\J,iP5",
+        "dataset": "GENERIC_STRING_64"
+    },
+    {
+        "ciphertext": "caac7RaQd/L]o:6Q",
+        "plaintext": "5yrxikL",
+        "dataset": "GENERIC_STRING_32"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaqbMRNbIJfun>G/wMmW,|:SydE='uar|[g~#MwOG}djt#vJbJ*0!|8r?{p07U0t_Y9v_.3jc1 !Avq.c!^6[?II$X1$_lh$7h;,X8tnC\"C(hjhk2UR\"MVK34+9/85w|9>3$$sZ8+Ok55pzB/C*9rv$zqv4O$z36IE{#",
+        "plaintext": "*uRddU4`CII/99M j^=c}D,3;Im`t~xkVc%'3nN9?%Q9p^,N|&u]7M{p_:^1_m/ )/2>Aj;P=Kr:%`PeR:?ZR,^$b)ZqRI6q$$CumuhQR7Zy,k$GD0A3W)\\Y2Z6VV+@+",
+        "dataset": "GENERIC_STRING_64"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaaaaaaaaaaaaaaaaz,^Q#!vZPa+6?l5y1buqcS4m({c4`3iuvqDK/4=K,XmJ2N\"DY#jK'z##<~xQMER3HN<hpn<;dpE?}(C2GpM!a-aS:;*`VoPd{dh",
+        "plaintext": "=`l>L{,/#}!5AY[]wg\\6F`53\"\\MFQ;9F,8d)]7h*?X3CA@#4\"w*:v$J8_SX1TO]+}g0Mtl|A%1@rn",
+        "dataset": "GENERIC_STRING_32"
+    },
+    {
+        "ciphertext": "caaaaaabSH<.{V9b]ER>vuTQUwmx3IeXMF#Y' !.*F-j]y]<?E8+xXg\\F4N9S457;oT'k!m.H>ds##l2gZbQb}M9s,N+Mz$A",
+        "plaintext": "DGL&D3s\"~/#&ON\\3kNytA8O=|\\k/^xvPEpRuhT[zx>hfAS)*h?H`L[*-fHMak3i3Fq1G !Q*",
+        "dataset": "GENERIC_STRING_64"
+    },
+    {
+        "ciphertext": "caaaaaaaaWaBvwclCKo(0]:+C2>&ODYQhz;PPBd!~53z[)83U$]Upf'Q;Rb]N4/pO{+CPfMON7,sq<1Vi;m:9W8]l>k.6,lSe%T8~<L&osw%2*~b",
+        "plaintext": "gYg)1LX^mrAqrr4R}Ql)W+p8t8P{0J%IQKrRJ!G`slzx3D.X8}Nx[$ok?`3<QT#sFyRp!f~LLJP<<-XOot",
+        "dataset": "GENERIC_STRING_64"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaaaaaabN3\"m$L33VT*nzKH]h2w[zOCUL=4a>$?%VK+--`-&Tm78A'~u>t+Z?_<Tk!DT9HkNF?Df#`u6Sl!e%DM|v7R}(m\"6Iid{2g8s`iJ+)?dr3EQwycY!6P L.*_]pa4q/-2b/^Wq{;d~XP)Lzc}[T'Oj4v|;Lhl3gL[wIr{x\"5*S,aXtY`V`9HMEO]?=^ c[`PPMC'>aA` Lgty=[t{#)z1%T(.(",
+        "plaintext": "7R6gY|se\")e~D0Na@KaAKTc0J&,%5B#V7Fe^kWX@8o!v0fY(hb>*)*\"qvl`9N\\TlQ'P&K,iX(9V!9ROUO*nz^H1f;Cub~F|I`Lhi~$} S-ba{@*IPaV-#r)u|a>&u~=lZ>fQisG#3taq8[F..b],[D|bVBmfi[I3QqD\\J-6)me",
+        "dataset": "GENERIC_STRING_64"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaaaaaabN~A6+9K!ETw{t ILBtss@e|!$C*qr<X$a?\"0e,ALfBPc2M5BSAkI`%+^me=/;b`{A<@G 4IT<<a=,p@kpNGruwN'<?g<]`yM%JKhzaQ)8H;k2$tpt7!yR1mhKBFW#tz4eBzqwoc1_pTQ^e$yh%<Y%KriH:htmJN}vS0,tO9'Y ^vdMdP~+}wj #{UDdsm%OC?xJ=P=h-*-Wfe%$YzE+`#~w![IIIu3:\\geVE",
+        "plaintext": "/~# :LBT\\k!u?]aeMx'\\3c8@`V;,c]:,oU@9M;4xF[-dSq~X90MPPo4KEzICk>mH]K;n9$[E}Y40lo1FJ}?k{Il[gni`y8iv:e?-ZEC&H[MUT:x]3i@7;$jBFD3\"{#_8le,`xR+Z2Q@(^m`m2S1n6qMt$x~(h[#6`mJ*|FsU^_SH;0-v8XZVn",
+        "dataset": "GENERIC_STRING_64"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaab&FX@Q5P5&L\\A+HtcY#NVGX{`'/Bf+SE!>wrLKH(OY/ntMB]t0eWig^Sk+]e<$M'm}4XLDGMIvqt-<L|MKLWV8I ;)skJC7A-ZL76])Y<a?/h1pLb:psa`SqUHPAX$ [{ze\\Q@dGT%3<0(Z2& D%",
+        "plaintext": "v\\'s$ 7eP:EPI#g;<?oWn<&~>q1Uf!.lYwU:D)8C.x%TyK@c!YL19}!i3!T Vv4U'xhOCLt$@\"rnq5[uag>J4hE'Kntq>|+XA|AT!f(G&y.1_wr|kEa>{",
+        "dataset": "GENERIC_STRING_64"
+    },
+    {
+        "ciphertext": "caa5hl8Efu1]yl*Pwi!FL?DE!5;z;*JL;v/<",
+        "plaintext": "'k8MB#&DC9E!|/g./%0Vr`V$LdA",
+        "dataset": "GENERIC_STRING_64"
+    },
+    {
+        "ciphertext": "caaaakzC6\"c\"9}8b+&;7e)x9",
+        "plaintext": "iY/l/*RI,bS",
+        "dataset": "GENERIC_STRING_32"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaaaaaaa9T=}>t<qIJ|T&79yb>5mK`>HRdut_l+yY#t9&>fFK[sH78,m Z34|I6%k/2+]C;1K#<3d#Wh\"|9Zjy;1W># 3eU.Rqh'[`up>r1fzACm$*j7eS^>a3opImbtm8<Z9JRc0GBR}8CC3 ~gD[@@[9OdK|Ev&293WH1Q!:fG`o>vX$:jXY$8LgnT=I2:/cx{vs}.*d2EF$'T!b]+W/}\"z---Nm^>5zb3sg@xVJ3P",
+        "plaintext": "U?E_cB]R>b)SQCWr`2RkLi C-H=g7{B1xxbDu_imR:=bi\\_DoDh~48.E!l~WyZ!^:iyL{IB~m33[\\J\\Tm>H#eZNL!1B&_e:|tIWT_)GPl+@K-pC[`1[.MC}/gUH?h/d^w3DaC=e[fdoVd8PX+dFASk3i=l(dv?=_rw4Bs?;-!?h]Pw<& #WU0P;",
+        "dataset": "GENERIC_STRING_64"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaaad%[~T}VUsN`JPI(UM(St.\\Ru~oxg9WXMX:\\\".mN#']I\"a~_hkodNTVE%",
+        "plaintext": "|!mpJ?)>+!yhZ0/u,BSWnvhJ(tKs>Ou#kdVRF[zF>bE",
+        "dataset": "GENERIC_STRING_32"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaafcLqN>}n0`4T6blA|Z{f~p i\\s~;xI zK+\"LbX!EgrADEKJdie\"QTU/W=u\\qYteE4%c<0A6Q)j8zu!cz~BgA5ZClKHj]1?~=|m^B(eo#f0%oZW#=)Sq|hrrIkL{SyY7yb>-xCJ`$Qry%Zx)^5+! ,<n8W(?v4N}+?]7|q;",
+        "plaintext": "tJ5\\bg%y0MU:>5)d$AaF6{4:a{t!M`.i:3ihEI$_bzY >>KJVAt\"DI|F.yvMCN_H=>>#@xdCz(Kg#Q9h<s{Z1d,+9YmAr<L~'t?=k\"G3= PPdBm^R6^^C%+O\\QginwO[RlK2K\"",
+        "dataset": "GENERIC_STRING_64"
+    },
+    {
+        "ciphertext": "caaaaaaabd(QTAWK#Br*J8lXlt(N9S)Z|P<g,q{=U1r$4'1-)d@9Q4=phkr{OfT3NMnE+DW|nOzLV&hF o5^xVTkMQt$AUl(zu-ldSLyKi5M`O9u",
+        "plaintext": "s>hywUm~%\"ZSvJh)4Y%R>ynCAXssFV:kskrkUyY4@xmQk1n|q ~cM5Dd<MD0>=(+U(:*%c'sR7= dl<e",
+        "dataset": "GENERIC_STRING_64"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaaae>!.\"&>F#:B#U+QKbGFK<0/lp=$GAf{kOw74l4pq,#tCL-K0iiNyqn~r",
+        "plaintext": "Gv&`fmHx[\"RwA tDL;wqK4_zeq(d>'J 1r6G4YX=yL5/",
+        "dataset": "GENERIC_STRING_32"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaaaa* }c#)%SJ_N3qC@T'Hn1}yqjSsb}d<<JNk$4JH/,8pQ0$Kr9faX,5C*(c)Rj\"esP(%C$ney/48bEZ5w\"FH7~`Sq*NCyU@\"+BCO}kZ{GsjA?r}:s$J7kJ[%!/J]F69-,L1a@fY*5y&%=Nrq'bON2_4>K~<pf@?')z!Ds[VsSR|wf'T&dUg_wf9H@6/Rx.T-1>?'$",
+        "plaintext": "\\+O[ 32M|[|JE@T$!\\P1&09*aZKfl?Q#u\"m]}*m46`7jDN=\"=@ibHFRQap$9S0\\%|[)DlgL$E.X7|*2Q661'kR~0FUh#\"hOveN+KN[iG 0mT1oL~H0u^HQ)=R=L#*ps_=\\US[\")p4wL<~@8Ol5np8AM\\Y_w ",
+        "dataset": "GENERIC_STRING_64"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaaaaaaaaaaf1<]K#U\\iRQCc;/O5HMhqAlI7>6YEHRG*D,Fbwc&=u;O/*9)cO\"_<!M8'9Z'k8GkD'hm_l2`UR^q37#!U",
+        "plaintext": "E7N7J}h-w~23Mx;:YBz0/q3}PoRbFDo9EO)Z*k-q}loj0AM(?2QgO@M1i>A~",
+        "dataset": "GENERIC_STRING_32"
+    },
+    {
+        "ciphertext": "caaaaaaaakvD|;F;ppU/Tyh7W,e*KG2-kou'vmG'0^\\M{HZ}_9(\\?T]yNC59 ekJQmX$=7$!F*`wJJef2%56c~M`{C;G1*IXekgY4 ZTe7HrY'/A",
+        "plaintext": "g?]?g*?`iWPKn3*O<},KYgu3M4G)DxE$i;4,,6}{<S)=-0#0S|Y$%X;\\Z8Z+N?jw>F_ygts[kF^x+I|^MZK",
+        "dataset": "GENERIC_STRING_64"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaaaaaaaaaad\\R4)kQW)LA7\\QSO<]ye`8IM$7Wai9%DC+tOGY-82Q9(cl;GSCdbpm@\\}`{\"[%H_y|XRknAFkD1Kc[ID}",
+        "plaintext": ">qV UD8jM(kBCh.=e2P16V3WHe,*R_'TtGk0BKWl5j/wIP6o[~2fKen^<Js-od",
+        "dataset": "GENERIC_STRING_32"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaaaaaaaaaaaaaaaaabnt8LF*PwZI_(\"KVKl9OxA/XhVmG1)(@3c!28~c@/lD$!HOL'Bj[24^t]r<W~pfuy/AxWfCf<f+`H3UAq:j@={|Vb+0p=N_3.-VcCW@r~{",
+        "plaintext": "mR%vTYxc,yZ ^oro{R/M\"sl/x=kFo7\\=\"57UnxS682*`JW-5LIiA_PD\\>a_%>y3IO!V[:iU;\"N9R%6DQZ02",
+        "dataset": "GENERIC_STRING_32"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaaaaaCXXCY,/w}v=SuO5C51Kv[6ofcD2tY)`?n$9.)haipcUO{F5tl_k6_tlfU|-0k1+aD+gC++q';*H1U]]?&('vSp>C_H,\\ts2)0\\UwabHkrd6.LMa/lbKZdEh~~TO'5RLSm/ayBjsnS`W{JkRh<n^%Q$|Ds0.&qam\\\"TlCX1R^&H^UrB=I?^z@Yg;Mn#^rJ(RymifxIJ\\p9-1jVN",
+        "plaintext": "QoU[iLD=J6z3$#xlZ,q;~LJrY_z(`dk3{WnrhkTFMFB\\s;Xf!j8h#*ewdb%]Sk?2a/}D!-kPGru&i@LH JaJGuHszyv{8>#K\"_)_9ib&#<m E((?jqWFZL\\,#?\\:T$@H\\&pC/!9j!fh,H4Mk=@y{;m_#^4VZ%]TJ1#4QcT",
+        "dataset": "GENERIC_STRING_64"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaaaaaaEt=P9LW7df4@2d}UzM\\~IK1?a-4$$]Fx!ngHE#>;G9<>?c{;6(WZUDy&k=|eo?e/SmPS[0CfVot99z]W%WB3^\\`ZEl'G/g{}QZh\"z,CIxFk1(,z!m[uWbECZ@x$R/9Y!0slt[>REJo+bUzcofxkJRpSDmP0*'MV$NsF//`32Y8`gC~/r6Q @MtVdQQGZo_k:5mLPOH,s<M17F+ti\\@C`'fZIyXr`N",
+        "plaintext": "Af2{mR1joGu/A.xyo/%<TW|k@S,~338N\"'sT1ec-X``x~2U5 r^gJ>)3<25_&o4s+5LZaHr!oNm7N.YKhr`Q\\%\"]WVNe{Sfb{N_O=;~(VO[l1b![H-kyHmHHQ]X14_M{RtjRC^'!,eJwgN.F_e@Pt|VK)t#/TI?1EO#42-,Q.zy0sa*My=",
+        "dataset": "GENERIC_STRING_64"
+    },
+    {
+        "ciphertext": "caarc)%%?*[Yi3Q 5\")2>Q3Q\"ENDD4-qZ.)Dlc4t",
+        "plaintext": "U?D_yL?:J2Rz*]avu~Op~5s27JEpG-",
+        "dataset": "GENERIC_STRING_64"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaHkGh' cA>31Spd_W:**@Z#w7hVzO:;alG`k-_qX[&SJD@V+Yxwqro07?d/x:w\"C5u)1Au2$}K }*bJ\"E#xyZ6/1sf`D/Z=4C`O<.a#C]\"sYl;cZ.s:*w}\",cx_qqg{0Pf*b=T:0d)^ymFS9EVntjG`tKIB5BW%[+/<fFK:R[Sm\"btp ,mNX@K7?H3eNIr(my",
+        "plaintext": "l\"+?#o&M!Us6.>+Ev'8|bV4wG,}I#\"$<n0o&},O{x>ABAY;jT8P-HDJPnKp.+S.Gs-,m=:!8Kn~JEKoO+y|^zMey&$cI?flD.eMIV]/aus4]BxX\\NerCE>2dl1\":\"VhI`n @;e#X>q$322.XRI3k%",
+        "dataset": "GENERIC_STRING_32"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaadID4Vr>X$JU-^GG}'x@i7t8*!1a1KE^oQu@H9xru#3eT_+,/1KOOgQgMhzDqzf2<:6>Z=a$)NGA5M`UN%y^sO5f|7 3~xEIH8md8+#]A'88O^?2&U$g&SQ;&g3VA%Phjw;2VqKWMn_8X_5V8-~4;EcuEolDw uC1+vgbXzgW7(.gcn",
+        "plaintext": "W Z\"_N/$VVk#}5;t`ezbuWi6]xV1@/Wn2Zm#26$^Gvo)c(m(\"uIW)`snIC)_[W3tB*`sNH+;u4:F:-ZGHl&kuB`9a<TTV Y5'opSscE|`P+;B$brsH2:~/8F#t0rLJ2a*`\"`h1a",
+        "dataset": "GENERIC_STRING_32"
+    },
+    {
+        "ciphertext": "cbg@j/&u{+xKmNR$I\\[~UaiS",
+        "plaintext": "N`h9~]>v'jmnryUS",
+        "dataset": "GENERIC_STRING_64"
+    },
+    {
+        "ciphertext": "caaaaaa-+0z>*V4x.I=pl-bKg>sND7e[R'@z_YB(()U>Tj3oftsv1b)Ls=6W&7te3d$W4H]Lwb;_DzgANCFsRV\\t",
+        "plaintext": "d~OxP8Q]mf6Lc|5odH*jlSa9@`*u1)$mXGT/YHL>\"xGzj;h]Tn z+KG~ec@1\"cw3L",
+        "dataset": "GENERIC_STRING_64"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaaaae&*~p^Q}{i4=jvI4OUDv);-nV'Y8&kAOu j7Hr'p|1:HJvK7co//7t;0[J9\"tIu\\@z6}4l,T))/>/Sc7b1=(D_lYa#LF6tJ[@\\D#u5[=Z<';IIdq:}3kH7t`U*SX1d98X,x_u!2}6*1t2<(vgY$|YV9TiTVIV'Y7Y]c0|{VUm28TX_x4ZZ+IIMRR:sV#lw7#C[IklU#",
+        "plaintext": "YN=m1Gk{ZF<*Kk7r/TYMafNv0dVj|U!I6A35dt@q::0\"!!\\qS9n'|v%Oz,n8^rKPI?piOp`66?tnw-3(<X{]`e6iRWEjq5X?P'SisYKlPwFOOO^7jQ^pmQcD6#;@u>I6mz~u11asGA(chg<>]e9^c<j>(r1[kM<5_6",
+        "dataset": "GENERIC_STRING_64"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaaaaaaaaaaf<pu[\\`R=F,R4-CP.pvMaY1_v~7v_)gRq3FT?nbr37N$X9 | E|@0}w; eg7Cs1USICe @@ BF-d%8A6r",
+        "plaintext": "J$w:|86-^6R4~h'.Tt95AV7;1'zo[:Ex={Dvb0o%^Zf:mR3F9.-0S;q=w\"i)*E",
+        "dataset": "GENERIC_STRING_32"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaaaaaatoVypQR.!A8Wf\\Wok.:qo!aNb~)~|OI|brIL%F?yW@qD/b1O_?Q`rr9>-|&$q{#I*^p+D5I(S:c+!M5IAF'd+n{\\8@1IMu#:02)go?o*`#rtoHL>%E*~<O>SdtjxE|\\?[i[!v\"l/.<\/f17j#TI^61omY|*?,e6BW03Q`T:g'l>'_jo[i<KplQ%v{yK [[Ssh`W81IQ&h.JB!=I7_Ybtt6c:E)",
+        "plaintext": ")xg/P@9'{F<1EgR;IpBc%\"P;w/&E#:.v*;UwSx)?%-;z+$~dn}%n~'hxidtb)%)[;v-J2p*gYu9,KGIs7kX;=Fx#/B+mPig\\w(sumNga*JPI{oiX_2b]D*;ENoidQ|qmQ-(5(!8T@x=c4U#>S\\J\"]UB0c'/H*}EnH$lHe*\\^;`B8W9YC",
+        "dataset": "GENERIC_STRING_64"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaaaaaaaaaaaaaaaaaaacQIt6Zzt~O9wS6>:a%+he9~pJ\"S]sE&wS]U(2YG 9Vxlp>6!Huba=g2Kc\\=x(6;Cal5|uvxx1Tcn{X281x;/mme?8jJx]a(c}wJ3rGuba6hn](K!",
+        "plaintext": "=,]wbUa?n2nOJa^sGb*6guOT()m2CF{1u|=P)wo?V=in(8Yo|s<W@<B\\wcMxsY1dYr5]@CqCQCNT(n(5q=N)kN`W",
+        "dataset": "GENERIC_STRING_32"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaaaaaaaaaaaaa@/r+e_M1WS;t)ZAY52TXc5FWv?uGY8zHWAB)zca!b Y!ZFl9{6AYF@vy=pzCk7T[Q|lp[sQugva-O$UUBLg`\"n",
+        "plaintext": "t%0S,yl{.MVdw:;>0V/Rinp$?kG0WOH.B6.OZW\"?Ac3cf\"}z@Z$^RiWB(hoRVh/x=vcS",
+        "dataset": "GENERIC_STRING_32"
+    },
+    {
+        "ciphertext": "caaT%j,BSBexTE_#K 3F&bXdo:(0,s16yVJ}",
+        "plaintext": "!irXtnlc&9V\\PU@,gwtcz}3^qq",
+        "dataset": "GENERIC_STRING_64"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaeo(+z]R)^;csUR1)!\"{^,zL&GMg#L[6d#85E(+~YwnE$gz&;ZAzaq6=PSED]3]{'GC8q(u!uen`O2X#\\Wp*b*>6p,F3V_ U=!edg<KC-_.!GtNQ;",
+        "plaintext": "Rg'S60po7=UQ*?#)eU*:Bt:WZ`HF+0j 2MVNq2'MI-8+!<&G=QQ4fN[Vhi'b/):\"If^/&,z4z8:QYY,5:p@C5OG",
+        "dataset": "GENERIC_STRING_32"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaav<S=j@#r)8#^`,6TSV'(QF2u4SzE<gXIC&a'i[u9Zt=zV|qz%EVV<>1^M!$`H7H8/&<iQ!g\"|m\\ml$SK8&]b#M4EyCY-_D!ztRC8>t|z~/#r Sk;aFcF(k G7[Z&=W=o`8d%~6C1noaqI1QpR\"\"q$ftB>4,",
+        "plaintext": "zuPaR!EV<RK_;6/!eJx7~]prJ:/^*<\/wN**OQ?y V-3[_V_IB=2YEh38B~~vDH]ghtp_}mF5$$!@O*V\\%Rj&<3U{>dB}$>-m]]CqH?%Ot\"Dp'IF]48_eCSxUlc,",
+        "dataset": "GENERIC_STRING_32"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaeB+ Exsg|\\ZrN;!,$\"SvpBNd](5@^V*Ru/{;##n\"v1n^[\\6n}l>|>L^RKjAmGu!o?Y_1];s ({.5N*|O\\XM,\\<$s @J6qq,k.$T/3CL$ElzDt]96Ne\\4)%*!6u<aC~}:XLPBK",
+        "plaintext": "3y{stZ3{1/@!h}B60TVyZo4oQpjK\\'DeyjeDa[m6)G2t<chAc/<)4r$+gLr<Fc=\"7-\\Fmwll$JWp\"Io*VNpL;q#@ScW,mLhO!3zcPt=;Fh(",
+        "dataset": "GENERIC_STRING_64"
+    },
+    {
+        "ciphertext": "caaaaaap28+6rE9%>F'~>6w.C:q>@?h,1LPo\\0`e=9\\Bf3W4HQ^BGIlIGx(397V2&Q1i/bm%6?tu!-i/89-Nn2jG2^8$",
+        "plaintext": "x~Yh}*0]`2u{(9AcQphBTOXmD96$mzFPUIb&}H?cAm/.h5<[]:fL)Z3$]M2_8B=T@F",
+        "dataset": "GENERIC_STRING_64"
+    },
+    {
+        "ciphertext": "caajoPaR8&<`Atm",
+        "plaintext": "@[Gv-",
+        "dataset": "GENERIC_STRING_32"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaaaaaaaI3Fr\\Ed.]rCS`hCMH]EorhInA\\~{[ZB#GYqF' Yj&<bul\\U&[r{Q[\\?lGb{FV`L$3jM7",
+        "plaintext": "z$#mIk:IJXBSH,&2zBzgApz,hd05eHmpt`mf`(UY<XVFCb)\"]0r_[",
+        "dataset": "GENERIC_STRING_32"
+    },
+    {
+        "ciphertext": "caaaaaaaaaachQWUESW,dj8CT%j$yg)JS;bjla\"V|!EUHbaJLBr;R\\Ta_.W%\"Ui7g2)%R^)YruN~)`Re[tA1oEd|L=.WxvaKI6b&Lp[#y.xp&P=;!#(vWW6|d^]N",
+        "plaintext": ",8mCdQ%b1q\\MYXE{Md]=fjk_i; fbbvpi#3Ya;dRVdd*|otgUIbKi9$qL=\\N}RSRck_'06?.@=[&x@fgI|>`K)(>duVf",
+        "dataset": "GENERIC_STRING_64"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaaaaaTl{0VP\\,SMN;,Y$\\bWE|k9cXv})5\\o]Kz$D~+Tocs:+C>i|Lt\"`,]Fb{7ksY+S",
+        "plaintext": "s>mN\\_9]U@F*\\MRK@untBF:@VSL)nJ+Um*Db(Y6@X1C|:@",
+        "dataset": "GENERIC_STRING_32"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaf$k-jj(JnPD8MQ=~p%^DaqM9;dFv0:Gml,Gf`%KALpA+yV#l)F",
+        "plaintext": "IVYG~XZ17/+w6'Hh@ o$zJ~\\nIxUgqAE0j=t8L",
+        "dataset": "GENERIC_STRING_32"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab=2L0TS.^.C0!Bon <$<%$|fq)&6tepHXv[c,i\\h!W/9n<Y. jSz|4b|hw^nwn>w)88[OY~oOK4Xw^/iz}$'_dVy1oy2r3B)ggdhzK6I[EeCUa8c<:;A1atI=PM39\"\"jQ2mi)Q_GK6F<-<M$/NQE+P5.cy%",
+        "plaintext": "jIn@s@&-w8PeRXm|<\/{-gX0!}u|'$v)[[Q\\a<(SHZ(Fibf'F;b$mGEb5\"$A>?<<206GH|\"Q}(]\"zQm;S.a:dPs54\"g|SKk9}(WP65LAM#6#[`,i#T,^q`!*]>?",
+        "dataset": "GENERIC_STRING_32"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa=cGH9)~1.XgkLhM{fWi-40TjjB8dD7b%?Z}&Xa\"Y4<|Z;w)S!%s(VndP([(i6jK#cUPZVM G?K0^!]%ePwk|apRK:FCfh{ B#5Gm=GzlQvL\"nB'gW]v&_ ^EQ!H{G_#t#@&9[[/1Sl,1(4gsv*z$\"j-qo+Hj#mU.e$iJDA;q]A-Va]j0LT^ad#GH0VpZP?)X",
+        "plaintext": "^3gD<K'KoJgma @rk<}\"92z*)V(WKFXaD)@AT@m3 Q!7UHen.?V<93adt 'M1f:_2g>FMFHn(H\"$=6d{79<$s\\GT`.5A>\\heb:u9P{![?Tdhx})a7/+jh&zfJ3<O[ktz:DZAvz%Tg!'[RbNadn8OyZ",
+        "dataset": "GENERIC_STRING_32"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabTvgi_F!eT)O'\\l!y}XwO?`1\"aa]`&rJf;knQ:WL^[,|(b8=B&U**D^DXhl1s+<%OjLqz\\p=lZ?QE3%m~xX]8*8RgjFgHnE^-+0..[Z',z^+9A(Od3+07uVzR;wcDR1jf7`j(RduIs-4Evhk|y^(|PJhqVjY2+K& k.\"V0]Fp|x;QW[-f}YB",
+        "plaintext": "]rl`sw5{ 2z<&ow(sU$POIPkOMA7}OX_@%Rw90d<B||6o|$w./ :( lf_? kP*NB0)`/Qj|@[k!,5O)V[d'i'%(;JSS,Q<KeB7I|>cd,>mJx(&%:T:|Ky$h.k:Y_eO)upn]A;;!k!7nzh",
+        "dataset": "GENERIC_STRING_32"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaag{sZ7u1J*?\"<a:h\\3gd:YQaUv!rCW{.2gi6==q!NIeQt8QsDC@Ar|f$M Ce0W&od\"^J_1QVa]#dQH ^yC_,)T5 'E!)IQ):\\L]QVtEu8?q&yH]~egw~k)I=,$a^=@IAA{aT6I~W)<#Nh#B\\*p[4AwH^?~|p",
+        "plaintext": "E4T@P~sKO\"ZoW+]y&[v2fPL{)!n3,7.vvi=WkTj+}.zWe9+Hx\"uXa}+jilyk1WD143o}(=2Z[}C]WF.E@R~YRgtOEVL!KX]7nQ7bToD<}j)*Ac$<SfmIBj65",
+        "dataset": "GENERIC_STRING_32"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaa;*Pql'%Wd>T|GszmA>]}W<GePLyO9YU_.]t\\A8YK =3B&:n/Z|ZYcr~U]q+#iG-MVX::^gJnjv,_Gain>,:/BN\\7- m:/<$@:wl$elul]M|q?LNAxXn3tSJ\\iF[KE/-5{b\\zg!wx8x9Ko,&F*/{N}nS8R^e[aEt&6Wr?9t4xl+}vQ",
+        "plaintext": "0|b\\;\\($ts%)1v`\\C>YG#[ekj01gt,62h]w\\vfdpzhs1X[G~?SK/i]UWVAEbV%6>THSot,U4OZNAm#NwT\"=<~~]E%fJnZt{^Fm@fq=#`y}IQxOPI }0?`_|7>4 ~;%BJ4'\"|~w{G",
+        "dataset": "GENERIC_STRING_64"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaaaamDER&VqC:<@^sS>116~w-)Cd6Cu6Z*=N+!`%W^x2GA~Kq!g;htpUn!Js.*ZK&`hn;.e!(W],8IJ /!_ZK|QhC/AQ*:EsZds%~}<&iUAk9uf$BzH,r-3XJ=SM.nN6h7m'b@hWE~AMQ$Y^QBT~7<9w\\F/:$2@2t\"CH\"1Ug#6b6uTG>x 7*6ho4L=<?=CLa](Mna^u2q3]",
+        "plaintext": "tD={A,H$*@uNSnqNi~on70 4GS<h1x/2c26:4 <FvMX)prf8=S8XygEAcx#~{_MkD+=u#{2}}+u<ZJ k\"2vu>)})fv0XG#<5<{>SumeKsg5SI;bG<|Qc$a:e(AhpEU6$hz3&.K?>+JkS?7<0\"w)by.XX=ED!{$9",
+        "dataset": "GENERIC_STRING_64"
+    },
+    {
+        "ciphertext": "caaaaaaaaaa'g(N(r'|P7n.XXZ:@!E2|\\.MNT$Uy[B^l$[[{",
+        "plaintext": "&QV,fM<9;3-W,o-uifI?.w{y?<\"@,(",
+        "dataset": "GENERIC_STRING_32"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaacCo.2|vtPL5c0pf.E^-1Cb@&Tqd{/`4-g4tv/V9LBrk!tn`=e7GH`/MiAJtR'a.p+Uld!-CLU7Ftr/u%NE5JuG9sI[):&&[ZA~UM{-:uO`(.uu9xgrtn^LIrh(c(3U?,8JsT=rN)buMOYh@'DEqe=#K:@>zIA^euxc$dmAySRq.aL\"L=RUC:,",
+        "plaintext": "0[ZG)C#w2<_&:>6n26S|, L^I*o}vcHB7:jhrd\\+_7tIF)?DBt7~@Uk<`(Z#rMW}ZFf5mv=v1Bdo s5Q%2{N\\+6\\6J6p2 [c%>;0sw;SrB4K-v/x,i]t@O>k0#c5[u37BIycI7bc6%]NqoYP",
+        "dataset": "GENERIC_STRING_64"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaaaaaaaaeVO\\uM`/46F2:\"O`fJN.s?'.r@&[izuwUuYt4_B]/p!#yVf?H+d<\/MYhN;:?J9\"wlLz2*p\\C*b6",
+        "plaintext": "`!2~g0tHtZ;OAXW4!~KWiko#IfX,*Atr/xm^6p#bvZT[`oVP`38Q;3F:pi",
+        "dataset": "GENERIC_STRING_32"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa=(&gA,N~[Y?\"sD;qF[_KNl1kB5%DqQq@q=e/ v]h~V(0|>5>WXJi16~B^(Q47.oApsq3nd9~9{8,?JJPx^vTb5`=BL6XEP!n)ZGc_0F*N(K{t=lvB{x:>fHy&qDhRD&Vr+@Z[+py`%}j@RWxT-u7li[E8Yz,{F\"w\"+dYozt3<\"(\"g,Q)A<:Y+\"!8&y~z`F')",
+        "plaintext": "m|T25^5.i^UBemf<b#W1SBnaDXn6[;pCYL*fxWmhKO yB4hVEn\"eVP$U2XaANkdK[[1bCBI>kfD RUVU.'Lr3a.VMn<,\"E3(r(''Y (1iD_82QoX|0v7I4kcU;_ywJ>ztm48qk!%h1aegt`P' 4yj\\",
+        "dataset": "GENERIC_STRING_32"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaaaaaaaaaaaaaa  yf2,yVmC8'WzuQEFfpEu_x/Dp:Ggn0~NG:-c^$3Vs}W1M?:A)}|]:7{b_6~X'^#mhZNIzp3\"fp(Z1h*]LZFgUxxIiG5",
+        "plaintext": "7\\itAR(^AdFi0x4ZkC+Iq0 !\"YM}a,nL3fa.^{Eu*L;$B.(stI0(lV\\~<@4\"wc%PQp\\Z@f)!}Z",
+        "dataset": "GENERIC_STRING_32"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaW{_H$,srt1cZg{E~.PSlhd[1kzw!yS)C57sev79hP`q`Io,k`(<|-j|;J.{K-LyWnGp>S%B=gkc4J2?<V}h8IB5S0N96Z^;(cYz}hqTKj>-U:q<!C#kd+S)UTxLD'dw@T'Ab7v%WpC2JR\\X9\"@6HNHR",
+        "plaintext": "%ZM-'6Kb0ewj8Thu$J\\2^j>&@MB1(JeoBPORDhrJ*uj`5\\3V>ybKd9CD/bFsG!U2jnUG1)d@1@zVuiik&\"_ME5Asm8o<3f$u'IUQ3RO0x\\zzun:c\"W*&n2AlF",
+        "dataset": "GENERIC_STRING_64"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaaaaaaaaaaaaaaaaaaadG@KyZs 2ZHS4U8-}N<We]|o!ypoR$1ULWBjr3{>~-/s@{\\3kh}@0^mP,/iz=)K`J\\XHRI!)e$NE0*(-5~JTz9p{T=V<]=^R$.-9_S($.t`JGtau",
+        "plaintext": "em=y-=mA8<i=ttc +V+jA>i$2Q? 7izC~[x@N2e#c[Fe\"ZUH)>ewP cH*c7[bSaY h^WDBArgL|S>:wJXLU5=+",
+        "dataset": "GENERIC_STRING_32"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa nZdy}-Ux8-OT@b\"<EMqzn<,(YBOYl.6&A\"vW7|I6X3[#g]h}0X@K{KqNI}D3|7W2\"2&uAmssT;aoHnTsG>XT1^v=o:!zo#Ji1F|_/N}-O1~l_)V`z<L[\"D0<hWUl=1!aWujpkDq6JYGmJ$J6Cx^~ *^K!Nrz1Rmwmg{Cc3$_}a*A",
+        "plaintext": "sbJ_#?QoQW6ur9};%tS?VmN?v$oP&U!@KRYyx+5i(N$*)>XpqA_-|a=T;d`OKj`NK}h5z&>7FN586vYe*H/tXZg(#r'WPLjtswnB';>^q9*aB/p{3S7xGUp|N_Vh~6LTZ8CuM}",
+        "dataset": "GENERIC_STRING_32"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaat kC w:(9!s#>sFS#4M}8C*\\Sm]J,6EHVfP_'6[z!KaUIHs`nP76lS*.>a 6(haK}/lD6WMJrJ[UUPT{SF68|Szy?ViDLz%})CdkEe78KEdCr7^<c BTbD$?dH}q)bQ4MX1Q.ig8;62PHAZ]^8$G3",
+        "plaintext": " :ZE*oyv3,/T]2+R39d?kq}bDi%{j&pG/H!Z1jBcY!hm7:1Z)]gHrn[nD(,}Y\" @sl'~aP]U[SG^BS2-c(Xp3$<m15*Fh`:Vl%L2z?+jz\"L'^=ML\"888+",
+        "dataset": "GENERIC_STRING_32"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaaaaaaaaaaaaaaaaaaachtlL6Y^cv.LzPp^5H0%vF&nQ\\lD\\zPl?!+w\\H\".1GwqrcgaX0%Av9QX(CywX8S{!o0WUd+2\\/42nfh7X1@>:V8td|LdtwG&*R|6Ra#4W.1'q0}W",
+        "plaintext": "N\"tz'B}|@-WtcxE9]IMt\\Zv]0uJA.9T_Hs#eUEewO#,hPq,_sEz3y*n/ ;An-COCC6!I,Uhh M6*UCB\\q{TL.^",
+        "dataset": "GENERIC_STRING_32"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabL{HhqC'd^V#DN1isNL>0m!:WzX9sLLThRl_Z)#aISfUR 8pVf\\mImWo[*\"t_/\\h_BtV@PX3m%wA`W7&o@(;{N1$]oLRS3%&a ;.[B-wYEge`n$?u+BgCbyH&D_p53G,z8i",
+        "plaintext": "8[I~THeO?I5sb~&6~P_PnT_!((!4zRx>N&5=(~^[$!6iz~Z&|pxtyw0h(K(XUE<\"r6HY]u)rQ#fK[mbPBK62e}9Q~NY5CS!n!j3",
+        "dataset": "GENERIC_STRING_32"
+    },
+    {
+        "ciphertext": "caaaaaaad)<h\";,Ji2.[USm2o`yo[ge~3~);j!9|332+aJp&[N/#'hd3S6?\\G>0bf8I}T#KDgs_T[NRY&a]<W@<iPHM_SIwes!!j7'o#~4q:",
+        "plaintext": "_&/;hdSR9hr>5\".YmB;|H^ D|jTp2]B@erewc$LzJPVo,VW^kxQ3<9[9H=_&rQ7b:#19#2dZ\\,E%SU.",
+        "dataset": "GENERIC_STRING_64"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaab{n@SIl/?6P7\\cU\"u]h)ObsnWKTiW[)\"SCnPK`JcNi47Dhnx&S<0+Xil7<9}7var|h.I6+8T=-6xVn2o#MUB2{)XZK/e>wIdWu$0Y0Iy'\"TX>QeV!YGZ6uQ^qDm!vZzQv'\\w~9NjE@4y|H%?DyraUZ^YhuSl;:b^73-1]]/:`|)Ob\\@kC'^LF",
+        "plaintext": "N|krZ]e|| YGEbSrJ2@naqO<$rr0LZ=qv`FVAncin^N'^}$>W*aNwe(^'Qq`.J_pTuZ~q9<:R`Qv257&aF_# ciC#}Kcm'k}V8 Qh't`=m$kbf~87o!mM)`r%4_SWTT<HOF:rMQ  v@.71LM}",
+        "dataset": "GENERIC_STRING_64"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaahCK|Li|\"Gw4{=j:)S@_QxGr<3U)A]aLf>S?=U^kx]a1,*uL/F^A1$xh4$-c]wXe_o;s@y/%$+JkS`||dTQj4NaQM?O3l:*+\\L_G\\fNUj=ef-$m&5w3'H(Wf?xb=<8R]q<WCAo>W2'+!~qyLZaIW0muK",
+        "plaintext": "cH[D[ELYri2R~^]>EOdZ}GG%>x#}W:pGus<5}PSA/(xqC>*sL=b_9{qzQ8$oT~AU>`).%\\6#8[<j_nib?0F4uHu1xesX9bUnC!,e}2C8%+=kTNYL^Hpv0-S+2",
+        "dataset": "GENERIC_STRING_64"
+    },
+    {
+        "ciphertext": "caau{ze\"#^GLH7J$mK\\Jy{RWyqD$4*5WcZljb/9I",
+        "plaintext": "?m*Qqbl,v4wi/c<[)esnx/^+>k+SC",
+        "dataset": "GENERIC_STRING_64"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaaaaaaaaaai?:6GOEjZn:Wm:)-%Yga%fzgDU(Vlgw?!_*y_6r-19aOM_N*0BN+Yace-UV#:7ai_O>&2_? *TxJ,K)Lg",
+        "plaintext": "J{$aVH\"0q`CF#e@lmgh%tCu:'B;Anuh9NwEKD/T('LROHI4ERhk|LYBoT2\\\"",
+        "dataset": "GENERIC_STRING_32"
+    },
+    {
+        "ciphertext": "ca&pAu<$*En0;;C-2|:fqzg)",
+        "plaintext": "9%(E1<;{F8o.BP]+]",
+        "dataset": "GENERIC_STRING_64"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaab`7H6Z$&lrvjt/obo)Gt8xOp\\`Cn<ls2t+$=4<Bdt!:%",
+        "plaintext": "%v/bbq^Uvyg+vk%n2om3swky=_*glm*rxOI",
+        "dataset": "GENERIC_STRING_32"
+    },
+    {
+        "ciphertext": "cKgwv6=X(`)0<Wu",
+        "plaintext": "2]p",
+        "dataset": "GENERIC_STRING_64"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaat9qemk*[OHhL];)f\".ze5-)(wkUM!v_!rJ2*?Qx em0V2[N;Dn4{gJH_7';uPe3!MD(<Avi:y[Sp[oVqnW91P:kE|=Khy{pHEK0`;bVP`le]?L#s,<^ykO(akuc@'Y.c`lkd=*(%i6FY",
+        "plaintext": "['EriD:Fpl>[_do.62`'_PquT8E7`~b5/:pJTXW``5#6h #]b:eVGv|5sYza ZuQNBeo~-$8qg,Zmp\\u8xSZZ\"3n_egRE<mc~sza9-z`uuk4?y>",
+        "dataset": "GENERIC_STRING_64"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaaaaaaiHUq._O^Jp9`J;>H3y+jZGfm>*%>_+#ZvDP;.U{.p_~Ci350+P-,{.B5U`S()XR?RT8_6.g*\"ME~wN^7eyWJ,#E0F+.C~vz&7wyaS6a@;CRc7'-p}nhbz'1\"l}i!:8/jVJ{ h(zw^5,)8qM;msZ?bK;ZxhaoQ[Su,\\+Ba@k@:TG1`UiTZq2H\\1Wl%9$Us{Sy)JKHfv@J>f,#*w e<=mr?R'sF",
+        "plaintext": "GO$%J,9JRubUOX]K^<4i$$YF2l*3ALK[u2Pe<J2/nWWrLX,bBfLM&Rx98)}'B1s4xk{uvQ^8fVR'YkuE+6q0Az9k3h$dx&i/:$T9a|d<sTs7n93xkf34;|z++iHGA#9[>Lc%{Mt.n|7fDxM*F)V`V#(wp!SJkKE;8ray_qh|F+REk13",
+        "dataset": "GENERIC_STRING_64"
+    },
+    {
+        "ciphertext": "caaaaaaaaaab\\MtPyDop*s:?>xr$Zc:RwI$HE&G5>[y&VZL@=|xo:e!Y\"qoO_7/#Hz@SyVpaNH-2Lsr!<u#5uCe2P'z{My\\pGnRLRV9Zh\"\"Y{_| zx{u%y4MK1KxkPWRBYX<eR{=6},Wv0aA>qo9",
+        "plaintext": ".Hgbye4}jz<SNg\\2\"5R#q(Ov\"n^'3~b[]{{?TQ_.F4Bi9eP>.npCbB Yj@]k4o:N*AEAOqg,AGbBWP3@#(o-ORg:a;f!8\\ohNW!]u748|r[~",
+        "dataset": "GENERIC_STRING_64"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaa,B?96N&wi<,:Z+5[o,_aEi9Rf_[P)e RGk\" 7\\HoH  }\"a[t\"`g4<_!qNn8n?nWNje2k6A1dJl1Z51;C}1nnG2.V1_ul\"&9l]nExU<_fRDY-*]08YxQFe!bwv|cnHleoHf?t+z)H]Y?#dbsz_{ajSENqf,kx-ArfK+b~EF6Vnlx)v",
+        "plaintext": "zWz-0-Ei.`5?r%XlrQ8!2:>+?{ONq.kGp,[8XO|#uR{,f2yz\\oH5\\K,)9I{Bzo=N9dk=!RSc/$rurHxgK.G4-GT5='d(R#0*vsA]bpS\"EvV@>c([=v{\\%PU/MVj Y,d]E{{VZ+] wi",
+        "dataset": "GENERIC_STRING_64"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaaaaahcT@0:>b`l@_>h'7gSun)CbauJP>1*O09iFC$R##KV^785rS:b*&Hw$_ynTdre>.c!fjJ(@yIXk&XI psu(i<(vaT/(zOWdpkQ[D@s,%6ll^-pxZYg<4GW0UFh%q9ZA 47T@p.9xjJc6*+-<=0zf=Jdd|^g3>}<4NVqT,%bgct 2 wThH]Kn)CeEpEv;;^p+b0J{Vn9Aaa3=6w3em-y6II",
+        "plaintext": "-#' B)^_@W`[M^~yUfr8R5a2CI{yVz7\\@{yA 8.*\"WlR8Y4o@WR/bg9\\qvHzg,IeKmo6l5U}Dyc%Wj*TsR$jP6w_o4pg]DJOny&^#?27F<dSk0>IOV)H:c[y~d3_Wa9Xj>!zHvfYj`1}4,1nS$aJAmG*~EqCv$7 ?=^JY\\1b.fg#",
+        "dataset": "GENERIC_STRING_64"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(jHIU\\f-J?)e)>_;I+mnqPC3:Qx8Tl\\/X?EbO4'A3{S297I+$SHS6g!p\\=z:vw$EX}$.x}:xl L5M?7CNI~9;,tt,k]x~KE8368ulOwBZ,FCD'2",
+        "plaintext": "k_{#!so108x^,)++8[e1=^NfR;9WT5 mLjI*.qejv<MDJu%i\\B{!GBGrOoJZc;pr\\5pK=Chr2'#M3<U\\@x{[$i\\|3Z",
+        "dataset": "GENERIC_STRING_32"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaD$dd^%q ,<$s>/ cjJ0_$x3>d^.?^:6P1Uz8PiUmMBk!dzP[>w$-X-[F+6~^~3FUDT$TIEv,a=j4+K]9:a<e/<Nni`#vf_*b1rZw&JZjX&;d'u{-<\/-t[(yj{'9j`K4)Z\\41PG>)&nmevDfs7k1#hkGC\\EGg037l~n'_Ct^lvB%FI]'VNew&ApcU9*+PN\",p",
+        "plaintext": "-$*I~NZ+^2n+--wP7:ILZXkQ5[f!i%d1{-R*O[^#nixh`CU6Rgg{QF&:m@iEWkm!B-,E%}':VE};0B0VNBgJmD&G-[w0pKD;y*yON FD6&{&[**rIiiw-s,VVKnbv$i@!d8HL$\\!OM4(C|\"iD>MDptYI",
+        "dataset": "GENERIC_STRING_32"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaaaxEBU>~N5B[5y>:$ti-uVYs5R/&LZ?0.0KMtlB`4#-,`QdvC!5MVVa8'X",
+        "plaintext": "IPm*w^Zx?%}7WUS\"riqb;chF73#jEoFR~9NmV>44;3LJS",
+        "dataset": "GENERIC_STRING_32"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaaaaaaaaaaaai}>)[yr5mGDxia-Lrh58L6I07.:ylwN'G248=;<\" K66Llt~DN\"QyvHnf\"*jU7-M,Gci.\"Ttpz.uX@=Y'",
+        "plaintext": "jH~#t2`6>i~a|QnO60Wo%-uss33L_k/.veYR;O3n_[R>h]{.JF.9;~,$G\\}+VC",
+        "dataset": "GENERIC_STRING_32"
+    },
+    {
+        "ciphertext": "caaakM@]yCJ'r44CCX]xnKx`^1VexVbJ+(3Lakmkl!Odc.\"3IE^O~-@m",
+        "plaintext": "{TItcza3t2<HVLsZ$x03Hh2^A1Fj ).e%*^!'-9qI0",
+        "dataset": "GENERIC_STRING_64"
+    },
+    {
+        "ciphertext": "caaaaaaaaaaaab!zEu1dQ7c`k@kY`#5MMBA()WMyncp.\\'D*`ncXR\\Fj$Jwp43jjZ[b~?G6]U?>2SF]Y7;1.NHoz<FNB)${~$?cOf=/4*$;XdsF1OaGoh!CS#/f;l-I$qEdq sL6'$eJ?tBn@B~vxftxA>k4J_tFmhd&u=7p",
+        "plaintext": "PmK[ih[1m~TEZ{#wz%}dc}f`P<f;+X3>E>+l9WxcnELztDDcck'GAKf.zL[vgTKyjafjnk#uHegc:[<v-s;g4.eLm%#u@.+l v;sG%^G;d@-@K0W}zA['B:((}86%",
+        "dataset": "GENERIC_STRING_64"
+    }
+]

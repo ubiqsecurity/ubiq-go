@@ -26,6 +26,28 @@ func Encrypt(
 	ctx := pipeline.NewOperationContext(dataset, plaintext, true, tweak)
 	ctx.KeyNumber = &keyNumber
 
+	// Input encoding: convert UTF-8 to base32/base64 if configured
+	enc := parseEncoding(dataset.InputEncoding)
+	if enc != operations.EncodingNone {
+		encOp := operations.NewEncodeInputOperation(enc)
+		result, err := encOp.Invoke(ctx)
+		if err != nil {
+			return "", fmt.Errorf("encode input failed: %w", err)
+		}
+		ctx.CurrentValue = result
+	}
+
+	// Input padding: pad to min length if pad character is configured
+	if dataset.InputPadCharacter != "" {
+		padChar := []rune(dataset.InputPadCharacter)[0]
+		padOp := operations.NewPadInputOperation(dataset.InputLengthMin, padChar)
+		result, err := padOp.Invoke(ctx)
+		if err != nil {
+			return "", fmt.Errorf("pad input failed: %w", err)
+		}
+		ctx.CurrentValue = result
+	}
+
 	// Pre-encryption: trim prefix, suffix, passthrough
 	pre := buildPrePipeline(dataset)
 	if _, err := pre.Invoke(ctx); err != nil {
@@ -87,6 +109,28 @@ func Decrypt(
 	}
 	ctx.CurrentValue = string(decrypted)
 
+	// Unpad input: remove padding added during encryption
+	if dataset.InputPadCharacter != "" {
+		padChar := []rune(dataset.InputPadCharacter)[0]
+		unpadOp := operations.NewUnpadInputOperation(padChar)
+		result, err := unpadOp.Invoke(ctx)
+		if err != nil {
+			return "", 0, fmt.Errorf("unpad input failed: %w", err)
+		}
+		ctx.CurrentValue = result
+	}
+
+	// Decode input: convert base32/base64 back to UTF-8
+	enc := parseEncoding(dataset.InputEncoding)
+	if enc != operations.EncodingNone {
+		decOp := operations.NewDecodeInputOperation(enc)
+		result, err := decOp.Invoke(ctx)
+		if err != nil {
+			return "", 0, fmt.Errorf("decode input failed: %w", err)
+		}
+		ctx.CurrentValue = result
+	}
+
 	// Post-decryption: expand passthrough/suffix/prefix
 	post := buildPostDecryptPipeline(dataset)
 	if _, err := post.Invoke(ctx); err != nil {
@@ -94,6 +138,18 @@ func Decrypt(
 	}
 
 	return ctx.CurrentValue, keyNumber, nil
+}
+
+// parseEncoding converts an input_encoding string to an EncodingType.
+func parseEncoding(encoding string) operations.EncodingType {
+	switch encoding {
+	case "base32":
+		return operations.EncodingBase32
+	case "base64":
+		return operations.EncodingBase64
+	default:
+		return operations.EncodingNone
+	}
 }
 
 // ruleWithOperation pairs a rule with its corresponding operation for sorting.
