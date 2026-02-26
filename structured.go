@@ -934,79 +934,18 @@ func (fe *StructuredEncryption) CipherWithKeyNumber(datasetName, pt string, twk 
 // @twk may be nil, in which case, the default will be used
 func (fe *StructuredEncryption) CipherForSearch(datasetName, pt string, twk []byte) (
 	ct []string, err error) {
-	dataset, err := ((*structuredContext)(fe)).getDatasetInfo(datasetName)
-
-	if err != nil {
-		return
-	}
-
-	// algo, kn, err := ((*structuredContext)(fe)).setAlgorithm(dataset, -1)
-	// if err != nil {
-	// 	return
-	// }
-
-	var fmtr, ptr, ctr []rune
-	var rules []passthroughRule
-
-	deftwk, err := base64.StdEncoding.DecodeString(dataset.Tweak)
-	if err != nil {
-		return
-	}
 
 	keys, err := ((*structuredContext)(fe)).fetchAllKeys(datasetName)
 	if err != nil {
 		return
 	}
 
-	// format, plaintext representation, rules, error
-	fmtr, ptr, rules, err = formatInput(
-		[]rune(pt),
-		&dataset.PassthroughAlphabet,
-		&dataset.InputAlphabet,
-		dataset.OutputAlphabet.ValAt(0),
-		dataset.PassthroughRules)
-	if err != nil {
-		return
-	}
-	if len(ptr) < dataset.InputLengthMin || len(ptr) > dataset.InputLengthMax {
-		err = errors.New("input length out of bounds")
-		return
-	}
-
 	ct = make([]string, len(keys))
 	for i := range keys {
-		var alg structuredAlgorithm
-
-		alg, err = ((*structuredContext)(fe)).getAlgorithm(dataset, keys[i].Key, deftwk)
+		ct[i], err = fe.CipherWithKeyNumber(datasetName, pt, twk, keys[i].Num)
 		if err != nil {
 			return
 		}
-
-		// Initialize a copy of the plaintext
-		_ptr := make([]rune, len(ptr))
-		copy(_ptr, ptr)
-
-		ctr, err = alg.EncryptRunes(_ptr, twk)
-		if err != nil {
-			return
-		}
-
-		fe.tracking.AddEvent(fe.papi, dataset.Name, "", trackingActionEncrypt, 1, i)
-
-		ctr, err = convertRadix(ctr, &dataset.InputAlphabet, &dataset.OutputAlphabet)
-		if err != nil {
-			return
-		}
-
-		ctr = encodeKeyNumber(
-			ctr, &dataset.OutputAlphabet, i, dataset.NumEncodingBits)
-		ctr, err = formatOutput(fmtr, ctr, &dataset.PassthroughAlphabet, rules)
-
-		if err != nil {
-			return
-		}
-
-		ct[i] = string(ctr)
 	}
 
 	return

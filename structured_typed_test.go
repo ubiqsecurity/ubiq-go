@@ -626,6 +626,112 @@ func TestCipherDateTimeForSearch(t *testing.T) {
 	}
 }
 
+func TestCipherGenericStringForSearch(t *testing.T) {
+	initializeCreds()
+
+	enc, err := NewStructuredEncryption(credentials)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer enc.Close()
+
+	dec, err := NewStructuredDecryption(credentials)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer dec.Close()
+
+	plainText := "abcdefghij"
+
+	allCiphers, err := enc.CipherForSearch("GENERIC_STRING_32", plainText, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(allCiphers) < 1 {
+		t.Fatal("expected at least 1 cipher for search")
+	}
+
+	for i, ct := range allCiphers {
+		pt, err := dec.Cipher("GENERIC_STRING_32", ct, nil)
+		if err != nil {
+			t.Fatalf("Decipher cipher[%d]=%q: %v", i, ct, err)
+		}
+		if pt != plainText {
+			t.Fatalf("cipher[%d]=%q decrypted to %q, want %q", i, ct, pt, plainText)
+		}
+	}
+
+	mostRecent, err := enc.Cipher("GENERIC_STRING_32", plainText, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	found := false
+	for _, ct := range allCiphers {
+		if ct == mostRecent {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("most recent cipher %q not found in search results", mostRecent)
+	}
+}
+
+func TestCipherTokenForSearch(t *testing.T) {
+	initializeCreds()
+
+	enc, err := NewStructuredEncryption(credentials)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer enc.Close()
+
+	dec, err := NewStructuredDecryption(credentials)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer dec.Close()
+
+	plainText := "hello"
+
+	allCiphers, err := enc.CipherForSearch("TOKEN64", plainText, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(allCiphers) < 1 {
+		t.Fatal("expected at least 1 cipher for search")
+	}
+
+	for i, ct := range allCiphers {
+		pt, err := dec.Cipher("TOKEN64", ct, nil)
+		if err != nil {
+			t.Fatalf("Decipher cipher[%d]=%q: %v", i, ct, err)
+		}
+		if pt != plainText {
+			t.Fatalf("cipher[%d]=%q decrypted to %q, want %q", i, ct, pt, plainText)
+		}
+	}
+
+	mostRecent, err := enc.Cipher("TOKEN64", plainText, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	found := false
+	for _, ct := range allCiphers {
+		if ct == mostRecent {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("most recent cipher %q not found in search results", mostRecent)
+	}
+}
+
 // --- Boundary / Error Tests ---
 
 func TestCipherInt32OutOfRange(t *testing.T) {
