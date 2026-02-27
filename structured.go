@@ -16,6 +16,7 @@ import (
 	"strings"
 
 	"gitlab.com/ubiqsecurity/ubiq-go/v2/structured"
+	"gitlab.com/ubiqsecurity/ubiq-go/v2/structured/pipeline/exec"
 )
 
 type datasetInfo struct {
@@ -850,52 +851,31 @@ func NewStructuredEncryption(c Credentials) (*StructuredEncryption, error) {
 func (fe *StructuredEncryption) Cipher(datasetName, pt string, twk []byte) (
 	ct string, err error) {
 	dataset, err := ((*structuredContext)(fe)).fetchDataset(datasetName)
-	// fe.dataset = dataset
 	if err != nil {
 		return
 	}
+
 	algo, kn, err := ((*structuredContext)(fe)).setAlgorithm(dataset, -1)
 	if err != nil {
 		return
 	}
 
-	var fmtr, ptr, ctr []rune
-	var rules []passthroughRule
+	// Use pipeline architecture for encryption
+	pipelineDataset := toPipelineDatasetInfo(dataset)
+	pipelineAlgo := wrapAlgorithm(algo)
 
-	fmtr, ptr, rules, err = formatInput(
-		[]rune(pt),
-		&dataset.PassthroughAlphabet,
-		&dataset.InputAlphabet,
-		dataset.OutputAlphabet.ValAt(0), dataset.PassthroughRules)
-
+	ct, err = exec.Encrypt(pipelineDataset, pt, twk, kn, pipelineAlgo)
 	if err != nil {
 		return
 	}
 
-	if len(ptr) < dataset.InputLengthMin || len(ptr) > dataset.InputLengthMax {
-		err = fmt.Errorf("invalid input length (%v) min: %v max %v", len(ptr), dataset.InputLengthMin, dataset.InputLengthMax)
-		return
-	}
-
-	ctr, err = algo.EncryptRunes(ptr, twk)
-	if err != nil {
-		return
-	}
-
+	// Track usage
 	fe.tracking.AddEvent(
 		fe.papi, dataset.Name, "",
 		trackingActionEncrypt,
 		1, kn)
 
-	ctr, err = convertRadix(ctr, &dataset.InputAlphabet, &dataset.OutputAlphabet)
-	if err != nil {
-		return "", err
-	}
-	ctr = encodeKeyNumber(
-		ctr, &dataset.OutputAlphabet, kn, dataset.NumEncodingBits)
-	ctr, err = formatOutput(fmtr, ctr, &dataset.PassthroughAlphabet, rules)
-
-	return string(ctr), err
+	return ct, nil
 }
 
 // Encrypt a plaintext string using algorithm, format
@@ -1030,51 +1010,30 @@ func (fd *StructuredDecryption) Cipher(datasetName, ct string, twk []byte) (
 		return
 	}
 
-	var fmtr, ctr []rune
-	var kn int
-	var rules []passthroughRule
+	// Use pipeline architecture for decryption
+	pipelineDataset := toPipelineDatasetInfo(dataset)
 
-	fmtr, ctr, rules, err = formatInput(
-		[]rune(ct),
-		&dataset.PassthroughAlphabet,
-		&dataset.OutputAlphabet,
-		dataset.InputAlphabet.ValAt(0),
-		dataset.PassthroughRules)
+	// Algorithm factory that fetches the algorithm for a given key number
+	algorithmFactory := func(keyNumber int) (exec.FF1Algorithm, error) {
+		algo, _, err := (*structuredContext)(fd).setAlgorithm(dataset, keyNumber)
+		if err != nil {
+			return nil, err
+		}
+		return wrapAlgorithm(algo), nil
+	}
 
+	pt, retKn, err := exec.Decrypt(pipelineDataset, ct, twk, algorithmFactory)
 	if err != nil {
 		return
 	}
 
-	// Validate ctr is not empty before decoding key number
-	if len(ctr) == 0 {
-		return "", errors.New("invalid text length")
-	}
-
-	ctr, kn = decodeKeyNumber(ctr, &dataset.OutputAlphabet, dataset.NumEncodingBits)
-	algo, retKn, err := (*structuredContext)(fd).setAlgorithm(dataset, kn)
-	if err != nil {
-		return
-	}
-
-	ctr, err = convertRadix(ctr, &dataset.OutputAlphabet, &dataset.InputAlphabet)
-
-	if err != nil {
-		return "", errors.New("an error occured. Please ensure input is a decryptable string.")
-	}
-
-	ptr, err := algo.DecryptRunes(ctr, twk)
-	if err != nil {
-		return
-	}
-
+	// Track usage
 	fd.tracking.AddEvent(
 		fd.papi, dataset.Name, "",
 		trackingActionDecrypt,
 		1, retKn)
 
-	ptr, err = formatOutput(fmtr, ptr, &dataset.PassthroughAlphabet, rules)
-
-	return string(ptr), err
+	return pt, nil
 }
 
 func (fd *StructuredDecryption) Close() {
