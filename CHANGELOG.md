@@ -1,6 +1,6 @@
 # Changelog
 
-# 2.2.10 - 2026-02-26
+# 2.3.0 - 2026-02-26
 * Added support for new data types: int32, int64, date, datetime, generic_string, and token
 * Added pipeline architecture for structured encryption operations
 * Added input padding and input encoding support
