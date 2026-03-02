@@ -18,7 +18,8 @@ stages:
         - apt -y update
         - apt -y install git golang
     script:
-        - go test -v
+        - go test -v -skip TestStructuredTypedFiles
+        - go test -run TestStructuredTypedFiles -count=1
         - go build examples/unstructured/ubiq_sample.go
         - go build examples/structured/ubiq_structured_sample.go
         - go build examples/structured_types/ubiq_structured_types_sample.go
@@ -28,7 +29,8 @@ test_dev:
     variables:
         UBIQ_TEST_TYPES_DIR: testdata/ubiq-test-data/dev/dataset_types/
     script:
-        - go test -v -skip TestStructuredFiles
+        - go test -v -skip "TestStructuredFiles|TestStructuredTypedFiles"
+        - go test -run TestStructuredTypedFiles -count=1
         - go build examples/unstructured/ubiq_sample.go
         - go build examples/structured/ubiq_structured_sample.go
         - go build examples/structured_types/ubiq_structured_types_sample.go
