@@ -12,6 +12,8 @@ stages:
 
 .test:
     stage: test
+    variables:
+        GIT_SUBMODULE_STRATEGY: recursive
     before_script:
         - apt -y update
         - apt -y install git golang
@@ -19,13 +21,17 @@ stages:
         - go test -v
         - go build examples/unstructured/ubiq_sample.go
         - go build examples/structured/ubiq_structured_sample.go
+        - go build examples/structured_types/ubiq_structured_types_sample.go
 
 test_dev:
     extends: .test
+    variables:
+        UBIQ_TEST_TYPES_DIR: testdata/ubiq-test-data/dev/dataset_types/
     script:
         - go test -v -skip TestStructuredFiles
         - go build examples/unstructured/ubiq_sample.go
         - go build examples/structured/ubiq_structured_sample.go
+        - go build examples/structured_types/ubiq_structured_types_sample.go
     rules:
     - if: $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE != 'merge_request_event'
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == 'schedule'
@@ -33,6 +39,8 @@ test_dev:
 
 test_prod:
     extends: .test
+    variables:
+        UBIQ_TEST_TYPES_DIR: testdata/ubiq-test-data/prod/dataset_types/
     rules:
     - if: $CI_COMMIT_REF_NAME == $CI_DEFAULT_BRANCH
       when: on_success
