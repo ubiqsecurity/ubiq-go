@@ -38,6 +38,22 @@ type datasetInfo struct {
 	TweakLengthMin          int               `json:"tweak_min_len"`
 	TweakSource             string            `json:"tweak_source"`
 	PassthroughRules        []passthroughRule `json:"passthrough_rules"`
+
+	// New fields for data type support (int32, int64, date, datetime)
+	InputPadCharacter string          `json:"input_pad_character"`
+	InputEncoding     string          `json:"input_encoding"`
+	DataType          string          `json:"data_type"`
+	DataTypeConfig    *dataTypeConfig `json:"data_type_config"`
+}
+
+// dataTypeConfig holds configuration for non-string data types
+type dataTypeConfig struct {
+	Size             int64  `json:"size"`
+	MinInputIntValue int64  `json:"min_input_int_value"`
+	MaxInputIntValue int64  `json:"max_input_int_value"`
+	Epoch            string `json:"epoch"`
+	MinInputDate     string `json:"min_input_date_value"`
+	MaxInputDate     string `json:"max_input_date_value"`
 }
 
 type passthroughRule struct {
@@ -878,6 +894,39 @@ func (fe *StructuredEncryption) Cipher(datasetName, pt string, twk []byte) (
 	return ct, nil
 }
 
+// CipherWithKeyNumber encrypts a plaintext string using a specific key number.
+// This is useful for encrypting with all keys for searchable encryption.
+// If keyNumber is -1, the current key will be used.
+func (fe *StructuredEncryption) CipherWithKeyNumber(datasetName, pt string, twk []byte, keyNumber int) (
+	ct string, err error) {
+	dataset, err := ((*structuredContext)(fe)).fetchDataset(datasetName)
+	if err != nil {
+		return
+	}
+
+	algo, kn, err := ((*structuredContext)(fe)).setAlgorithm(dataset, keyNumber)
+	if err != nil {
+		return
+	}
+
+	// Use pipeline architecture for encryption
+	pipelineDataset := toPipelineDatasetInfo(dataset)
+	pipelineAlgo := wrapAlgorithm(algo)
+
+	ct, err = exec.Encrypt(pipelineDataset, pt, twk, kn, pipelineAlgo)
+	if err != nil {
+		return
+	}
+
+	// Track usage
+	fe.tracking.AddEvent(
+		fe.papi, dataset.Name, "",
+		trackingActionEncrypt,
+		1, kn)
+
+	return ct, nil
+}
+
 // Encrypt a plaintext string using algorithm, format
 // preserving parameters, and all keys defined by the
 // encryption object.
@@ -885,79 +934,18 @@ func (fe *StructuredEncryption) Cipher(datasetName, pt string, twk []byte) (
 // @twk may be nil, in which case, the default will be used
 func (fe *StructuredEncryption) CipherForSearch(datasetName, pt string, twk []byte) (
 	ct []string, err error) {
-	dataset, err := ((*structuredContext)(fe)).getDatasetInfo(datasetName)
-
-	if err != nil {
-		return
-	}
-
-	// algo, kn, err := ((*structuredContext)(fe)).setAlgorithm(dataset, -1)
-	// if err != nil {
-	// 	return
-	// }
-
-	var fmtr, ptr, ctr []rune
-	var rules []passthroughRule
-
-	deftwk, err := base64.StdEncoding.DecodeString(dataset.Tweak)
-	if err != nil {
-		return
-	}
 
 	keys, err := ((*structuredContext)(fe)).fetchAllKeys(datasetName)
 	if err != nil {
 		return
 	}
 
-	// format, plaintext representation, rules, error
-	fmtr, ptr, rules, err = formatInput(
-		[]rune(pt),
-		&dataset.PassthroughAlphabet,
-		&dataset.InputAlphabet,
-		dataset.OutputAlphabet.ValAt(0),
-		dataset.PassthroughRules)
-	if err != nil {
-		return
-	}
-	if len(ptr) < dataset.InputLengthMin || len(ptr) > dataset.InputLengthMax {
-		err = errors.New("input length out of bounds")
-		return
-	}
-
 	ct = make([]string, len(keys))
 	for i := range keys {
-		var alg structuredAlgorithm
-
-		alg, err = ((*structuredContext)(fe)).getAlgorithm(dataset, keys[i].Key, deftwk)
+		ct[i], err = fe.CipherWithKeyNumber(datasetName, pt, twk, keys[i].Num)
 		if err != nil {
 			return
 		}
-
-		// Initialize a copy of the plaintext
-		_ptr := make([]rune, len(ptr))
-		copy(_ptr, ptr)
-
-		ctr, err = alg.EncryptRunes(_ptr, twk)
-		if err != nil {
-			return
-		}
-
-		fe.tracking.AddEvent(fe.papi, dataset.Name, "", trackingActionEncrypt, 1, i)
-
-		ctr, err = convertRadix(ctr, &dataset.InputAlphabet, &dataset.OutputAlphabet)
-		if err != nil {
-			return
-		}
-
-		ctr = encodeKeyNumber(
-			ctr, &dataset.OutputAlphabet, i, dataset.NumEncodingBits)
-		ctr, err = formatOutput(fmtr, ctr, &dataset.PassthroughAlphabet, rules)
-
-		if err != nil {
-			return
-		}
-
-		ct[i] = string(ctr)
 	}
 
 	return

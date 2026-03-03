@@ -75,12 +75,10 @@ func TestUnpadInputOperation(t *testing.T) {
 		Dataset:      &pipeline.DatasetInfo{},
 		CurrentValue: "000123",
 		IsEncrypt:    false,
-		Data: map[string]string{
-			"OriginalLength": "3",
-		},
+		Data:         make(map[string]string),
 	}
 
-	op := NewUnpadInputOperation()
+	op := NewUnpadInputOperation('0')
 	result, err := op.Invoke(ctx)
 
 	if err != nil {
@@ -92,24 +90,23 @@ func TestUnpadInputOperation(t *testing.T) {
 	}
 }
 
-func TestUnpadInputOperation_NoOriginalLength(t *testing.T) {
+func TestUnpadInputOperation_NoPadding(t *testing.T) {
 	ctx := &pipeline.OperationContext{
 		Dataset:      &pipeline.DatasetInfo{},
-		CurrentValue: "000123",
+		CurrentValue: "123456",
 		IsEncrypt:    false,
 		Data:         make(map[string]string),
 	}
 
-	op := NewUnpadInputOperation()
+	op := NewUnpadInputOperation('0')
 	result, err := op.Invoke(ctx)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Should return unchanged when no original length stored
-	if result != "000123" {
-		t.Errorf("expected '000123', got '%s'", result)
+	if result != "123456" {
+		t.Errorf("expected '123456', got '%s'", result)
 	}
 }
 
@@ -157,7 +154,7 @@ func TestPadUnpad_Roundtrip(t *testing.T) {
 				Data:         padCtx.Data, // Copy stored OriginalLength
 			}
 
-			unpadOp := NewUnpadInputOperation()
+			unpadOp := NewUnpadInputOperation(tc.padChar)
 			unpadded, err := unpadOp.Invoke(unpadCtx)
 			if err != nil {
 				t.Fatalf("unpad error: %v", err)

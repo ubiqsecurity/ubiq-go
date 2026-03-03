@@ -1,5 +1,11 @@
 # Changelog
 
+# 2.3.0 - 2026-02-26
+* Added support for new data types: int32, int64, date, datetime, generic_string, and token
+* Added pipeline architecture for structured encryption operations
+* Added input padding and input encoding support
+* Fixed CipherForSearch for datasets using input encoding
+
 # 2.2.9 - 2025-11-12
 * Fixed panic when decrypting invalid strings with large alphabet datasets (>62 characters)
 * Fixed panic when decrypting empty strings

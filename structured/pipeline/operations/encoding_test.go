@@ -21,9 +21,9 @@ func TestEncodeInputOperation_Base64(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// "Hello" in base64 is "SGVsbG8=" but we strip padding
-	if result != "SGVsbG8" {
-		t.Errorf("expected 'SGVsbG8', got '%s'", result)
+	// "Hello" in base64 is "SGVsbG8=" with standard padding
+	if result != "SGVsbG8=" {
+		t.Errorf("expected 'SGVsbG8=', got '%s'", result)
 	}
 }
 
@@ -42,7 +42,7 @@ func TestEncodeInputOperation_Base32(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// "Hello" in base32 is "JBSWY3DP" (without padding)
+	// "Hello" in base32 is "JBSWY3DP" (5 bytes = 8 base32 chars, no padding needed)
 	if result != "JBSWY3DP" {
 		t.Errorf("expected 'JBSWY3DP', got '%s'", result)
 	}

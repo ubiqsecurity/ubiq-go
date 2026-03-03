@@ -1,0 +1,3 @@
+[submodule "testdata/ubiq-test-data"]
+	path = testdata/ubiq-test-data
+	url = https://gitlab.com/ubiqsecurity/ubiq-test-data.git

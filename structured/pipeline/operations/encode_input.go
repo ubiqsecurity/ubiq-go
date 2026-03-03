@@ -4,7 +4,6 @@ import (
 	"encoding/base32"
 	"encoding/base64"
 	"fmt"
-	"strings"
 
 	"gitlab.com/ubiqsecurity/ubiq-go/v2/structured/pipeline"
 )
@@ -39,16 +38,10 @@ func (op *EncodeInputOperation) Invoke(ctx *pipeline.OperationContext) (string, 
 
 	switch op.encoding {
 	case EncodingBase32:
-		encoded := base32.StdEncoding.EncodeToString(data)
-		// Remove padding by default for FPE compatibility
-		encoded = strings.TrimRight(encoded, "=")
-		return encoded, nil
+		return base32.StdEncoding.EncodeToString(data), nil
 
 	case EncodingBase64:
-		encoded := base64.StdEncoding.EncodeToString(data)
-		// Remove padding by default for FPE compatibility
-		encoded = strings.TrimRight(encoded, "=")
-		return encoded, nil
+		return base64.StdEncoding.EncodeToString(data), nil
 
 	default:
 		return "", fmt.Errorf("unsupported encoding type: %d", op.encoding)
