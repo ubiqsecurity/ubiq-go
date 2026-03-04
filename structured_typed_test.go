@@ -685,8 +685,8 @@ func TestCipherGenericStringForSearch(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(allCiphers) < 1 {
-		t.Fatal("expected at least 1 cipher for search")
+	if len(allCiphers) < 2 {
+		t.Fatalf("expected at least 2 ciphers for search, got %d", len(allCiphers))
 	}
 
 	for i, ct := range allCiphers {
@@ -741,8 +741,8 @@ func TestCipherTokenForSearch(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(allCiphers) < 1 {
-		t.Fatal("expected at least 1 cipher for search")
+	if len(allCiphers) < 2 {
+		t.Fatalf("expected at least 2 ciphers for search, got %d", len(allCiphers))
 	}
 
 	for i, ct := range allCiphers {
@@ -797,8 +797,8 @@ func TestCipherGenericStringNoSuffixForSearch(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(allCiphers) < 1 {
-		t.Fatal("expected at least 1 cipher for search")
+	if len(allCiphers) < 2 {
+		t.Fatalf("expected at least 2 ciphers for search, got %d", len(allCiphers))
 	}
 
 	for i, ct := range allCiphers {
