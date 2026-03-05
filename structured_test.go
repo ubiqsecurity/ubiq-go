@@ -93,6 +93,10 @@ func testStructuredForSearchLocal(t *testing.T, dataset, pt string) {
 		t.Fatal(err)
 	}
 
+	if len(ct) < 2 {
+		t.Fatalf("%s: expected at least 2 ciphers for search, got %d", dataset, len(ct))
+	}
+
 	for i := range ct {
 		rt, err := dec.Cipher(dataset, ct[i], nil)
 		if err != nil {
@@ -150,6 +154,10 @@ func testStructuredForSearchRemote(t *testing.T, dataset, pt string) {
 	ct, err := enc.CipherForSearch(dataset, pt, nil)
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	if len(ct) < 2 {
+		t.Fatalf("%s: expected at least 2 ciphers for search, got %d", dataset, len(ct))
 	}
 
 	var found bool = false
