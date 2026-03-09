@@ -1,6 +1,7 @@
 package operations
 
 import (
+	"strings"
 	"testing"
 
 	"gitlab.com/ubiqsecurity/ubiq-go/v2/structured/pipeline"
@@ -162,6 +163,42 @@ func TestPadUnpad_Roundtrip(t *testing.T) {
 
 			if unpadded != tc.input {
 				t.Errorf("roundtrip failed: expected '%s', got '%s'", tc.input, unpadded)
+			}
+		})
+	}
+}
+
+func TestPadInputOperation_InputContainsPadChar(t *testing.T) {
+	testCases := []struct {
+		name    string
+		input   string
+		padChar rune
+	}{
+		{"zero_in_middle", "1023", '0'},
+		{"zero_at_start", "0123", '0'},
+		{"zero_at_end", "1230", '0'},
+		{"space_in_input", "ab cd", ' '},
+		{"underscore_in_input", "a_b", '_'},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := &pipeline.OperationContext{
+				Dataset:      &pipeline.DatasetInfo{},
+				CurrentValue: tc.input,
+				IsEncrypt:    true,
+				Data:         make(map[string]string),
+			}
+
+			op := NewPadInputOperation(10, tc.padChar)
+			_, err := op.Invoke(ctx)
+
+			if err == nil {
+				t.Fatal("expected error when input contains pad character")
+			}
+
+			if !strings.Contains(err.Error(), "input_pad_character") {
+				t.Errorf("expected error about input_pad_character, got: %v", err)
 			}
 		})
 	}

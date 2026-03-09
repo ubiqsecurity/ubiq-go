@@ -1,7 +1,9 @@
 package operations
 
 import (
+	"fmt"
 	"strconv"
+	"strings"
 
 	"gitlab.com/ubiqsecurity/ubiq-go/v2/structured/pipeline"
 )
@@ -26,6 +28,10 @@ func NewPadInputOperation(minLength int, padChar rune) *PadInputOperation {
 // Invoke pads the current value if shorter than minLength.
 // Stores the original length in ctx.Data["OriginalLength"] for unpadding.
 func (op *PadInputOperation) Invoke(ctx *pipeline.OperationContext) (string, error) {
+	if strings.ContainsRune(ctx.CurrentValue, op.padChar) {
+		return "", fmt.Errorf("input may not contain input_pad_character '%c'", op.padChar)
+	}
+
 	runes := []rune(ctx.CurrentValue)
 	currentLen := len(runes)
 
