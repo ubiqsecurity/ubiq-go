@@ -243,9 +243,9 @@ func (sC *structuredContext) encryptDateTime(dataset datasetInfo, plainDateTime 
 		absSeconds = -secondsFromEpoch
 	}
 
-	// Pad to min_input_length
-	plainText := fmt.Sprintf("%d", absSeconds)
-	plainText = padLeft(plainText, dataset.InputLengthMin, '0')
+	// Format in the dataset's input alphabet and pad to min_input_length
+	plainText := formatIntegerInAlphabet(absSeconds, dataset.InputCharacterSet)
+	plainText = padLeft(plainText, dataset.InputLengthMin, dataset.InputCharacterSet[0])
 
 	// Re-add negative sign
 	if isNegative {
@@ -258,9 +258,8 @@ func (sC *structuredContext) encryptDateTime(dataset datasetInfo, plainDateTime 
 		return time.Time{}, err
 	}
 
-	// Convert base-X string to base-10 int
-	outputBase := len(dataset.OutputCharacterSet)
-	encryptedSeconds, err := parseIntegerFromBase(cipherText, outputBase)
+	// Convert ciphertext from the dataset's output alphabet to int64
+	encryptedSeconds, err := parseIntegerInAlphabet(cipherText, dataset.OutputCharacterSet)
 	if err != nil {
 		return time.Time{}, fmt.Errorf("failed to parse encrypted seconds: %w", err)
 	}
@@ -303,12 +302,11 @@ func (sC *structuredContext) decryptDateTime(dataset datasetInfo, cipherDateTime
 		absSeconds = -cipherSecondsFromEpoch
 	}
 
-	// Convert from base 10 to base-X
-	outputBase := len(dataset.OutputCharacterSet)
-	cipherText := formatIntegerToBase(absSeconds, outputBase)
+	// Format in the dataset's output alphabet
+	cipherText := formatIntegerInAlphabet(absSeconds, dataset.OutputCharacterSet)
 
 	// Left pad to min_input_length
-	cipherText = padLeft(cipherText, dataset.InputLengthMin, '0')
+	cipherText = padLeft(cipherText, dataset.InputLengthMin, dataset.OutputCharacterSet[0])
 
 	// Re-add negative sign if needed
 	if isNegative {
@@ -321,8 +319,8 @@ func (sC *structuredContext) decryptDateTime(dataset datasetInfo, cipherDateTime
 		return time.Time{}, err
 	}
 
-	// Parse the plaintext as seconds
-	plainSeconds, err := parseInt64(plainText)
+	// Parse the plaintext as seconds in the dataset's input alphabet
+	plainSeconds, err := parseIntegerInAlphabet(plainText, dataset.InputCharacterSet)
 	if err != nil {
 		return time.Time{}, fmt.Errorf("failed to parse plain seconds: %w", err)
 	}
@@ -393,24 +391,22 @@ func (sC *structuredContext) encryptDate(dataset datasetInfo, plainDate time.Tim
 		absDays = -daysFromEpoch
 	}
 
-	// Pad to min_input_length
-	plainText := fmt.Sprintf("%d", absDays)
-	plainText = padLeft(plainText, dataset.InputLengthMin, '0')
+	// Format in the dataset's input alphabet and pad to min_input_length
+	plainText := formatIntegerInAlphabet(absDays, dataset.InputCharacterSet)
+	plainText = padLeft(plainText, dataset.InputLengthMin, dataset.InputCharacterSet[0])
 
 	// Re-add negative sign
 	if isNegative {
 		plainText = "-" + plainText
 	}
 
-	// Encrypt using the string cipher
 	cipherText, err := sC.cipherString(dataset, plainText, tweak, keyNumber)
 	if err != nil {
 		return time.Time{}, err
 	}
 
-	// Convert base-X string to base-10 int
-	outputBase := len(dataset.OutputCharacterSet)
-	encryptedDays, err := parseIntegerFromBase(cipherText, outputBase)
+	// Convert ciphertext from the dataset's output alphabet to int64
+	encryptedDays, err := parseIntegerInAlphabet(cipherText, dataset.OutputCharacterSet)
 	if err != nil {
 		return time.Time{}, fmt.Errorf("failed to parse encrypted days: %w", err)
 	}
@@ -450,12 +446,11 @@ func (sC *structuredContext) decryptDate(dataset datasetInfo, cipherDate time.Ti
 		absDays = -cipherDaysFromEpoch
 	}
 
-	// Convert from base 10 to base-X
-	outputBase := len(dataset.OutputCharacterSet)
-	cipherText := formatIntegerToBase(absDays, outputBase)
+	// Format in the dataset's output alphabet
+	cipherText := formatIntegerInAlphabet(absDays, dataset.OutputCharacterSet)
 
 	// Left pad to min_input_length
-	cipherText = padLeft(cipherText, dataset.InputLengthMin, '0')
+	cipherText = padLeft(cipherText, dataset.InputLengthMin, dataset.OutputCharacterSet[0])
 
 	// Re-add negative sign if needed
 	if isNegative {
@@ -468,8 +463,8 @@ func (sC *structuredContext) decryptDate(dataset datasetInfo, cipherDate time.Ti
 		return time.Time{}, err
 	}
 
-	// Parse the plaintext as days
-	plainDays, err := parseInt64(plainText)
+	// Parse the plaintext as days in the dataset's input alphabet
+	plainDays, err := parseIntegerInAlphabet(plainText, dataset.InputCharacterSet)
 	if err != nil {
 		return time.Time{}, fmt.Errorf("failed to parse plain days: %w", err)
 	}
@@ -478,9 +473,4 @@ func (sC *structuredContext) decryptDate(dataset datasetInfo, cipherDate time.Ti
 	plainDate := epochDate.AddDate(0, 0, int(plainDays))
 
 	return plainDate, nil
-}
-
-// parseInt64 parses an int64 from a string.
-func parseInt64(s string) (int64, error) {
-	return parseIntegerFromBase(s, 10)
 }
