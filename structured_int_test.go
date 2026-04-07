@@ -31,72 +31,75 @@ func TestFormatIntegerForEncryption(t *testing.T) {
 	}
 }
 
-func TestFormatIntegerToBase(t *testing.T) {
+func TestFormatIntegerInAlphabet(t *testing.T) {
 	tests := []struct {
 		name     string
 		value    int64
-		base     int
+		alphabet string
 		expected string
 	}{
-		{"base10_simple", 123, 10, "123"},
-		{"base10_zero", 0, 10, "0"},
-		{"base16_simple", 255, 16, "FF"},
-		{"base16_larger", 256, 16, "100"},
-		{"base12_simple", 11, 12, "B"},
-		{"base12_larger", 144, 12, "100"},
-		{"base14_simple", 13, 14, "D"},
+		{"base10_simple", 123, "0123456789", "123"},
+		{"base10_zero", 0, "0123456789", "0"},
+		{"base16_simple", 255, "0123456789ABCDEF", "FF"},
+		{"base16_larger", 256, "0123456789ABCDEF", "100"},
+		{"base12_simple", 11, "0123456789AB", "B"},
+		{"base12_larger", 144, "0123456789AB", "100"},
+		{"base14_simple", 13, "0123456789ABCD", "D"},
+		{"base32_simple", 60108, "0123456789ABCDEFGHIJKLMNOPQRSTUV", "1QMC"},
+		{"custom_alphabet", 5, "abcdefghij", "f"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := formatIntegerToBase(tt.value, tt.base)
+			result := formatIntegerInAlphabet(tt.value, tt.alphabet)
 			if result != tt.expected {
-				t.Errorf("formatIntegerToBase(%d, %d) = %q, want %q",
-					tt.value, tt.base, result, tt.expected)
+				t.Errorf("formatIntegerInAlphabet(%d, %q) = %q, want %q",
+					tt.value, tt.alphabet, result, tt.expected)
 			}
 		})
 	}
 }
 
-func TestParseIntegerFromBase(t *testing.T) {
+func TestParseIntegerInAlphabet(t *testing.T) {
 	tests := []struct {
 		name     string
 		value    string
-		base     int
+		alphabet string
 		expected int64
 		wantErr  bool
 	}{
-		{"base10_simple", "123", 10, 123, false},
-		{"base10_zero", "0", 10, 0, false},
-		{"base16_simple", "FF", 16, 255, false},
-		{"base16_lower", "ff", 16, 255, false},
-		{"base16_mixed", "Ff", 16, 255, false},
-		{"base16_larger", "100", 16, 256, false},
-		{"base12_simple", "B", 12, 11, false},
-		{"base12_larger", "100", 12, 144, false},
-		{"base14_simple", "D", 14, 13, false},
-		{"negative", "-123", 10, -123, false},
-		{"invalid_char", "XYZ", 10, 0, true},
+		{"base10_simple", "123", "0123456789", 123, false},
+		{"base10_zero", "0", "0123456789", 0, false},
+		{"base16_simple", "FF", "0123456789ABCDEF", 255, false},
+		{"base16_larger", "100", "0123456789ABCDEF", 256, false},
+		{"base12_simple", "B", "0123456789AB", 11, false},
+		// Regression: base-32 dataset alphabet (e.g. date type) where the
+		// integer value (60108 days from epoch) needs 5 chars in base 10
+		// but fits in 4 chars in base 32 ("1QMC").
+		{"base32_simple", "1QMC", "0123456789ABCDEFGHIJKLMNOPQRSTUV", 60108, false},
+		{"negative", "-123", "0123456789", -123, false},
+		{"invalid_char", "XYZ", "0123456789", 0, true},
+		{"custom_alphabet", "f", "abcdefghij", 5, false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := parseIntegerFromBase(tt.value, tt.base)
+			result, err := parseIntegerInAlphabet(tt.value, tt.alphabet)
 			if tt.wantErr {
 				if err == nil {
-					t.Errorf("parseIntegerFromBase(%q, %d) expected error, got nil",
-						tt.value, tt.base)
+					t.Errorf("parseIntegerInAlphabet(%q, %q) expected error, got nil",
+						tt.value, tt.alphabet)
 				}
 				return
 			}
 			if err != nil {
-				t.Errorf("parseIntegerFromBase(%q, %d) unexpected error: %v",
-					tt.value, tt.base, err)
+				t.Errorf("parseIntegerInAlphabet(%q, %q) unexpected error: %v",
+					tt.value, tt.alphabet, err)
 				return
 			}
 			if result != tt.expected {
-				t.Errorf("parseIntegerFromBase(%q, %d) = %d, want %d",
-					tt.value, tt.base, result, tt.expected)
+				t.Errorf("parseIntegerInAlphabet(%q, %q) = %d, want %d",
+					tt.value, tt.alphabet, result, tt.expected)
 			}
 		})
 	}
@@ -129,21 +132,31 @@ func TestPadLeft(t *testing.T) {
 }
 
 func TestBaseConversionRoundtrip(t *testing.T) {
-	bases := []int{10, 11, 12, 13, 14, 15, 16}
+	alphabets := []string{
+		"0123456789",
+		"0123456789A",
+		"0123456789AB",
+		"0123456789ABC",
+		"0123456789ABCD",
+		"0123456789ABCDE",
+		"0123456789ABCDEF",
+		"0123456789ABCDEFGHIJKLMNOPQRSTUV",                             // base 32
+		"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz", // base 62
+	}
 	values := []int64{0, 1, 10, 100, 1000, 123456, 999999}
 
-	for _, base := range bases {
+	for _, alphabet := range alphabets {
 		for _, value := range values {
 			t.Run("", func(t *testing.T) {
-				str := formatIntegerToBase(value, base)
-				result, err := parseIntegerFromBase(str, base)
+				str := formatIntegerInAlphabet(value, alphabet)
+				result, err := parseIntegerInAlphabet(str, alphabet)
 				if err != nil {
-					t.Errorf("roundtrip failed for value=%d, base=%d: %v", value, base, err)
+					t.Errorf("roundtrip failed for value=%d, alphabet=%q: %v", value, alphabet, err)
 					return
 				}
 				if result != value {
-					t.Errorf("roundtrip mismatch for value=%d, base=%d: got %d via %q",
-						value, base, result, str)
+					t.Errorf("roundtrip mismatch for value=%d, alphabet=%q: got %d via %q",
+						value, alphabet, result, str)
 				}
 			})
 		}

@@ -7,9 +7,6 @@ import (
 	"strings"
 )
 
-// integerAlphabet is the alphabet used for integer base conversion (0-9A-F supports up to base 16)
-const integerAlphabet = "0123456789ABCDEF"
-
 // CipherInt64 encrypts an int64 value using format-preserving encryption.
 // The dataset must be configured with data_type="integer" and size=64.
 func (se *StructuredEncryption) CipherInt64(datasetName string, plainInteger int64, tweak []byte) (int64, error) {
@@ -169,9 +166,8 @@ func (sC *structuredContext) encryptInt64(dataset datasetInfo, plainInteger int6
 		return 0, err
 	}
 
-	// Convert base-X string to base-10 int
-	outputBase := len(dataset.OutputCharacterSet)
-	cipherInteger, err := parseIntegerFromBase(cipherText, outputBase)
+	// Convert ciphertext from the dataset's output alphabet to int64
+	cipherInteger, err := parseIntegerInAlphabet(cipherText, dataset.OutputCharacterSet)
 	if err != nil {
 		return 0, fmt.Errorf("failed to parse cipher integer: %w", err)
 	}
@@ -204,9 +200,8 @@ func (sC *structuredContext) encryptInt32(dataset datasetInfo, plainInteger int3
 		return 0, err
 	}
 
-	// Convert base-X string to base-10 int
-	outputBase := len(dataset.OutputCharacterSet)
-	cipherInteger, err := parseIntegerFromBase(cipherText, outputBase)
+	// Convert ciphertext from the dataset's output alphabet to int64
+	cipherInteger, err := parseIntegerInAlphabet(cipherText, dataset.OutputCharacterSet)
 	if err != nil {
 		return 0, fmt.Errorf("failed to parse cipher integer: %w", err)
 	}
@@ -226,12 +221,11 @@ func (sC *structuredContext) decryptInt64(dataset datasetInfo, cipherInteger int
 		absValue = -cipherInteger
 	}
 
-	// Convert from base 10 to base-X
-	outputBase := len(dataset.OutputCharacterSet)
-	cipherText := formatIntegerToBase(absValue, outputBase)
+	// Format in the dataset's output alphabet
+	cipherText := formatIntegerInAlphabet(absValue, dataset.OutputCharacterSet)
 
 	// Left pad to min_input_length
-	cipherText = padLeft(cipherText, dataset.InputLengthMin, '0')
+	cipherText = padLeft(cipherText, dataset.InputLengthMin, dataset.OutputCharacterSet[0])
 
 	// Re-add negative sign if needed
 	if isNegative {
@@ -265,12 +259,11 @@ func (sC *structuredContext) decryptInt32(dataset datasetInfo, cipherInteger int
 		absValue = -absValue
 	}
 
-	// Convert from base 10 to base-X
-	outputBase := len(dataset.OutputCharacterSet)
-	cipherText := formatIntegerToBase(absValue, outputBase)
+	// Format in the dataset's output alphabet
+	cipherText := formatIntegerInAlphabet(absValue, dataset.OutputCharacterSet)
 
 	// Left pad to min_input_length
-	cipherText = padLeft(cipherText, dataset.InputLengthMin, '0')
+	cipherText = padLeft(cipherText, dataset.InputLengthMin, dataset.OutputCharacterSet[0])
 
 	// Re-add negative sign if needed
 	if isNegative {
@@ -328,59 +321,37 @@ func formatIntegerForEncryption(value int64, minLength int) string {
 	return result
 }
 
-// formatIntegerToBase converts a non-negative integer to a string in the given base.
-func formatIntegerToBase(value int64, base int) string {
+// formatIntegerInAlphabet converts a non-negative integer to a string using the
+// given alphabet as the digit set. The base is len(alphabet).
+func formatIntegerInAlphabet(value int64, alphabet string) string {
 	if value == 0 {
-		return "0"
+		return string(alphabet[0])
 	}
-
-	var result strings.Builder
+	base := int64(len(alphabet))
+	var buf []byte
 	for value > 0 {
-		digit := value % int64(base)
-		result.WriteByte(integerAlphabet[digit])
-		value /= int64(base)
+		buf = append([]byte{alphabet[value%base]}, buf...)
+		value /= base
 	}
-
-	// Reverse the string
-	s := result.String()
-	runes := []rune(s)
-	for i, j := 0, len(runes)-1; i < j; i, j = i+1, j-1 {
-		runes[i], runes[j] = runes[j], runes[i]
-	}
-
-	return string(runes)
+	return string(buf)
 }
 
-// parseIntegerFromBase parses a string in the given base to an int64.
-func parseIntegerFromBase(s string, base int) (int64, error) {
+// parseIntegerInAlphabet parses a string using the given alphabet as the digit set.
+// Supports an optional leading '-' for negative values.
+func parseIntegerInAlphabet(s string, alphabet string) (int64, error) {
 	isNegative := strings.HasPrefix(s, "-")
 	if isNegative {
 		s = s[1:]
 	}
-
-	// Native bases can use strconv
-	if base == 2 || base == 8 || base == 10 || base == 16 {
-		result, err := strconv.ParseInt(s, base, 64)
-		if err != nil {
-			return 0, err
-		}
-		if isNegative {
-			return -result, nil
-		}
-		return result, nil
-	}
-
-	// For other bases, parse manually
+	base := int64(len(alphabet))
 	var result int64
-	s = strings.ToUpper(s)
 	for i := 0; i < len(s); i++ {
-		digit := strings.IndexByte(integerAlphabet, s[i])
-		if digit < 0 || digit >= base {
-			return 0, fmt.Errorf("invalid character '%c' for base %d", s[i], base)
+		digit := strings.IndexByte(alphabet, s[i])
+		if digit < 0 {
+			return 0, fmt.Errorf("invalid character %q for alphabet %q", s[i], alphabet)
 		}
-		result = result*int64(base) + int64(digit)
+		result = result*base + int64(digit)
 	}
-
 	if isNegative {
 		return -result, nil
 	}
