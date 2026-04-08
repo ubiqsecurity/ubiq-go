@@ -346,6 +346,59 @@ if err != nil {
 fmt.Fprintf(os.Stdout, "DECRYPTED decrypted_text= %s \n", plainText)
 ```
 
+### Generic String and Token Datasets
+
+Datasets configured with `data_type` `generic_string` or `token` are string-based and use the standard `Cipher` / `CipherForSearch` APIs shown above — no special method is required. They behave like traditional structured datasets (such as `SSN`) but with platform-managed input/output alphabets and length handling, so the same call site works without code changes:
+
+```go
+enc, _ := ubiq.NewStructuredEncryption(creds)
+defer enc.Close()
+
+ct, err := enc.Cipher("MY_TOKEN_DATASET", "abc123XYZ", nil)
+// CipherForSearch works the same way for multi-key lookups
+```
+
+Decryption likewise uses `StructuredDecryption.Cipher`.
+
+### Typed Data (Integers, Dates, and DateTimes)
+
+In addition to string-based structured encryption, the library supports encrypting native Go types against datasets configured for them on the Ubiq platform. The original value goes in and the encrypted value is returned in the same type, preserving the format expected by the dataset.
+
+The dataset on the Ubiq platform must be configured with a matching `data_type`: `integer` (with `size: 32` or `size: 64`) for `CipherInt32` / `CipherInt64`, `date` for `CipherDate`, or `datetime` for `CipherDateTime`. Calling a typed method against a mismatched dataset will return an error. See [examples/structured_types/](examples/structured_types/) for a runnable CLI that exercises all typed datasets (string, int32, int64, date, datetime), encrypt-for-search, and a `-roundtrip` flag for quickly verifying a dataset is configured correctly.
+
+#### Integers (`int32` / `int64`)
+
+```go
+enc, _ := ubiq.NewStructuredEncryption(creds)
+defer enc.Close()
+
+cipherInt, err := enc.CipherInt64("BIRTH_YEAR", int64(1985), nil)
+// CipherInt32 / CipherInt32ForSearch / CipherInt64ForSearch are also available
+
+dec, _ := ubiq.NewStructuredDecryption(creds)
+defer dec.Close()
+
+plainInt, err := dec.DecipherInt64("BIRTH_YEAR", cipherInt, nil)
+```
+
+#### Dates and DateTimes (`time.Time`)
+
+Use `CipherDate` for date-only datasets and `CipherDateTime` for datasets that include a time component. The decryption side mirrors with `DecipherDate` / `DecipherDateTime`, and `*ForSearch` variants exist for both.
+
+```go
+enc, _ := ubiq.NewStructuredEncryption(creds)
+defer enc.Close()
+
+cipherDate, err := enc.CipherDate("BIRTH_DATE", time.Date(1985, 6, 15, 0, 0, 0, 0, time.UTC), nil)
+cipherDT, err := enc.CipherDateTime("EVENT_TS", time.Now().UTC(), nil)
+
+dec, _ := ubiq.NewStructuredDecryption(creds)
+defer dec.Close()
+
+plainDate, err := dec.DecipherDate("BIRTH_DATE", cipherDate, nil)
+plainDT, err := dec.DecipherDateTime("EVENT_TS", cipherDT, nil)
+```
+
 ### Loading the cache
 
 The library automatically populates the cache on first use of a dataset. To pre-load the cache for better performance, use `LoadCache()` on either encryption or decryption objects. Calling `LoadCache()` will also reset the TTL for already-cached datasets, which is useful for keeping frequently-used datasets in cache.
