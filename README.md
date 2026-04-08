@@ -362,7 +362,9 @@ Decryption likewise uses `StructuredDecryption.Cipher`.
 
 ### Typed Data (Integers, Dates, and DateTimes)
 
-In addition to string-based structured encryption, the library supports encrypting native Go types against datasets configured for them on the Ubiq platform. The plaintext value goes in and the ciphertext is returned in the same type, preserving the format expected by the dataset.
+In addition to string-based structured encryption, the library supports encrypting native Go types against datasets configured for them on the Ubiq platform. The original value goes in and the encrypted value is returned in the same type, preserving the format expected by the dataset.
+
+The dataset on the Ubiq platform must be configured with a matching `data_type`: `integer` (with `size: 32` or `size: 64`) for `CipherInt32` / `CipherInt64`, `date` for `CipherDate`, or `datetime` for `CipherDateTime`. Calling a typed method against a mismatched dataset will return an error. See [examples/structured_types/](examples/structured_types/) for a runnable CLI that exercises all typed datasets (string, int32, int64, date, datetime), encrypt-for-search, and a `-roundtrip` flag for quickly verifying a dataset is configured correctly.
 
 #### Integers (`int32` / `int64`)
 
@@ -396,8 +398,6 @@ defer dec.Close()
 plainDate, err := dec.DecipherDate("BIRTH_DATE", cipherDate, nil)
 plainDT, err := dec.DecipherDateTime("EVENT_TS", cipherDT, nil)
 ```
-
-The dataset on the Ubiq platform must be configured with a matching `data_type`: `integer` (with `size: 32` or `size: 64`) for `CipherInt32` / `CipherInt64`, `date` for `CipherDate`, or `datetime` for `CipherDateTime`. Calling a typed method against a mismatched dataset will return an error. See [examples/structured_types/](examples/structured_types/) for a runnable CLI that exercises all typed datasets (string, int32, int64, date, datetime), encrypt-for-search, and a `-roundtrip` flag for quickly verifying a dataset is configured correctly.
 
 ### Loading the cache
 
