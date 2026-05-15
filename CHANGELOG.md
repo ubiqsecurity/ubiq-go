@@ -1,8 +1,5 @@
 # Changelog
 
-# 2.3.1 - 2026-05-14
-* Added InferredCipher and InferredDecipher methods that pick the right typed pipeline based on the dataset's DataType. Matches the .NET SDK's InferredEncrypt/InferredDecrypt design.
-
 # 2.3.0 - 2026-02-26
 * Added support for new data types: int32, int64, date, datetime, generic_string, and token
 * Added pipeline architecture for structured encryption operations

@@ -88,14 +88,14 @@ func TestStructuredTypedFiles(t *testing.T) {
 				ops[rec.Dataset] = &_op
 				op = &_op
 				// Warm up the dataset-specific pipeline state with one round trip
-				enc.InferredCipher(rec.Dataset, rec.Plaintext, nil)
-				dec.InferredDecipher(rec.Dataset, rec.Ciphertext, nil)
+				enc.inferredCipher(rec.Dataset, rec.Plaintext, nil)
+				dec.inferredDecipher(rec.Dataset, rec.Ciphertext, nil)
 			}
 
 			t.Run(fmt.Sprintf("%s/%d", rec.Dataset, i), func(t *testing.T) {
 				// Test encryption: plaintext → ciphertext
 				beg := time.Now()
-				ct, err := enc.InferredCipher(rec.Dataset, rec.Plaintext, nil)
+				ct, err := enc.inferredCipher(rec.Dataset, rec.Plaintext, nil)
 				if err != nil {
 					t.Fatalf("encrypt(%s, %q): %v", rec.Dataset, rec.Plaintext, err)
 				}
@@ -107,7 +107,7 @@ func TestStructuredTypedFiles(t *testing.T) {
 
 				// Test decryption: ciphertext → plaintext
 				beg = time.Now()
-				pt, err := dec.InferredDecipher(rec.Dataset, rec.Ciphertext, nil)
+				pt, err := dec.inferredDecipher(rec.Dataset, rec.Ciphertext, nil)
 				if err != nil {
 					t.Fatalf("decrypt(%s, %q): %v", rec.Dataset, rec.Ciphertext, err)
 				}

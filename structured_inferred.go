@@ -11,12 +11,13 @@ const (
 	inferredDateTimeLayout = time.RFC3339
 )
 
-// InferredCipher encrypts plainText by dispatching to the typed cipher matching
+// inferredCipher encrypts plainText by dispatching to the typed cipher matching
 // the dataset's DataType (integer/date/datetime), or to the string Cipher for
 // anything else. plainText and the returned ciphertext are formatted exactly
 // like the corresponding typed APIs (decimal for integers, "YYYY-MM-DDTHH:MMZ"
-// for dates, RFC3339 for datetimes).
-func (se *StructuredEncryption) InferredCipher(datasetName, plainText string, tweak []byte) (string, error) {
+// for dates, RFC3339 for datetimes). Internal: matches .NET's internal
+// InferredEncryptAsync; used by tests to drive fixture-based round-trips.
+func (se *StructuredEncryption) inferredCipher(datasetName, plainText string, tweak []byte) (string, error) {
 	sC := (*structuredContext)(se)
 	dataset, err := sC.fetchDataset(datasetName)
 	if err != nil {
@@ -76,10 +77,11 @@ func (se *StructuredEncryption) InferredCipher(datasetName, plainText string, tw
 	}
 }
 
-// InferredDecipher decrypts cipherText by dispatching to the typed decipher
+// inferredDecipher decrypts cipherText by dispatching to the typed decipher
 // matching the dataset's DataType. The cipherText must be in the format
-// produced by the corresponding typed API (see InferredCipher).
-func (sd *StructuredDecryption) InferredDecipher(datasetName, cipherText string, tweak []byte) (string, error) {
+// produced by the corresponding typed API (see inferredCipher). Internal:
+// matches .NET's internal InferredDecryptAsync.
+func (sd *StructuredDecryption) inferredDecipher(datasetName, cipherText string, tweak []byte) (string, error) {
 	sC := (*structuredContext)(sd)
 	dataset, err := sC.fetchDataset(datasetName)
 	if err != nil {
