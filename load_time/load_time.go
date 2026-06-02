@@ -183,6 +183,7 @@ func load_test(creds ubiq.Credentials, params parameters) error {
 		return err
 	}
 	defer dec.Close()
+	seenDatasets := make(map[string]bool)
 	for _, infile := range params.infiles {
 		fmt.Printf("Loading file: %v\n", infile)
 		content, err := os.ReadFile(infile)
@@ -205,6 +206,13 @@ func load_test(creds ubiq.Credentials, params parameters) error {
 				var _op StructuredOperations
 				ops[c.Dataset] = &_op
 				op = &_op
+			}
+
+			// Prime the cache on first encounter of each dataset
+			if !seenDatasets[c.Dataset] {
+				enc.Cipher(c.Dataset, c.Plaintext, nil)
+				dec.Cipher(c.Dataset, c.Ciphertext, nil)
+				seenDatasets[c.Dataset] = true
 			}
 
 			startEnc := time.Now()
