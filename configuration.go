@@ -35,6 +35,12 @@ type Configuration struct {
 		TokenEndpointUrl string `json:"idp_token_endpoint_url"`
 		TenantId         string `json:"idp_tenant_id"`
 		ClientSecret     string `json:"idp_client_secret"`
+		// Self-signed (self-managed) IDP. The library signs a short-lived
+		// token locally with SelfSignKey for SelfSignIdentity instead of
+		// authenticating against an external IDP. SelfSignIdentity may also
+		// be supplied per-credential via IDP_USERNAME.
+		SelfSignKey      string `json:"idp_self_sign_key"`
+		SelfSignIdentity string `json:"idp_self_sign_identity"`
 	} `json:"idp"`
 
 	Golang struct {
@@ -71,6 +77,8 @@ func (config *Configuration) setDefaults() {
 	config.Idp.TokenEndpointUrl = ""
 	config.Idp.TenantId = ""
 	config.Idp.ClientSecret = ""
+	config.Idp.SelfSignKey = ""
+	config.Idp.SelfSignIdentity = ""
 
 	config.Golang.CacheHardMaxSizeMB = 0
 	config.Golang.CacheCleanWindowS = 1

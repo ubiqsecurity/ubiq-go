@@ -92,7 +92,9 @@ func NewEncryptionTS(c Credentials, uses uint) (*EncryptionTS, error) {
 	isIdp, _ := c.isIdp()
 	if isIdp {
 		// IDP mode requires passing the idp cert to the server
-		c.renewIdpCert()
+		if err := c.renewIdpCert(); err != nil {
+			return nil, err
+		}
 		request.PayloadCert = c.idpBase64Cert
 	}
 

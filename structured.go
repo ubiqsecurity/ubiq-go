@@ -240,7 +240,9 @@ func (sC *structuredContext) fetchKey(name string, n int) (
 
 		if isIdp {
 			// IDP mode requires passing the idp cert to the server
-			sC.creds.renewIdpCert()
+			if err := sC.creds.renewIdpCert(); err != nil {
+				return structuredKey{}, err
+			}
 			query.Set("payload_cert", sC.creds.idpBase64Cert)
 		}
 
@@ -315,7 +317,9 @@ func (sC *structuredContext) fetchAllKeys(name string) (
 
 	if isIdp {
 		// IDP mode requires passing the idp cert to the server
-		sC.creds.renewIdpCert()
+		if err := sC.creds.renewIdpCert(); err != nil {
+			return nil, err
+		}
 		query.Set("payload_cert", sC.creds.idpBase64Cert)
 	}
 
@@ -395,7 +399,9 @@ func (sC *structuredContext) fetchDefKeys(datasets []string) (map[string]defKeys
 
 	if isIdp {
 		// IDP mode requires passing the idp cert to the server
-		sC.creds.renewIdpCert()
+		if err := sC.creds.renewIdpCert(); err != nil {
+			return nil, err
+		}
 		query.Set("payload_cert", sC.creds.idpBase64Cert)
 	}
 

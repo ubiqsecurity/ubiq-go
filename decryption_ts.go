@@ -80,7 +80,9 @@ func (d *DecryptionTS) initializeSession(session *DecryptionSession, edk []byte,
 		isIdp, _ := d.creds.isIdp()
 		if isIdp {
 			// IDP mode requires passing the idp cert to the server
-			d.creds.renewIdpCert()
+			if err := d.creds.renewIdpCert(); err != nil {
+				return err
+			}
 			request.PayloadCert = d.creds.idpBase64Cert
 		}
 

@@ -7,6 +7,7 @@ import (
 	"os/user"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-ini/ini"
@@ -19,6 +20,7 @@ const (
 	credentialsHostId        = "SERVER"
 	credentialsIdpUsernameId = "IDP_USERNAME"
 	credentialsIdpPasswordId = "IDP_PASSWORD"
+	credentialsIdpJwtId      = "IDP_JWT"
 
 	credentialsPapiEnvId        = "UBIQ_" + credentialsPapiId
 	credentialsSapiEnvId        = "UBIQ_" + credentialsSapiId
@@ -26,10 +28,37 @@ const (
 	credentialsHostEnvId        = "UBIQ_" + credentialsHostId
 	credentialsIdpUsernameEnvId = "UBIQ_" + credentialsIdpUsernameId
 	credentialsIdpPasswordEnvId = "UBIQ_" + credentialsIdpPasswordId
+	credentialsIdpJwtEnvId      = "UBIQ_" + credentialsIdpJwtId
 
 	credentialsDefaultProfileId = "default"
 	credentialsDefaultHost      = "api.ubiqsecurity.com"
 )
+
+// idpAuthMode identifies how a Credentials object authenticates against
+// the Ubiq platform when IDP integration is in use.
+type idpAuthMode int
+
+const (
+	idpModeNone idpAuthMode = iota
+	// idpModeUser authenticates against an external IDP (okta/entra) with
+	// an IDP username and password via the OAuth password grant.
+	idpModeUser
+	// idpModeJwt uses a caller-supplied, pre-issued JWT access token.
+	idpModeJwt
+	// idpModeSelfSigned signs a short-lived token locally for a given
+	// identity (self-managed IDP, no external IDP involved).
+	idpModeSelfSigned
+)
+
+// isSelfSignedProvider reports whether the configured IDP provider denotes
+// the self-managed (self-signed) flow.
+func isSelfSignedProvider(provider string) bool {
+	switch strings.ToLower(strings.TrimSpace(provider)) {
+	case "selfsigned", "self-signed", "self_signed", "ubiq":
+		return true
+	}
+	return false
+}
 
 // Credentials holds the caller's credentials which are used
 // to authenticate the caller to the Ubiq platform. Credentials
@@ -37,10 +66,16 @@ const (
 // function.
 type Credentials struct {
 	params map[string]string
+	// paramsMu guards params. The map is shared by every value copy of a
+	// Credentials object (and so by the enc/dec objects built from it), and
+	// is written after construction by IDP cert renewal and the JWT object
+	// cache's token refresh.
+	paramsMu *sync.RWMutex
 
 	config *Configuration
 	cache  cache
 
+	idpMode                idpAuthMode
 	idpCsr                 string
 	idpBase64Cert          string
 	idpCertExpires         time.Time
@@ -50,37 +85,65 @@ type Credentials struct {
 
 // internal function to initialize a Credentials object
 func newCredentials() Credentials {
-	return Credentials{params: make(map[string]string), initialized: false}
+	return Credentials{
+		params:      make(map[string]string),
+		paramsMu:    new(sync.RWMutex),
+		initialized: false,
+	}
+}
+
+// getParam and setParam synchronize access to the shared params map. The
+// mutex may be nil for credentials built outside newCredentials (e.g. zero
+// values during loading); those are not shared across goroutines yet.
+func (c Credentials) getParam(key string) (string, bool) {
+	if c.paramsMu != nil {
+		c.paramsMu.RLock()
+		defer c.paramsMu.RUnlock()
+	}
+	val, ok := c.params[key]
+	return val, ok
+}
+
+func (c Credentials) setParam(key, val string) {
+	if c.paramsMu != nil {
+		c.paramsMu.Lock()
+		defer c.paramsMu.Unlock()
+	}
+	c.params[key] = val
 }
 
 func (c Credentials) papi() (string, bool) {
-	val, ok := c.params[credentialsPapiId]
-	return val, ok
+	return c.getParam(credentialsPapiId)
 }
 
 func (c Credentials) sapi() (string, bool) {
-	val, ok := c.params[credentialsSapiId]
-	return val, ok
+	return c.getParam(credentialsSapiId)
 }
 
 func (c Credentials) srsa() (string, bool) {
-	val, ok := c.params[credentialsSrsaId]
-	return val, ok
+	return c.getParam(credentialsSrsaId)
 }
 
 func (c Credentials) host() (string, bool) {
-	val, ok := c.params[credentialsHostId]
-	return val, ok
+	return c.getParam(credentialsHostId)
 }
 
 func (c Credentials) idpUsername() (string, bool) {
-	val, ok := c.params[credentialsIdpUsernameId]
-	return val, ok
+	return c.getParam(credentialsIdpUsernameId)
 }
 
 func (c Credentials) idpPassword() (string, bool) {
-	val, ok := c.params[credentialsIdpPasswordId]
-	return val, ok
+	return c.getParam(credentialsIdpPasswordId)
+}
+
+func (c Credentials) idpJwt() (string, bool) {
+	return c.getParam(credentialsIdpJwtId)
+}
+
+// setIdpJwt replaces the stored IDP JWT. The JWT object cache uses it to keep
+// the freshest presented token available for the next cert renewal.
+func (c Credentials) setIdpJwt(jwt string) {
+	c.setParam(credentialsIdpJwtId, jwt)
 }
 
 // viable indicates that the Credentials are not valid but
@@ -92,6 +155,8 @@ func (c Credentials) viable() bool {
 				return true
 			}
 		}
+	} else if val, ok := c.idpJwt(); ok && len(val) > 0 {
+		return true
 	} else if _, ok := c.idpUsername(); ok {
 		if _, ok := c.idpPassword(); ok {
 			return true
@@ -146,6 +211,8 @@ func loadCredentials(args ...string) (map[string]Credentials, error) {
 				case credentialsIdpUsernameId:
 					fallthrough
 				case credentialsIdpPasswordId:
+					fallthrough
+				case credentialsIdpJwtId:
 					c.params[k.Name()] = k.Value()
 				}
 			}
@@ -189,6 +256,10 @@ func (c *Credentials) merge(other Credentials) {
 		c.params[credentialsIdpPasswordId] =
 			other.params[credentialsIdpPasswordId]
 	}
+	if _, ok := c.idpJwt(); !ok {
+		c.params[credentialsIdpJwtId] =
+			other.params[credentialsIdpJwtId]
+	}
 }
 
 // finalize is called to turn viable credentials into valid
@@ -231,6 +302,9 @@ func (c *Credentials) init() error {
 	}
 	if val, ok := os.LookupEnv(credentialsIdpPasswordEnvId); ok {
 		c.params[credentialsIdpPasswordId] = val
+	}
+	if val, ok := os.LookupEnv(credentialsIdpJwtEnvId); ok {
+		c.params[credentialsIdpJwtId] = val
 	}
 
 	m, _ := loadCredentials()
@@ -363,6 +437,7 @@ type CredentialsParams struct {
 
 	IdpUsername string
 	IdpPassword string
+	IdpJwt      string
 
 	Host string
 
@@ -384,38 +459,107 @@ func (params *CredentialsParams) Build() (Credentials, error) {
 		return c, fmt.Errorf("only one, credentials values or credentials file, should be set")
 	}
 
+	// Load base credentials. For IDP flows there may be no static
+	// (papi/sapi/srsa) credentials present, so any error here is deferred
+	// and only returned if the credentials turn out to be non-IDP.
+	var loadErr error
 	if params.AccessKeyId != "" && params.SecretSigningKey != "" && params.SecretCryptoAccessKey != "" {
 		// Load from individual values
-		err = c.set(params.AccessKeyId, params.SecretSigningKey, params.SecretCryptoAccessKey, params.Host)
+		loadErr = c.set(params.AccessKeyId, params.SecretSigningKey, params.SecretCryptoAccessKey, params.Host)
 	} else if params.CredentialsFile != "" {
 		// Load from file/profile
-		err = c.load(params.CredentialsFile, params.Profile)
+		loadErr = c.load(params.CredentialsFile, params.Profile)
 	} else {
 		// Load from ENV variables
-		err = c.init()
+		loadErr = c.init()
 	}
 
-	if err != nil {
-		return c, err
+	// load() may replace the receiver with a zero value when the profile is
+	// absent; make sure the params map remains usable.
+	if c.params == nil {
+		c.params = make(map[string]string)
+	}
+	if c.paramsMu == nil {
+		c.paramsMu = new(sync.RWMutex)
 	}
 
+	// Resolve configuration first; it is needed to detect the self-signed
+	// (self-managed) IDP provider.
 	if params.Config == nil {
-		// Load default configuration
-		config, err := NewConfiguration()
-
-		if err != nil {
-			return c, err
+		config, cerr := NewConfiguration()
+		if cerr != nil {
+			return c, cerr
 		}
-
 		c.config = &config
 	} else {
 		c.config = params.Config
 	}
 
-	// Create cache for storing data
-	c.cache, err = initializeCache(params.Config)
+	// Explicit IDP parameters take precedence over file/env values.
+	if params.IdpUsername != "" {
+		c.params[credentialsIdpUsernameId] = params.IdpUsername
+	}
+	if params.IdpPassword != "" {
+		c.params[credentialsIdpPasswordId] = params.IdpPassword
+	}
+	if params.IdpJwt != "" {
+		c.params[credentialsIdpJwtId] = params.IdpJwt
+	}
 
-	if len(c.params[credentialsIdpUsernameId]) > 0 {
+	// For the self-managed provider the identity may be supplied via
+	// configuration when it is not provided as an IDP username.
+	if isSelfSignedProvider(c.config.Idp.Provider) {
+		if _, ok := c.idpUsername(); !ok && c.config.Idp.SelfSignIdentity != "" {
+			c.params[credentialsIdpUsernameId] = c.config.Idp.SelfSignIdentity
+		}
+	}
+
+	// Determine the IDP authentication mode.
+	jwt, hasJwt := c.idpJwt()
+	username, hasUser := c.idpUsername()
+	switch {
+	case hasJwt && len(jwt) > 0:
+		c.idpMode = idpModeJwt
+	case isSelfSignedProvider(c.config.Idp.Provider) && hasUser && len(username) > 0:
+		c.idpMode = idpModeSelfSigned
+	case hasUser && len(username) > 0:
+		c.idpMode = idpModeUser
+	}
+
+	// Non-IDP credentials must have loaded cleanly.
+	if c.idpMode == idpModeNone && loadErr != nil {
+		return c, loadErr
+	}
+
+	// Ensure a host is set for IDP flows that bypassed finalize().
+	if c.idpMode != idpModeNone {
+		host := params.Host
+		if host == "" {
+			if val, ok := c.host(); ok {
+				host = val
+			}
+		}
+		if host == "" {
+			if val, ok := os.LookupEnv(credentialsHostEnvId); ok {
+				host = val
+			}
+		}
+		if host == "" {
+			host = credentialsDefaultHost
+		}
+		if !strings.HasPrefix(host, "http://") && !strings.HasPrefix(host, "https://") {
+			host = "https://" + host
+		}
+		c.params[credentialsHostId] = host
+	}
+
+	// Create cache for storing data
+	c.cache, err = initializeCache(c.config)
+	if err != nil {
+		return c, err
+	}
+
+	if c.idpMode != idpModeNone {
 		err = c.initIdp()
 	}
 
