@@ -50,6 +50,11 @@ const (
 	// the @Ignore'd jwtWriteOnlyIdp / jwtReadOnlyIdp tests in the Java SDK and
 	// are off by default so a permissive dev account does not fail the suite.
 	envIdpPermissions = "UBIQ_UNITTEST_IDP_PERMISSIONS"
+
+	// envIdpSelfSignKeyFile points at a PEM RSA private key and enables
+	// TestIdpSelfSigned (with UBIQ_UNITTEST_IDP_TYPE set to the self-signed
+	// provider). The server-side directory must hold the matching public key.
+	envIdpSelfSignKeyFile = "UBIQ_UNITTEST_IDP_SELF_SIGN_KEY_FILE"
 )
 
 const (
@@ -68,8 +73,10 @@ func idpTestConfig(t *testing.T) *Configuration {
 	t.Helper()
 
 	provider := os.Getenv(envIdpType)
-	if provider == "" {
-		t.Skipf("IDP integration test skipped: %s not set", envIdpType)
+	if provider != "okta" && provider != "entra" {
+		// The OAuth password-grant tests only apply to external IDPs; the
+		// self-signed provider is covered by TestIdpSelfSigned.
+		t.Skipf("IDP integration test skipped: %s is not okta or entra", envIdpType)
 	}
 
 	cfgJson := fmt.Sprintf(`{
@@ -616,5 +623,89 @@ func TestIdpReadOnly(t *testing.T) {
 
 	if _, err := StructuredEncryptJwt(readJwt, cfg, idpDatasetSSN, plainText, nil); err == nil {
 		t.Error("expected read-only user to fail encrypting")
+	}
+}
+
+// TestIdpSelfSigned exercises the self-signed (self-managed) IDP flow against
+// a live server: the SDK mints a short-lived RS256 token locally with the
+// configured private key (self_sign_key), exchanges it at the SSO endpoint,
+// and performs a structured encrypt/decrypt round trip. The server-side
+// directory must be configured with the matching public key and a directory
+// user whose username equals the identity.
+func TestIdpSelfSigned(t *testing.T) {
+	provider := os.Getenv(envIdpType)
+	if !isSelfSignedProvider(provider) {
+		t.Skipf("self-signed IDP test skipped: %s (%q) is not a self-signed provider", envIdpType, provider)
+	}
+	keyFile := os.Getenv(envIdpSelfSignKeyFile)
+	if keyFile == "" {
+		t.Skipf("self-signed IDP test skipped: %s not set", envIdpSelfSignKeyFile)
+	}
+	keyPem, err := os.ReadFile(keyFile)
+	if err != nil {
+		t.Fatalf("reading %s: %v", keyFile, err)
+	}
+	identity := os.Getenv(envIdpUsername)
+	if identity == "" {
+		t.Skipf("self-signed IDP test skipped: %s not set", envIdpUsername)
+	}
+
+	cfgJson := fmt.Sprintf(`{
+		"idp": {
+			"provider": %q,
+			"ubiq_customer_id": %q,
+			"self_sign_key": %q
+		}
+	}`,
+		provider,
+		os.Getenv(envIdpCustomerId),
+		string(keyPem),
+	)
+	cfg, err := NewConfigurationFromJson(cfgJson)
+	if err != nil {
+		t.Fatalf("building self-signed configuration: %v", err)
+	}
+	if server := os.Getenv(envIdpServer); server != "" {
+		os.Setenv(credentialsHostEnvId, server)
+	}
+
+	creds, err := (&CredentialsParams{IdpUsername: identity, Config: &cfg}).Build()
+	if err != nil {
+		t.Fatalf("building self-signed credentials: %v", err)
+	}
+
+	enc, err := NewStructuredEncryption(creds)
+	if err != nil {
+		t.Fatalf("NewStructuredEncryption: %v", err)
+	}
+	defer enc.Close()
+	dec, err := NewStructuredDecryption(creds)
+	if err != nil {
+		t.Fatalf("NewStructuredDecryption: %v", err)
+	}
+	defer dec.Close()
+
+	plainText := "123-45-6789"
+	ct, err := enc.Cipher(idpDatasetSSN, plainText, nil)
+	if err != nil {
+		t.Fatalf("self-signed encrypt: %v", err)
+	}
+	if ct == plainText {
+		t.Error("ciphertext equals plaintext")
+	}
+	pt, err := dec.Cipher(idpDatasetSSN, ct, nil)
+	if err != nil {
+		t.Fatalf("self-signed decrypt: %v", err)
+	}
+	if pt != plainText {
+		t.Errorf("decrypted %q, want %q", pt, plainText)
+	}
+
+	cts, err := enc.CipherForSearch(idpDatasetSSN, plainText, nil)
+	if err != nil {
+		t.Fatalf("self-signed for-search: %v", err)
+	}
+	if !contains(cts, ct) {
+		t.Errorf("for-search result %v does not contain %q", cts, ct)
 	}
 }

@@ -38,9 +38,10 @@ type Configuration struct {
 		// Self-signed (self-managed) IDP. The library signs a short-lived
 		// token locally with SelfSignKey for SelfSignIdentity instead of
 		// authenticating against an external IDP. SelfSignIdentity may also
-		// be supplied per-credential via IDP_USERNAME.
-		SelfSignKey      string `json:"idp_self_sign_key"`
-		SelfSignIdentity string `json:"idp_self_sign_identity"`
+		// be supplied per-credential via IDP_USERNAME. The JSON names match
+		// the dotnet SDK's IdpConfig for cross-SDK config compatibility.
+		SelfSignKey      string `json:"self_sign_key"`
+		SelfSignIdentity string `json:"self_sign_identity"`
 	} `json:"idp"`
 
 	Golang struct {

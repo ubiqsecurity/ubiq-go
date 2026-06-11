@@ -69,10 +69,10 @@ func parseJwt(token string) (jwtIdpClaims, error) {
 func (c Credentials) makeSelfSignedToken() (string, error) {
 	identity, _ := c.idpUsername()
 	if identity == "" {
-		return "", fmt.Errorf("self-signed IDP requires an identity (IDP_USERNAME or idp_self_sign_identity)")
+		return "", fmt.Errorf("self-signed IDP requires an identity (IDP_USERNAME or self_sign_identity)")
 	}
 	if c.config.Idp.SelfSignKey == "" {
-		return "", fmt.Errorf("self-signed IDP requires idp_self_sign_key in the configuration")
+		return "", fmt.Errorf("self-signed IDP requires self_sign_key in the configuration")
 	}
 
 	privateKey, err := parseRsaPrivateKey(c.config.Idp.SelfSignKey)

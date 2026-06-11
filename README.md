@@ -167,6 +167,51 @@ credentials, err := credParams.Build()
 
 ```
 
+#### JWT access token credentials
+
+If your application already holds a user's IDP-issued JWT access token (for example a multi-tenant server that authenticates its own users), the token can be used directly instead of an IDP username and password.
+
+```go
+// in the credentials file
+// [profile-name]
+// IDP_JWT = ***
+
+// Environment Variable
+// UBIQ_IDP_JWT
+
+// Explicitly set
+credParams := ubiq.CredentialsParams{
+  Config: &config,
+  IdpJwt: "eyJ...",
+}
+credentials, err := credParams.Build()
+```
+
+For the multi-tenant case there is also a JWT-keyed convenience API for structured encryption (`StructuredEncryptJwt`, `StructuredDecryptJwt`, `StructuredLoadCacheJwt` and related functions). It resolves each distinct JWT identity to cached credentials and encryption objects automatically; call `CloseJwt()` to flush and release them. See [docs/jwt-idp.md](docs/jwt-idp.md) for how the caching and token lifecycle work.
+
+```go
+ct, err := ubiq.StructuredEncryptJwt(jwt, &config, "SSN", "123-45-6789", nil)
+pt, err := ubiq.StructuredDecryptJwt(jwt, &config, "SSN", ct, nil)
+```
+
+#### Self-signed (self-managed) IDP
+
+With the self-managed provider the library signs a short-lived token locally instead of authenticating against an external IDP. Set the provider to <b>ubiq</b> (or <b>selfsigned</b>) and supply the RSA private key in the configuration; the matching public key is configured on the Ubiq platform for your directory. The identity may be set via <b>self_sign_identity</b> in the configuration or via the IDP username (credentials file, environment variable, or `IdpUsername`).
+
+```go
+// configuration file
+// "idp": {
+//   "provider": "ubiq",
+//   "ubiq_customer_id": "...",
+//   "self_sign_key": "-----BEGIN RSA PRIVATE KEY-----\n...",
+//   "self_sign_identity": "user@example.com"
+// }
+credParams := ubiq.CredentialsParams{
+  Config: &config,
+}
+credentials, err := credParams.Build()
+```
+
 
 ## Ubiq Unstructured Encryption/Decryption
 
@@ -490,11 +535,13 @@ This section contains configuration controls available only to golang.
 - <b>cache_hard_max_size_mb</b> (exposed from [BigCache](https://github.com/allegro/bigcache)) is hard limit for cache memory allocation, in MB. If value is reached, older entries will be overwritten to make room for new ones. 0 means no size limit. (default: 0)
 
 ### IDP specific parameters
-- <b>provider</b> indicates the IDP provider, either <b>okta</b> or <b>entra</b>
+- <b>provider</b> indicates the IDP provider: <b>okta</b>, <b>entra</b>, or <b>ubiq</b> (self-signed / self-managed)
 - <b>ubiq_customer_id</b> The UUID for this customer.  Will be provided by Ubiq.
 - <b>idp_token_endpoint_url</b> The endpoint needed to authenticate the user credentials, provided by Okta or Entra
 - <b>idp_tenant_id</b> contains the tenant value provided by Okta or Entra
 - <b>idp_client_secret</b> contains the client secret value provided by Okta or Entra
+- <b>self_sign_key</b> the PEM RSA private key used to sign tokens locally (self-signed provider only); the matching public key is configured on the Ubiq platform
+- <b>self_sign_identity</b> the identity to sign tokens for (self-signed provider only); may instead be supplied as the IDP username
 
 ### Custom Metadata for Usage Reporting
 There are cases where a developer would like to attach metadata to usage information reported by the application.  Both the structured and unstructured interfaces allow user_defined metadata to be sent with the usage information reported by the libraries.
