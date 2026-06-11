@@ -71,6 +71,11 @@ type Credentials struct {
 	// is written after construction by IDP cert renewal and the JWT object
 	// cache's token refresh.
 	paramsMu *sync.RWMutex
+	// idpRenewMu serializes IDP cert renewal so concurrent operations on a
+	// shared enc/dec object cannot renew twice or read the cert fields
+	// mid-write. It is separate from paramsMu because renewal itself writes
+	// params through setParam.
+	idpRenewMu *sync.Mutex
 
 	config *Configuration
 	cache  cache
@@ -88,6 +93,7 @@ func newCredentials() Credentials {
 	return Credentials{
 		params:      make(map[string]string),
 		paramsMu:    new(sync.RWMutex),
+		idpRenewMu:  new(sync.Mutex),
 		initialized: false,
 	}
 }
@@ -482,6 +488,9 @@ func (params *CredentialsParams) Build() (Credentials, error) {
 	if c.paramsMu == nil {
 		c.paramsMu = new(sync.RWMutex)
 	}
+	if c.idpRenewMu == nil {
+		c.idpRenewMu = new(sync.Mutex)
+	}
 
 	// Resolve configuration first; it is needed to detect the self-signed
 	// (self-managed) IDP provider.
@@ -514,7 +523,6 @@ func (params *CredentialsParams) Build() (Credentials, error) {
 		}
 	}
 
-	// Determine the IDP authentication mode.
 	jwt, hasJwt := c.idpJwt()
 	username, hasUser := c.idpUsername()
 	switch {

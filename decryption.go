@@ -112,10 +112,11 @@ func (d *Decryption) newSession(edk []byte, algo int) error {
 		isIdp, _ := d.creds.isIdp()
 		if isIdp {
 			// IDP mode requires passing the idp cert to the server
-			if err := d.creds.renewIdpCert(); err != nil {
-				return err
+			cert, cerr := d.creds.renewIdpCert()
+			if cerr != nil {
+				return cerr
 			}
-			request.PayloadCert = d.creds.idpBase64Cert
+			request.PayloadCert = cert
 		}
 
 		body, _ := json.Marshal(request)

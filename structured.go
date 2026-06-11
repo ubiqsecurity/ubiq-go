@@ -240,10 +240,11 @@ func (sC *structuredContext) fetchKey(name string, n int) (
 
 		if isIdp {
 			// IDP mode requires passing the idp cert to the server
-			if err := sC.creds.renewIdpCert(); err != nil {
+			cert, err := sC.creds.renewIdpCert()
+			if err != nil {
 				return structuredKey{}, err
 			}
-			query.Set("payload_cert", sC.creds.idpBase64Cert)
+			query.Set("payload_cert", cert)
 		}
 
 		rsp, err = sC.client.Get(sC.host + "/api/v0/fpe/key?" + query.Encode())
@@ -317,10 +318,11 @@ func (sC *structuredContext) fetchAllKeys(name string) (
 
 	if isIdp {
 		// IDP mode requires passing the idp cert to the server
-		if err := sC.creds.renewIdpCert(); err != nil {
-			return nil, err
+		cert, cerr := sC.creds.renewIdpCert()
+		if cerr != nil {
+			return nil, cerr
 		}
-		query.Set("payload_cert", sC.creds.idpBase64Cert)
+		query.Set("payload_cert", cert)
 	}
 
 	var rsp *http.Response
@@ -399,10 +401,11 @@ func (sC *structuredContext) fetchDefKeys(datasets []string) (map[string]defKeys
 
 	if isIdp {
 		// IDP mode requires passing the idp cert to the server
-		if err := sC.creds.renewIdpCert(); err != nil {
-			return nil, err
+		cert, cerr := sC.creds.renewIdpCert()
+		if cerr != nil {
+			return nil, cerr
 		}
-		query.Set("payload_cert", sC.creds.idpBase64Cert)
+		query.Set("payload_cert", cert)
 	}
 
 	var rsp *http.Response

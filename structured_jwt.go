@@ -28,9 +28,9 @@ var (
 // write the same underlying key/dataset cache.
 type jwtEntry struct {
 	creds Credentials
-	// lastJwt is the most recently presented raw token. It only exists so
-	// the next cert renewal uses a fresh token instead of the one the entry
-	// was built with; presenting a known token never touches the network.
+	// lastJwt is the most recently presented raw token, kept so the next
+	// cert renewal uses a fresh token instead of the one the entry was
+	// built with.
 	lastJwt string
 	enc     *StructuredEncryption // nil until the first encrypt call
 	dec     *StructuredDecryption // nil until the first decrypt call
@@ -120,8 +120,7 @@ func getStructDecByJwt(jwt string, cfg *Configuration) (*StructuredDecryption, e
 
 // CloseJwt closes and discards every cached JWT-keyed encryption and decryption
 // object, flushing their tracking events, and clears the cached credentials.
-// Subsequent JWT calls rebuild the objects on demand. It is the Go equivalent
-// of the Java SDK's closeJwt().
+// Subsequent JWT calls rebuild the objects on demand.
 func CloseJwt() {
 	jwtStructMu.Lock()
 	defer jwtStructMu.Unlock()

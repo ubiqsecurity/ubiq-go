@@ -138,12 +138,11 @@ func parseRsaPrivateKey(pemStr string) (*rsa.PrivateKey, error) {
 }
 
 // IdpLoginJwt performs an OAuth password-grant login against the external IDP
-// described by cfg and returns the resulting JWT access token. It is the Go
-// equivalent of reading OauthResults.access_token after an IDP login in the
-// Java SDK, and is intended for minting a JWT to exercise the JWT-based
-// structured API (StructuredEncryptJwt / StructuredDecryptJwt). cfg must carry
-// the IDP provider settings (provider, tenant id, client secret, token endpoint
-// url); if cfg is nil the default configuration is loaded.
+// described by cfg and returns the resulting JWT access token, suitable for
+// the JWT-based structured API (StructuredEncryptJwt / StructuredDecryptJwt).
+// cfg must carry the IDP provider settings (provider, tenant id, client
+// secret, token endpoint url); if cfg is nil the default configuration is
+// loaded.
 func IdpLoginJwt(idpUsername, idpPassword string, cfg *Configuration) (string, error) {
 	if cfg == nil {
 		config, err := NewConfiguration()
@@ -322,20 +321,31 @@ func (c *Credentials) getIdpTokenAndCert() error {
 	return nil
 }
 
-// renewIdpCert refreshes the server-issued API cert when it has expired.
-// For idpModeJwt the exchange presents the most recently stored JWT, so a
-// failure here usually means the stored token has itself expired.
-func (c *Credentials) renewIdpCert() error {
+// renewIdpCert refreshes the server-issued API cert when it has expired and
+// returns the current base64 cert. The renewal check and the cert read happen
+// under a lock so concurrent operations on a shared object cannot renew twice
+// or see a half-written cert. For idpModeJwt the exchange presents the most
+// recently stored JWT, so a failure here usually means the stored token has
+// itself expired.
+func (c *Credentials) renewIdpCert() (string, error) {
 	isIdp, err := c.isIdp()
 	if err != nil {
-		return err
+		return "", err
 	}
-	if isIdp && c.idpCertExpires.Before(time.Now()) {
+	if !isIdp {
+		return "", nil
+	}
+
+	if c.idpRenewMu != nil {
+		c.idpRenewMu.Lock()
+		defer c.idpRenewMu.Unlock()
+	}
+	if c.idpCertExpires.Before(time.Now()) {
 		if err := c.getIdpTokenAndCert(); err != nil {
-			return fmt.Errorf("unable to renew IDP certificate: %w", err)
+			return "", fmt.Errorf("unable to renew IDP certificate: %w", err)
 		}
 	}
-	return nil
+	return c.idpBase64Cert, nil
 }
 
 func (c Credentials) getSso(accessToken, csr string) (SsoResponse, error) {
