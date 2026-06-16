@@ -61,6 +61,12 @@ func Encrypt(
 			inputLen, dataset.InputLengthMin, dataset.InputLengthMax)
 	}
 
+	// Validate charset: reject characters outside the input alphabet before they
+	// reach FF1, where PosOf(-1) would otherwise panic with index out of range.
+	if _, err := operations.NewValidateCharsetOperation().Invoke(ctx); err != nil {
+		return "", err
+	}
+
 	// FF1 encryption
 	encrypted, err := algorithm.EncryptRunes([]rune(ctx.CurrentValue), ctx.Tweak)
 	if err != nil {
@@ -339,6 +345,11 @@ func buildPreDecryptPipeline(ds *pipeline.DatasetInfo) *pipeline.Pipeline {
 			ops = append(ops, operations.NewTrimPassthroughOperation())
 		}
 	}
+
+	// Validate charset after trimming passthrough/prefix/suffix: the remaining
+	// characters must belong to the output alphabet before DecodeKeyNumber and
+	// ConvertRadix index into it, otherwise PosOf(-1) panics.
+	ops = append(ops, operations.NewValidateCharsetOperation())
 
 	// DecodeKeyNumber and ConvertRadix always happen after trim operations
 	ops = append(ops, operations.NewDecodeKeyNumberOperation())
