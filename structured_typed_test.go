@@ -3,147 +3,11 @@ package ubiq
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
-	"strconv"
-	"strings"
 	"testing"
 	"time"
 )
-
-// parseDateTestString parses a date string from the test data JSON.
-// DATE format: "2677-05-16T00:00Z" (no seconds)
-func parseDateTestString(s string) (time.Time, error) {
-	// Insert :00 seconds before Z to make valid RFC3339
-	s = strings.Replace(s, "T00:00Z", "T00:00:00Z", 1)
-	return time.Parse(time.RFC3339, s)
-}
-
-// formatDateTestString formats a time.Time back to the DATE test data format.
-// Output: "2677-05-16T00:00Z"
-func formatDateTestString(t time.Time) string {
-	return t.UTC().Format("2006-01-02") + "T00:00Z"
-}
-
-// parseDateTimeTestString parses a datetime string from the test data JSON.
-// DATETIME format: "2195-04-02T23:24:40Z"
-func parseDateTimeTestString(s string) (time.Time, error) {
-	return time.Parse(time.RFC3339, s)
-}
-
-// formatDateTimeTestString formats a time.Time back to the DATETIME test data format.
-// Output: "2195-04-02T23:24:40Z"
-func formatDateTimeTestString(t time.Time) string {
-	return t.UTC().Format(time.RFC3339)
-}
-
-// inferredEncrypt encrypts a plaintext string using the appropriate typed API
-// based on the dataset name, and returns the ciphertext as a string.
-func inferredEncrypt(enc *StructuredEncryption, dataset, plainText string) (string, error) {
-	switch dataset {
-	case "integer32":
-		v, err := strconv.ParseInt(plainText, 10, 32)
-		if err != nil {
-			return "", fmt.Errorf("parse integer32 plaintext %q: %w", plainText, err)
-		}
-		ct, err := enc.CipherInt32(dataset, int32(v), nil)
-		if err != nil {
-			return "", err
-		}
-		return strconv.FormatInt(int64(ct), 10), nil
-
-	case "integer64":
-		v, err := strconv.ParseInt(plainText, 10, 64)
-		if err != nil {
-			return "", fmt.Errorf("parse integer64 plaintext %q: %w", plainText, err)
-		}
-		ct, err := enc.CipherInt64(dataset, v, nil)
-		if err != nil {
-			return "", err
-		}
-		return strconv.FormatInt(ct, 10), nil
-
-	case "date":
-		v, err := parseDateTestString(plainText)
-		if err != nil {
-			return "", fmt.Errorf("parse date plaintext %q: %w", plainText, err)
-		}
-		ct, err := enc.CipherDate(dataset, v, nil)
-		if err != nil {
-			return "", err
-		}
-		return formatDateTestString(ct), nil
-
-	case "datetime":
-		v, err := parseDateTimeTestString(plainText)
-		if err != nil {
-			return "", fmt.Errorf("parse datetime plaintext %q: %w", plainText, err)
-		}
-		ct, err := enc.CipherDateTime(dataset, v, nil)
-		if err != nil {
-			return "", err
-		}
-		return formatDateTimeTestString(ct), nil
-
-	default:
-		// String-based datasets (generic_string_*, token*, etc.)
-		return enc.Cipher(dataset, plainText, nil)
-	}
-}
-
-// inferredDecrypt decrypts a ciphertext string using the appropriate typed API
-// based on the dataset name, and returns the plaintext as a string.
-func inferredDecrypt(dec *StructuredDecryption, dataset, cipherText string) (string, error) {
-	switch dataset {
-	case "integer32":
-		v, err := strconv.ParseInt(cipherText, 10, 32)
-		if err != nil {
-			return "", fmt.Errorf("parse integer32 ciphertext %q: %w", cipherText, err)
-		}
-		pt, err := dec.DecipherInt32(dataset, int32(v), nil)
-		if err != nil {
-			return "", err
-		}
-		return strconv.FormatInt(int64(pt), 10), nil
-
-	case "integer64":
-		v, err := strconv.ParseInt(cipherText, 10, 64)
-		if err != nil {
-			return "", fmt.Errorf("parse integer64 ciphertext %q: %w", cipherText, err)
-		}
-		pt, err := dec.DecipherInt64(dataset, v, nil)
-		if err != nil {
-			return "", err
-		}
-		return strconv.FormatInt(pt, 10), nil
-
-	case "date":
-		v, err := parseDateTestString(cipherText)
-		if err != nil {
-			return "", fmt.Errorf("parse date ciphertext %q: %w", cipherText, err)
-		}
-		pt, err := dec.DecipherDate(dataset, v, nil)
-		if err != nil {
-			return "", err
-		}
-		return formatDateTestString(pt), nil
-
-	case "datetime":
-		v, err := parseDateTimeTestString(cipherText)
-		if err != nil {
-			return "", fmt.Errorf("parse datetime ciphertext %q: %w", cipherText, err)
-		}
-		pt, err := dec.DecipherDateTime(dataset, v, nil)
-		if err != nil {
-			return "", err
-		}
-		return formatDateTimeTestString(pt), nil
-
-	default:
-		return dec.Cipher(dataset, cipherText, nil)
-	}
-}
 
 // TestStructuredTypedFiles loads test vector JSON files from load_time/DATA/types/
 // and tests encrypt/decrypt for all data types (int32, int64, date, datetime, string, token).
@@ -176,9 +40,33 @@ func TestStructuredTypedFiles(t *testing.T) {
 	}
 	defer dec.Close()
 
-	// Pre-load all typed datasets into cache to avoid per-request API calls
-	// and prevent hitting the rate limit (500 req/60s)
-	typedDatasets := []string{"integer32", "integer64", "date", "datetime", "generic_string", "generic_string_32", "generic_string_64", "token64", "token128"}
+	// First pass: read every fixture and collect the unique dataset names so we
+	// can batch-warm the cache (avoids hitting the 500 req/60s rate limit).
+	type fileRecords struct {
+		path    string
+		records []StructuredTestRecord
+	}
+	var loaded []fileRecords
+	datasetSet := make(map[string]struct{})
+	for _, infile := range foundFiles {
+		raw, err := os.ReadFile(infile)
+		if err != nil {
+			t.Skipf("cannot read %s: %v", infile, err)
+		}
+		var records []StructuredTestRecord
+		if err := json.Unmarshal(raw, &records); err != nil {
+			t.Skipf("cannot parse %s: %v", infile, err)
+		}
+		loaded = append(loaded, fileRecords{infile, records})
+		for _, r := range records {
+			datasetSet[r.Dataset] = struct{}{}
+		}
+	}
+
+	typedDatasets := make([]string, 0, len(datasetSet))
+	for name := range datasetSet {
+		typedDatasets = append(typedDatasets, name)
+	}
 	if err := enc.LoadCache(typedDatasets); err != nil {
 		t.Fatalf("LoadCache(enc): %v", err)
 	}
@@ -186,45 +74,28 @@ func TestStructuredTypedFiles(t *testing.T) {
 		t.Fatalf("LoadCache(dec): %v", err)
 	}
 
-	var ops map[string]*StructuredOperations = make(map[string]*StructuredOperations)
+	ops := make(map[string]*StructuredOperations)
 
-	for _, infile := range foundFiles {
-		t.Logf("Loading file: %v", infile)
+	for _, fr := range loaded {
+		t.Logf("Loading file: %v", fr.path)
 
-		file, err := os.Open(infile)
-		if err != nil {
-			t.Skipf("cannot open %s: %v", infile, err)
-		}
-		defer file.Close()
-
-		raw, err := io.ReadAll(file)
-		if err != nil {
-			t.Skipf("cannot read %s: %v", infile, err)
-		}
-
-		var records []StructuredTestRecord
-		err = json.Unmarshal(raw, &records)
-		if err != nil {
-			t.Skipf("cannot parse %s: %v", infile, err)
-		}
-
-		for i := range records {
-			rec := &records[i]
+		for i := range fr.records {
+			rec := &fr.records[i]
 
 			op, ok := ops[rec.Dataset]
 			if !ok {
 				var _op StructuredOperations
 				ops[rec.Dataset] = &_op
 				op = &_op
-				// Warm up cache with one encrypt/decrypt
-				inferredEncrypt(enc, rec.Dataset, rec.Plaintext)
-				inferredDecrypt(dec, rec.Dataset, rec.Ciphertext)
+				// Warm up the dataset-specific pipeline state with one round trip
+				enc.inferredCipher(rec.Dataset, rec.Plaintext, nil)
+				dec.inferredDecipher(rec.Dataset, rec.Ciphertext, nil)
 			}
 
 			t.Run(fmt.Sprintf("%s/%d", rec.Dataset, i), func(t *testing.T) {
 				// Test encryption: plaintext → ciphertext
 				beg := time.Now()
-				ct, err := inferredEncrypt(enc, rec.Dataset, rec.Plaintext)
+				ct, err := enc.inferredCipher(rec.Dataset, rec.Plaintext, nil)
 				if err != nil {
 					t.Fatalf("encrypt(%s, %q): %v", rec.Dataset, rec.Plaintext, err)
 				}
@@ -236,7 +107,7 @@ func TestStructuredTypedFiles(t *testing.T) {
 
 				// Test decryption: ciphertext → plaintext
 				beg = time.Now()
-				pt, err := inferredDecrypt(dec, rec.Dataset, rec.Ciphertext)
+				pt, err := dec.inferredDecipher(rec.Dataset, rec.Ciphertext, nil)
 				if err != nil {
 					t.Fatalf("decrypt(%s, %q): %v", rec.Dataset, rec.Ciphertext, err)
 				}
