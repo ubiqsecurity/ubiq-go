@@ -184,16 +184,16 @@ There are three flavors:
 With the self-signed provider no external IDP login happens. The library signs a
 short-lived RS256 token locally with your RSA private key and exchanges it at the
 Ubiq SSO endpoint for an API certificate. The identity becomes the token's
-`email` claim, which the server matches against the directory user (or API key)
-under the configured directory (`ubiq_customer_id`).
+`email` claim, which the server matches against the user (or API key)
+under the configured `ubiq_customer_id`.
 
 The RSA key pair is created for you when you enable self-signed IDP in the Ubiq
-dashboard: the public key is stored on your directory and the private key is
+dashboard: the public key is registered with Ubiq and the private key is
 shown to you once. Save that private key (Ubiq does not keep a copy) as
 `selfsign_priv.pem` next to the example. Do not generate your own key here: a key
-whose public half is not registered on the directory will fail verification.
+whose public half is not registered with Ubiq will fail verification.
 
-Edit `configuration.selfsigned` (provider + directory UUID) and the constants at
+Edit `configuration.selfsigned` (provider + `ubiq_customer_id`) and the constants at
 the top of `self_signed.go` (`identity`, `dataset`, `plaintext`), then run it:
 
 ```sh
@@ -201,14 +201,14 @@ $ cd ubiq-go/examples/self_signed
 $ go run self_signed.go
 ```
 
-The configuration file is just the provider and the directory UUID
+The configuration file is just the provider and the `ubiq_customer_id`
 (`configuration.selfsigned` in this directory is a starting point):
 
 ```json
 {
   "idp": {
     "provider": "ubiq",
-    "ubiq_customer_id": "REPLACE-WITH-YOUR-DIRECTORY-UUID"
+    "ubiq_customer_id": "REPLACE-WITH-YOUR-UBIQ-CUSTOMER-UUID"
   }
 }
 ```
@@ -222,7 +222,7 @@ certificate, and returns Credentials usable with the regular structured API.
 
 The password lives in the credentials file (not in source). Fill in
 `configuration.idp` (provider, tenant id, client secret, token endpoint,
-directory UUID) and the `credentials` file (`IDP_USERNAME` / `IDP_PASSWORD`),
+`ubiq_customer_id`) and the `credentials` file (`IDP_USERNAME` / `IDP_PASSWORD`),
 then run it:
 
 ```sh
@@ -243,7 +243,7 @@ IDP_PASSWORD = REPLACE-WITH-YOUR-IDP-PASSWORD
 Use this when your application already has a JWT from its own IDP integration.
 You pass the JWT straight to the JWT-based structured API
 (`StructuredEncryptJwt` / `StructuredDecryptJwt`); the SDK performs no login. The
-configuration only needs the directory (`ubiq_customer_id`) the token belongs to.
+configuration only needs the `ubiq_customer_id` the token belongs to.
 
 The JWT is read from the environment (it is a short-lived secret, not config):
 

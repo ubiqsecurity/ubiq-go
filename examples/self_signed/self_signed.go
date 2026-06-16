@@ -8,8 +8,8 @@
 // regular StructuredEncryption / StructuredDecryption API.
 //
 // The identity is placed into the token's "email" claim, which the server uses
-// to find the matching directory user (or API key) under the configured
-// directory (ubiq_customer_id).
+// to find the matching user (or API key) under the configured
+// ubiq_customer_id.
 //
 // To run it, edit the constants below (and configuration.selfsigned), provide
 // an RSA private key PEM, then:
@@ -26,15 +26,15 @@ import (
 )
 
 const (
-	// configFile sets provider ("ubiq") and ubiq_customer_id (directory UUID).
+	// configFile sets provider ("ubiq") and ubiq_customer_id.
 	configFile = "configuration.selfsigned"
 	// keyFile is the RSA private key (PEM) used to sign the local token. This is
 	// the private key the Ubiq dashboard showed you once when you enabled
-	// self-signed IDP; its public half is stored on your directory. Do not
+	// self-signed IDP; its public half is registered with Ubiq. Do not
 	// generate a new key here. Keeping it in its own file avoids escaping PEM
 	// into JSON.
 	keyFile = "selfsign_priv.pem"
-	// identity becomes the token's email claim (the directory user to match).
+	// identity becomes the token's email claim (the user to match).
 	identity = "user@example.test"
 
 	dataset   = "SSN"

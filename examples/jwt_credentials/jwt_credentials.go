@@ -3,8 +3,8 @@
 //
 // You pass that JWT straight to the JWT-based structured API
 // (StructuredEncryptJwt / StructuredDecryptJwt); the SDK does not perform any
-// IDP login. The server identifies the user from the token and the configured
-// directory (ubiq_customer_id).
+// IDP login. The server identifies the user from the token and the IDP
+// configuration in Ubiq (ubiq_customer_id).
 //
 // If you instead want the SDK to log in for you with a username and password,
 // see examples/idp_user.
@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	// configFile needs the directory the token belongs to (ubiq_customer_id);
+	// configFile needs the ubiq_customer_id the token belongs to;
 	// no client secret or password is required for this flow.
 	configFile = "configuration.idp"
 
