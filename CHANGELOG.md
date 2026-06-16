@@ -1,5 +1,11 @@
 # Changelog
 
+# 2.4.0 - 2026-06-15
+* Added JWT IDP authentication and the JWT-keyed structured API (StructuredEncryptJwt, StructuredDecryptJwt, and related functions)
+* Added self-signed ("Ubiq" provider) IDP authentication
+* Added IDP credentials via the credentials file, environment variables, and CredentialsParams
+* Added runnable examples for the self-signed, username/password, and JWT IDP flows
+
 # 2.3.1 - 2026-06-17
 * Fixed an out-of-charset panic by validating input against the dataset character set before FF1 encryption
 
