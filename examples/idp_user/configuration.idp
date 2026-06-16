@@ -1,0 +1,13 @@
+{
+  "idp": {
+    "provider": "okta",
+    "ubiq_customer_id": "REPLACE-WITH-YOUR-DIRECTORY-UUID",
+    "idp_tenant_id": "REPLACE-WITH-YOUR-IDP-CLIENT-ID",
+    "idp_client_secret": "REPLACE-WITH-YOUR-IDP-CLIENT-SECRET",
+    "idp_token_endpoint_url": "https://your-idp.example.com/oauth2/v1/token"
+  },
+  "key_caching": {
+    "structured": true,
+    "ttl_seconds": 1800
+  }
+}

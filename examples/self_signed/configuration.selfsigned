@@ -1,0 +1,10 @@
+{
+  "idp": {
+    "provider": "ubiq",
+    "ubiq_customer_id": "REPLACE-WITH-YOUR-DIRECTORY-UUID"
+  },
+  "key_caching": {
+    "structured": true,
+    "ttl_seconds": 1800
+  }
+}

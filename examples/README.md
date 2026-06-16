@@ -161,3 +161,94 @@ $ ./ubiq_structured_sample -c credentials -P unittest -n SSN -d 200-0N-nphF
 ```sh
 $ ./ubiq_structured_sample -c ./credentials -P default -n SSN -e 123-45-6789 -s
 ```
+
+### IDP-based Structured Encryption
+
+These examples authenticate through an Identity Provider instead of static API
+credentials. Each is kept deliberately short: the inputs live in a JSON
+configuration file (and a couple of `const` values at the top of each program),
+so the file reads as a straight-line demonstration of the SDK calls. Edit the
+config and constants, then `go run` it.
+
+There are three flavors:
+
+- Self-signed ("Ubiq" provider), where the library mints and signs a short-lived
+  token locally, see `examples/self_signed`.
+- External IDP (Okta / Entra) with a username and password, where the SDK logs
+  in for you, see `examples/idp_user`.
+- External IDP JWT, where you already hold a JWT and hand it to the SDK, see
+  `examples/jwt_credentials`.
+
+#### Self-Signed IDP
+
+With the self-signed provider no external IDP login happens. The library signs a
+short-lived RS256 token locally with your RSA private key and exchanges it at the
+Ubiq SSO endpoint for an API certificate. The identity becomes the token's
+`email` claim, which the server matches against the directory user (or API key)
+under the configured directory (`ubiq_customer_id`).
+
+The RSA key pair is created for you when you enable self-signed IDP in the Ubiq
+dashboard: the public key is stored on your directory and the private key is
+shown to you once. Save that private key (Ubiq does not keep a copy) as
+`selfsign_priv.pem` next to the example. Do not generate your own key here: a key
+whose public half is not registered on the directory will fail verification.
+
+Edit `configuration.selfsigned` (provider + directory UUID) and the constants at
+the top of `self_signed.go` (`identity`, `dataset`, `plaintext`), then run it:
+
+```sh
+$ cd ubiq-go/examples/self_signed
+$ go run self_signed.go
+```
+
+The configuration file is just the provider and the directory UUID
+(`configuration.selfsigned` in this directory is a starting point):
+
+```json
+{
+  "idp": {
+    "provider": "ubiq",
+    "ubiq_customer_id": "REPLACE-WITH-YOUR-DIRECTORY-UUID"
+  }
+}
+```
+
+#### External IDP (username + password)
+
+Here the SDK does the IDP login for you. `CredentialsParams.Build()` reads
+`IDP_USERNAME` / `IDP_PASSWORD` from a credentials file, performs an OAuth
+password-grant login against the configured IDP, exchanges the result for an API
+certificate, and returns Credentials usable with the regular structured API.
+
+The password lives in the credentials file (not in source). Fill in
+`configuration.idp` (provider, tenant id, client secret, token endpoint,
+directory UUID) and the `credentials` file (`IDP_USERNAME` / `IDP_PASSWORD`),
+then run it:
+
+```sh
+$ cd ubiq-go/examples/idp_user
+$ go run idp_user.go
+```
+
+The credentials file is the usual INI format with the IDP login under a profile:
+
+```ini
+[default]
+IDP_USERNAME = user@example.com
+IDP_PASSWORD = REPLACE-WITH-YOUR-IDP-PASSWORD
+```
+
+#### External IDP (JWT)
+
+Use this when your application already has a JWT from its own IDP integration.
+You pass the JWT straight to the JWT-based structured API
+(`StructuredEncryptJwt` / `StructuredDecryptJwt`); the SDK performs no login. The
+configuration only needs the directory (`ubiq_customer_id`) the token belongs to.
+
+The JWT is read from the environment (it is a short-lived secret, not config):
+
+```sh
+$ cd ubiq-go/examples/jwt_credentials
+$ export IDP_JWT="eyJ..."
+$ go run jwt_credentials.go
+```
