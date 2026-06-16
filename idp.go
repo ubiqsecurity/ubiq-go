@@ -348,6 +348,23 @@ func (c *Credentials) renewIdpCert() (string, error) {
 	return c.idpBase64Cert, nil
 }
 
+// validateIdpToken forces an SSO exchange using the currently stored IDP token,
+// regardless of whether the existing cert is still valid. The exchange is the
+// validation: the server rejects (401) a token that is invalid or expired, so a
+// nil return means the stored token was accepted. Used by the JWT object cache
+// to validate a freshly presented token instead of trusting it until the cert
+// happens to expire.
+func (c *Credentials) validateIdpToken() error {
+	if c.idpRenewMu != nil {
+		c.idpRenewMu.Lock()
+		defer c.idpRenewMu.Unlock()
+	}
+	if err := c.getIdpTokenAndCert(); err != nil {
+		return fmt.Errorf("unable to validate IDP token: %w", err)
+	}
+	return nil
+}
+
 func (c Credentials) getSso(accessToken, csr string) (SsoResponse, error) {
 	client := &http.Client{}
 	host, _ := c.host()

@@ -16,8 +16,8 @@ import (
 //     tracking events flush at process exit. This matches the multi-tenant
 //     server use case where the process is long lived.
 //   - A cached object is shared across goroutines for the same identity; the
-//     mutex below only guards cache lookup/creation and the stored-token
-//     refresh, not the encryption work itself.
+//     mutex below only guards cache lookup/creation and the per-token
+//     validation, not the encryption work itself.
 var (
 	jwtStructMu sync.Mutex
 	jwtObjects  = map[string]*jwtEntry{}
@@ -28,9 +28,9 @@ var (
 // write the same underlying key/dataset cache.
 type jwtEntry struct {
 	creds Credentials
-	// lastJwt is the most recently presented raw token, kept so the next
-	// cert renewal uses a fresh token instead of the one the entry was
-	// built with.
+	// lastJwt is the most recent token that was accepted by the server. A
+	// different token triggers a fresh server-side validation before it is
+	// adopted (see jwtEntryLocked).
 	lastJwt string
 	enc     *StructuredEncryption // nil until the first encrypt call
 	dec     *StructuredDecryption // nil until the first decrypt call
@@ -58,11 +58,22 @@ func jwtCacheKey(jwt string) (string, error) {
 func jwtEntryLocked(key, jwt string, cfg *Configuration) (*jwtEntry, error) {
 	if entry, ok := jwtObjects[key]; ok {
 		if jwt != entry.lastJwt {
-			entry.lastJwt = jwt
+			// A different token for a known identity is validated against the
+			// server before it is adopted, rather than trusting it until the
+			// existing cert expires. On failure the last accepted token is
+			// kept so the cached objects stay usable.
+			prev := entry.lastJwt
 			entry.creds.setIdpJwt(jwt)
+			if err := entry.creds.validateIdpToken(); err != nil {
+				entry.creds.setIdpJwt(prev)
+				return nil, err
+			}
+			entry.lastJwt = jwt
 		}
 		return entry, nil
 	}
+	// New identity: Build performs the initial SSO exchange, which validates
+	// the token.
 	creds, err := (&CredentialsParams{IdpJwt: jwt, Config: cfg}).Build()
 	if err != nil {
 		return nil, err
