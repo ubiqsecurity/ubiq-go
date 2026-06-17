@@ -1,5 +1,8 @@
 # Changelog
 
+# 2.3.1 - 2026-06-17
+* Fixed an out-of-charset panic by validating input against the dataset character set before FF1 encryption
+
 # 2.3.0 - 2026-02-26
 * Added support for new data types: int32, int64, date, datetime, generic_string, and token
 * Added pipeline architecture for structured encryption operations
