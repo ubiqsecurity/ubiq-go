@@ -1,6 +1,6 @@
 # Changelog
 
-# 2.4.0 - 2026-06-15
+# 2.4.0-rc.1 - 2026-06-17
 * Added JWT IDP authentication and the JWT-keyed structured API (StructuredEncryptJwt, StructuredDecryptJwt, and related functions)
 * Added self-signed ("Ubiq" provider) IDP authentication
 * Added IDP credentials via the credentials file, environment variables, and CredentialsParams
