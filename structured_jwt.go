@@ -36,21 +36,23 @@ type jwtEntry struct {
 	dec     *StructuredDecryption // nil until the first decrypt call
 }
 
-// jwtCacheKey resolves the identity used to cache objects for a JWT. It prefers
-// the subject claim, matching how the multi-tenant flow keys users.
-func jwtCacheKey(jwt string) (string, error) {
+// jwtCacheKey resolves the identity used to cache objects for a JWT. It uses the
+// same provider-aware resolution as the credential identity so a cached entry is
+// keyed by the same value the server resolves the user to.
+func jwtCacheKey(jwt, provider string) (string, error) {
 	claims, err := parseJwt(jwt)
 	if err != nil {
 		return "", err
 	}
-	name := claims.Sub
-	if name == "" {
-		name = claims.UniqueName
+	return claims.identity(provider), nil
+}
+
+// providerOf returns the IDP provider from cfg, tolerating a nil configuration.
+func providerOf(cfg *Configuration) string {
+	if cfg == nil {
+		return ""
 	}
-	if name == "" {
-		name = claims.Email
-	}
-	return name, nil
+	return cfg.Idp.Provider
 }
 
 // jwtEntryLocked returns (building and caching if necessary) the cache entry
@@ -84,7 +86,7 @@ func jwtEntryLocked(key, jwt string, cfg *Configuration) (*jwtEntry, error) {
 }
 
 func getStructEncByJwt(jwt string, cfg *Configuration) (*StructuredEncryption, error) {
-	key, err := jwtCacheKey(jwt)
+	key, err := jwtCacheKey(jwt, providerOf(cfg))
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +109,7 @@ func getStructEncByJwt(jwt string, cfg *Configuration) (*StructuredEncryption, e
 }
 
 func getStructDecByJwt(jwt string, cfg *Configuration) (*StructuredDecryption, error) {
-	key, err := jwtCacheKey(jwt)
+	key, err := jwtCacheKey(jwt, providerOf(cfg))
 	if err != nil {
 		return nil, err
 	}

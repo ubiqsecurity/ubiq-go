@@ -52,6 +52,50 @@ func TestParseJwt(t *testing.T) {
 	}
 }
 
+func TestJwtClaimsIdentity(t *testing.T) {
+	// claims carrying every relevant field so each case shows the provider
+	// picking its specific claim.
+	full := jwtIdpClaims{
+		Sub:               "00000000-0000-0000-0000-000000000001",
+		UniqueName:        "uname@example.com",
+		PreferredUsername: "puser@example.com",
+		Email:             "email@example.com",
+	}
+
+	cases := []struct {
+		name     string
+		provider string
+		claims   jwtIdpClaims
+		want     string
+	}{
+		// Mirrors the backend resolution per provider.
+		{name: "self-signed -> email", provider: "selfsigned", claims: full, want: "email@example.com"},
+		{name: "ubiq alias -> email", provider: "ubiq", claims: full, want: "email@example.com"},
+		{name: "okta -> sub", provider: "okta", claims: full, want: "00000000-0000-0000-0000-000000000001"},
+		{name: "okta case-insensitive -> sub", provider: "OKTA", claims: full, want: "00000000-0000-0000-0000-000000000001"},
+		{name: "entra -> unique_name", provider: "entra", claims: full, want: "uname@example.com"},
+		{
+			// preferred_username fallback is deferred until the app-server
+			// change merges, so entra without unique_name resolves to empty.
+			name:     "entra without unique_name (preferred_username fallback deferred)",
+			provider: "entra",
+			claims:   jwtIdpClaims{Sub: "guid", PreferredUsername: "puser@example.com"},
+			want:     "",
+		},
+		// Unknown/unset provider mirrors the backend, which has no fallback branch.
+		{name: "unknown provider resolves empty", provider: "", claims: full, want: ""},
+		{name: "unrecognized provider resolves empty", provider: "auth0", claims: full, want: ""},
+		{name: "empty when nothing present", provider: "entra", claims: jwtIdpClaims{}, want: ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.claims.identity(tc.provider); got != tc.want {
+				t.Errorf("identity(%q) = %q, want %q", tc.provider, got, tc.want)
+			}
+		})
+	}
+}
+
 func TestParseJwtInvalid(t *testing.T) {
 	if _, err := parseJwt("not-a-jwt"); err == nil {
 		t.Error("expected error for token without a payload segment")

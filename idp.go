@@ -33,10 +33,43 @@ type SsoResponse struct {
 // jwtIdpClaims holds the subset of JWT payload claims the library uses to
 // identify the user behind a token.
 type jwtIdpClaims struct {
-	Sub        string `json:"sub"`
-	UniqueName string `json:"unique_name"`
-	Email      string `json:"email"`
-	Exp        int64  `json:"exp"`
+	Sub               string `json:"sub"`
+	UniqueName        string `json:"unique_name"`
+	PreferredUsername string `json:"preferred_username"`
+	Email             string `json:"email"`
+	Exp               int64  `json:"exp"`
+}
+
+// identity returns the local identifier for the token, mirroring exactly how the
+// backend resolves the user from the configured IDP provider:
+//
+//	self-signed -> email
+//	okta        -> sub
+//	entra       -> unique_name (||preferred_username deferred, see below)
+//
+// For OIDC id tokens sub is a globally unique opaque identifier rather than the
+// user's name, which is why entra uses the username claim. The authoritative
+// user match always happens server-side from the token itself; this value is
+// only used locally for caching and identity keying. An unrecognized provider
+// returns "" to mirror the backend, which has no fallback branch.
+func (c jwtIdpClaims) identity(provider string) string {
+	switch {
+	case isSelfSignedProvider(provider):
+		return c.Email
+	case strings.EqualFold(provider, "okta"):
+		return c.Sub
+	case strings.EqualFold(provider, "entra"):
+		// TODO(next release): fall back to preferred_username when unique_name
+		// is absent (OIDC id tokens), once the matching app-server change that
+		// resolves preferred_username is merged. Until then entra stays in
+		// lockstep with the live backend, which uses unique_name only.
+		//   if c.UniqueName != "" {
+		//       return c.UniqueName
+		//   }
+		//   return c.PreferredUsername
+		return c.UniqueName
+	}
+	return ""
 }
 
 // parseJwt decodes the (unverified) payload of a JWT and returns the claims
@@ -237,14 +270,7 @@ func (c *Credentials) getIdpTokenAndCert() error {
 		}
 		// Identify the user locally (used for caching/identity). The
 		// authoritative match happens server-side from the token itself.
-		name := claims.UniqueName
-		if name == "" {
-			name = claims.Sub
-		}
-		if name == "" {
-			name = claims.Email
-		}
-		c.setParam(credentialsIdpUsernameId, name)
+		c.setParam(credentialsIdpUsernameId, claims.identity(c.config.Idp.Provider))
 	case idpModeSelfSigned:
 		token, err = c.makeSelfSignedToken()
 		if err != nil {
