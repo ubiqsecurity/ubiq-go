@@ -2,10 +2,8 @@ package ubiq
 
 import (
 	"bytes"
-	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/sha256"
 	"crypto/x509"
 	"crypto/x509/pkix"
 
@@ -18,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/youmark/pkcs8"
 )
 
@@ -75,15 +74,14 @@ func (c Credentials) makeSelfSignedToken() (string, error) {
 		return "", fmt.Errorf("self-signed IDP requires self_sign_key in the configuration")
 	}
 
-	privateKey, err := parseRsaPrivateKey(c.config.Idp.SelfSignKey)
+	privateKey, err := jwt.ParseRSAPrivateKeyFromPEM([]byte(c.config.Idp.SelfSignKey))
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("invalid self-sign key: %w", err)
 	}
 
 	now := time.Now()
 	notBefore := now.Add(-30 * time.Millisecond).Unix()
-	header := map[string]string{"alg": "RS256", "typ": "JWT"}
-	payload := map[string]interface{}{
+	claims := jwt.MapClaims{
 		"iss":   "Ubiq",
 		"aud":   "",
 		"sub":   identity,
@@ -94,47 +92,8 @@ func (c Credentials) makeSelfSignedToken() (string, error) {
 		"exp":   now.Add(10 * time.Minute).Unix(),
 	}
 
-	headerJSON, err := json.Marshal(header)
-	if err != nil {
-		return "", err
-	}
-	payloadJSON, err := json.Marshal(payload)
-	if err != nil {
-		return "", err
-	}
-
-	signingInput := base64.RawURLEncoding.EncodeToString(headerJSON) +
-		"." + base64.RawURLEncoding.EncodeToString(payloadJSON)
-	hashed := sha256.Sum256([]byte(signingInput))
-	sig, err := rsa.SignPKCS1v15(rand.Reader, privateKey, crypto.SHA256, hashed[:])
-	if err != nil {
-		return "", err
-	}
-
-	return signingInput + "." + base64.RawURLEncoding.EncodeToString(sig), nil
-}
-
-// parseRsaPrivateKey parses a PEM-encoded RSA private key in either PKCS#1 or
-// PKCS#8 form.
-func parseRsaPrivateKey(pemStr string) (*rsa.PrivateKey, error) {
-	block, _ := pem.Decode([]byte(pemStr))
-	if block == nil {
-		return nil, fmt.Errorf("invalid self-sign key: not PEM encoded")
-	}
-
-	if key, err := x509.ParsePKCS1PrivateKey(block.Bytes); err == nil {
-		return key, nil
-	}
-
-	keyIfc, err := x509.ParsePKCS8PrivateKey(block.Bytes)
-	if err != nil {
-		return nil, fmt.Errorf("invalid self-sign key: %w", err)
-	}
-	rsaKey, ok := keyIfc.(*rsa.PrivateKey)
-	if !ok {
-		return nil, fmt.Errorf("self-sign key is not an RSA private key")
-	}
-	return rsaKey, nil
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+	return token.SignedString(privateKey)
 }
 
 // IdpLoginJwt performs an OAuth password-grant login against the external IDP
