@@ -203,7 +203,7 @@ With the self-managed provider the library signs a short-lived token locally ins
 // "idp": {
 //   "provider": "ubiq",
 //   "ubiq_customer_id": "...",
-//   "self_sign_key": "-----BEGIN RSA PRIVATE KEY-----\n...",
+//   "self_sign_key": "<PEM-encoded PKCS#1 RSA private key>",
 //   "self_sign_identity": "user@example.com"
 // }
 credParams := ubiq.CredentialsParams{
