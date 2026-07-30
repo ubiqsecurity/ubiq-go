@@ -749,19 +749,19 @@ func TestStructuredGetCurrentKeyNumber(t *testing.T) {
 	}
 	defer enc.Close()
 
-	// first call may fetch from the server (cache miss)
+	// always fetched from the server
 	kn, err := enc.GetCurrentKeyNumber(dataset)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// second call is served from the cache and must agree
+	// a second call also fetches from the server and must agree
 	kn2, err := enc.GetCurrentKeyNumber(dataset)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if kn != kn2 {
-		t.Fatalf("cached key number %d does not match first result %d", kn2, kn)
+		t.Fatalf("second key number %d does not match first result %d", kn2, kn)
 	}
 
 	// the current key number must match what Cipher uses right now

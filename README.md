@@ -337,7 +337,7 @@ if err != nil {
 fmt.Fprintf(os.Stdout, "ENCRYPTED cipher= %s key number= %d \n", cipherText, keyNumber)
 ```
 
-To find out which key number the encryption object will use for a dataset without encrypting anything, use `GetCurrentKeyNumber`. The result is served from the local cache when the current key is already loaded; otherwise the key is fetched from the server and cached, so a subsequent `Cipher` call will not fetch again. Note that with key caching enabled, a server-side key rotation is not visible until the cached entry expires.
+To find out the current key number for a dataset without encrypting anything, use `GetCurrentKeyNumber`. It always asks the server, so a server-side key rotation is visible immediately. The fetched key is also stored in the local cache, so a subsequent `Cipher` call on the same dataset encrypts with the newest key.
 
 ```go
 keyNumber, err := enc.GetCurrentKeyNumber(datasetName)
