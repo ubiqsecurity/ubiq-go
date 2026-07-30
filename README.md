@@ -325,6 +325,30 @@ fmt.Fprintf(os.Stdout, "ENCRYPTED cipher= %v \n", cipherTextArr)
 // ENCRYPTED cipher= ["000-03-OJMp", "100-0B-dnKG", "200-12-NOx5", "300-0j-esgH"]
 ```
 
+### Key Numbers
+
+Every structured ciphertext embeds the number (version) of the key it was encrypted with. To get the key number along with the ciphertext, use `CipherAndKeyNumber`. It behaves exactly like `Cipher` with the key number added as a second return value.
+
+```go
+cipherText, keyNumber, err := enc.CipherAndKeyNumber(datasetName, plainText, nil)
+if err != nil {
+    return err
+}
+fmt.Fprintf(os.Stdout, "ENCRYPTED cipher= %s key number= %d \n", cipherText, keyNumber)
+```
+
+To find out which key number the encryption object will use for a dataset without encrypting anything, use `GetCurrentKeyNumber`. The result is served from the local cache when the current key is already loaded; otherwise the key is fetched from the server and cached, so a subsequent `Cipher` call will not fetch again. Note that with key caching enabled, a server-side key rotation is not visible until the cached entry expires.
+
+```go
+keyNumber, err := enc.GetCurrentKeyNumber(datasetName)
+if err != nil {
+    return err
+}
+fmt.Fprintf(os.Stdout, "current key number= %d \n", keyNumber)
+```
+
+Together these can be used to detect data encrypted with an outdated key and re-encrypt it with the current one.
+
 ### Decrypt
 
 Pass credentials, the name of a structured dataset, and data into the decryption function.

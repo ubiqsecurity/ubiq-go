@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strconv"
 	"sync"
 	"testing"
-	"path/filepath"
 	"time"
 )
 
@@ -553,7 +553,7 @@ func TestLoadCacheTTLRefresh(t *testing.T) {
 	// This mirrors the Java test that validates TTL refresh behavior
 
 	initializeCreds()
-	
+
 	// Use a test-specific config with short TTL
 	config, err := NewConfiguration()
 	if err != nil {
@@ -562,11 +562,11 @@ func TestLoadCacheTTLRefresh(t *testing.T) {
 	config.KeyCaching.Structured = true
 	config.KeyCaching.TTLSeconds = 3 // 3 second TTL (matches Java test)
 	config.KeyCaching.Encrypt = false
-	
+
 	// Create new credentials with custom config
 	testCreds := credentials
 	testCreds.config = &config
-	
+
 	// Initialize cache with new TTL
 	testCreds.cache, err = NewCache(&config)
 	if err != nil {
@@ -666,5 +666,111 @@ func TestEmptyStringDecryption(t *testing.T) {
 		// If we got a different error (like dataset compatibility),
 		// that's fine - we just want to ensure no panic occurred
 		t.Logf("Got error (no panic): %v", err)
+	}
+}
+
+// decode the key number embedded in a structured ciphertext by
+// stripping passthrough characters and decoding the first remaining
+// character against the dataset's output alphabet
+func decodeCiphertextKeyNumber(dataset datasetInfo, ct string) int {
+	var stripped []rune
+	for _, c := range ct {
+		if dataset.PassthroughAlphabet.PosOf(c) < 0 {
+			stripped = append(stripped, c)
+		}
+	}
+
+	_, kn := decodeKeyNumber(stripped, &dataset.OutputAlphabet,
+		dataset.NumEncodingBits)
+	return kn
+}
+
+func TestStructuredCipherAndKeyNumber(t *testing.T) {
+	const dataset = "ALPHANUM_SSN"
+	const pt = "123-45-6789"
+
+	initializeCreds()
+
+	enc, err := NewStructuredEncryption(credentials)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer enc.Close()
+
+	dec, err := NewStructuredDecryption(credentials)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer dec.Close()
+
+	ct, kn, err := enc.CipherAndKeyNumber(dataset, pt, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// the ciphertext must still decrypt back to the plaintext
+	rt, err := dec.Cipher(dataset, ct, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pt != rt {
+		t.Fatalf("bad recovered plaintext: \"%s\" vs. \"%s\"", pt, rt)
+	}
+
+	// the returned key number must match the one embedded in the ciphertext
+	dsInfo, err := ((*structuredContext)(enc)).fetchDataset(dataset)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if embedded := decodeCiphertextKeyNumber(dsInfo, ct); embedded != kn {
+		t.Fatalf("returned key number %d does not match embedded key number %d",
+			kn, embedded)
+	}
+
+	// encrypting with the returned key number must reproduce the ciphertext
+	ct2, err := enc.CipherWithKeyNumber(dataset, pt, nil, kn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ct != ct2 {
+		t.Fatalf("ciphertext mismatch for key number %d: \"%s\" vs. \"%s\"",
+			kn, ct, ct2)
+	}
+}
+
+func TestStructuredGetCurrentKeyNumber(t *testing.T) {
+	const dataset = "ALPHANUM_SSN"
+
+	initializeCreds()
+
+	enc, err := NewStructuredEncryption(credentials)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer enc.Close()
+
+	// first call may fetch from the server (cache miss)
+	kn, err := enc.GetCurrentKeyNumber(dataset)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// second call is served from the cache and must agree
+	kn2, err := enc.GetCurrentKeyNumber(dataset)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if kn != kn2 {
+		t.Fatalf("cached key number %d does not match first result %d", kn2, kn)
+	}
+
+	// the current key number must match what Cipher uses right now
+	_, encKn, err := enc.CipherAndKeyNumber(dataset, "123-45-6789", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if kn != encKn {
+		t.Fatalf("GetCurrentKeyNumber %d does not match Cipher key number %d",
+			kn, encKn)
 	}
 }

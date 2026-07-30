@@ -866,6 +866,16 @@ func NewStructuredEncryption(c Credentials) (*StructuredEncryption, error) {
 // @twk may be nil, in which case, the default will be used
 func (fe *StructuredEncryption) Cipher(datasetName, pt string, twk []byte) (
 	ct string, err error) {
+	ct, _, err = fe.CipherAndKeyNumber(datasetName, pt, twk)
+	return
+}
+
+// CipherAndKeyNumber encrypts a plaintext string like Cipher and also
+// returns the key number (key version) the ciphertext was encrypted with.
+//
+// @twk may be nil, in which case, the default will be used
+func (fe *StructuredEncryption) CipherAndKeyNumber(datasetName, pt string, twk []byte) (
+	ct string, keyNumber int, err error) {
 	dataset, err := ((*structuredContext)(fe)).fetchDataset(datasetName)
 	if err != nil {
 		return
@@ -891,7 +901,7 @@ func (fe *StructuredEncryption) Cipher(datasetName, pt string, twk []byte) (
 		trackingActionEncrypt,
 		1, kn)
 
-	return ct, nil
+	return ct, kn, nil
 }
 
 // CipherWithKeyNumber encrypts a plaintext string using a specific key number.
@@ -949,6 +959,26 @@ func (fe *StructuredEncryption) CipherForSearch(datasetName, pt string, twk []by
 	}
 
 	return
+}
+
+// GetCurrentKeyNumber returns the key number (key version) that this
+// object will use to encrypt data for the given dataset.
+//
+// The result reflects the key as known locally: if key caching is
+// enabled and the current key is already cached, it is returned from
+// the cache. Otherwise it is fetched from the server and cached, so a
+// subsequent Cipher call on the same dataset will not fetch again.
+//
+// Note: with key caching enabled, a server-side key rotation is not
+// visible until the cached entry expires. The returned value is the key
+// number Cipher would use right now, which may lag the server's newest
+// key by up to the cache TTL.
+func (fe *StructuredEncryption) GetCurrentKeyNumber(datasetName string) (int, error) {
+	key, err := ((*structuredContext)(fe)).fetchKey(datasetName, -1)
+	if err != nil {
+		return 0, err
+	}
+	return key.Num, nil
 }
 
 func (fe *StructuredEncryption) Close() {
