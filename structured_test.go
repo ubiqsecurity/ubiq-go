@@ -822,3 +822,47 @@ func TestStructuredGetKeyNumber(t *testing.T) {
 		t.Fatal("expected error for invalid ciphertext characters")
 	}
 }
+
+func TestStructuredGetKeyNumberWithRules(t *testing.T) {
+	initializeCreds()
+
+	enc, err := NewStructuredEncryption(credentials)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer enc.Close()
+
+	dec, err := NewStructuredDecryption(credentials)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer dec.Close()
+
+	// generic_string and generic_string_32 use passthrough rules
+	// (prefix/suffix), exercising the rule-priority trim path
+	for _, dataset := range []string{"generic_string", "generic_string_32"} {
+		t.Run(dataset, func(t *testing.T) {
+			ct, kn, err := enc.CipherAndKeyNumber(dataset, "abcdefghij", nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			decKn, err := dec.GetKeyNumber(dataset, ct)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if decKn != kn {
+				t.Fatalf("GetKeyNumber %d does not match encryption key number %d",
+					decKn, kn)
+			}
+		})
+	}
+
+	// datasets with a non-string data type must be rejected: decoding
+	// the native string representation would give a wrong key number
+	t.Run("typed_dataset_rejected", func(t *testing.T) {
+		if _, err := dec.GetKeyNumber("integer32", "12345"); err == nil {
+			t.Fatal("expected error for typed dataset")
+		}
+	})
+}

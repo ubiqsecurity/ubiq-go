@@ -990,6 +990,16 @@ func (sC *structuredContext) getKeyNumber(datasetName, ct string) (int, error) {
 		return 0, err
 	}
 
+	// A typed ciphertext must be converted back to its output-alphabet
+	// string form before the key number can be decoded; decoding the
+	// native string representation would silently yield a wrong result.
+	switch dataset.DataType {
+	case "integer", "date", "datetime":
+		return 0, fmt.Errorf(
+			"dataset '%s' has data type '%s': use the typed GetKeyNumber method for this data type",
+			dataset.Name, dataset.DataType)
+	}
+
 	return exec.DecodeKeyNumber(toPipelineDatasetInfo(dataset), ct)
 }
 
@@ -999,6 +1009,12 @@ func (sC *structuredContext) getKeyNumber(datasetName, ct string) (int, error) {
 // Only the dataset definition is required, which is typically served
 // from the local cache. No encryption key is fetched and no usage
 // event is reported.
+//
+// Datasets configured with a non-string data type (integer, date,
+// datetime) are rejected: use the typed GetKeyNumber variants on
+// StructuredDecryption for those. Note that the ciphertext is not
+// authenticated: any input made of in-alphabet characters decodes to
+// some key number.
 func (fe *StructuredEncryption) GetKeyNumber(datasetName, ct string) (int, error) {
 	return ((*structuredContext)(fe)).getKeyNumber(datasetName, ct)
 }
@@ -1082,6 +1098,12 @@ func (fd *StructuredDecryption) Cipher(datasetName, ct string, twk []byte) (
 // Only the dataset definition is required, which is typically served
 // from the local cache. No encryption key is fetched and no usage
 // event is reported.
+//
+// Datasets configured with a non-string data type (integer, date,
+// datetime) are rejected: use the typed GetKeyNumber variants on
+// StructuredDecryption for those. Note that the ciphertext is not
+// authenticated: any input made of in-alphabet characters decodes to
+// some key number.
 func (fd *StructuredDecryption) GetKeyNumber(datasetName, ct string) (int, error) {
 	return ((*structuredContext)(fd)).getKeyNumber(datasetName, ct)
 }
