@@ -146,6 +146,38 @@ func Decrypt(
 	return ctx.CurrentValue, keyNumber, nil
 }
 
+// DecodeKeyNumber extracts the key number embedded in a ciphertext
+// without performing decryption. Only the dataset definition is needed:
+// the ciphertext is trimmed (prefix, suffix, passthrough), validated
+// against the output alphabet, and the key number is decoded from the
+// first remaining character.
+func DecodeKeyNumber(
+	dataset *pipeline.DatasetInfo,
+	ciphertext string,
+) (int, error) {
+	ctx := pipeline.NewOperationContext(dataset, ciphertext, false, nil)
+
+	// Same trim ordering as decryption, but stop after decoding the
+	// key number: ConvertRadix and FF1 are not needed.
+	pre := pipeline.NewPipeline(buildTrimOperations(dataset)...)
+	if _, err := pre.Invoke(ctx); err != nil {
+		return 0, fmt.Errorf("pre-decode failed: %w", err)
+	}
+
+	if _, err := operations.NewValidateCharsetOperation().Invoke(ctx); err != nil {
+		return 0, err
+	}
+
+	if _, err := operations.NewDecodeKeyNumberOperation().Invoke(ctx); err != nil {
+		return 0, err
+	}
+
+	if ctx.KeyNumber == nil {
+		return 0, fmt.Errorf("key number not decoded")
+	}
+	return *ctx.KeyNumber, nil
+}
+
 // parseEncoding converts an input_encoding string to an EncodingType.
 func parseEncoding(encoding string) operations.EncodingType {
 	switch encoding {

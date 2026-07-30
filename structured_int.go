@@ -5,6 +5,8 @@ import (
 	"math"
 	"strconv"
 	"strings"
+
+	"gitlab.com/ubiqsecurity/ubiq-go/v2/structured/pipeline/exec"
 )
 
 // CipherInt64 encrypts an int64 value using format-preserving encryption.
@@ -122,6 +124,52 @@ func (sd *StructuredDecryption) DecipherInt32(datasetName string, cipherInteger 
 	}
 
 	return sC.decryptInt32(dataset, cipherInteger, tweak)
+}
+
+// GetKeyNumberInt64 returns the key number (key version) that the given
+// int64 ciphertext was encrypted with, without decrypting it.
+// The dataset must be configured with data_type="integer" and size=64.
+//
+// Only the dataset definition is required, which is typically served
+// from the local cache. No encryption key is fetched and no usage
+// event is reported.
+func (sd *StructuredDecryption) GetKeyNumberInt64(datasetName string, cipherInteger int64) (int, error) {
+	sC := (*structuredContext)(sd)
+
+	dataset, err := sC.fetchDataset(datasetName)
+	if err != nil {
+		return 0, err
+	}
+
+	if err := sC.validateIntegerDataset(dataset, 64); err != nil {
+		return 0, err
+	}
+
+	return exec.DecodeKeyNumber(toPipelineDatasetInfo(dataset),
+		integerCipherText(dataset, cipherInteger))
+}
+
+// GetKeyNumberInt32 returns the key number (key version) that the given
+// int32 ciphertext was encrypted with, without decrypting it.
+// The dataset must be configured with data_type="integer" and size=32.
+//
+// Only the dataset definition is required, which is typically served
+// from the local cache. No encryption key is fetched and no usage
+// event is reported.
+func (sd *StructuredDecryption) GetKeyNumberInt32(datasetName string, cipherInteger int32) (int, error) {
+	sC := (*structuredContext)(sd)
+
+	dataset, err := sC.fetchDataset(datasetName)
+	if err != nil {
+		return 0, err
+	}
+
+	if err := sC.validateIntegerDataset(dataset, 32); err != nil {
+		return 0, err
+	}
+
+	return exec.DecodeKeyNumber(toPipelineDatasetInfo(dataset),
+		integerCipherText(dataset, int64(cipherInteger)))
 }
 
 // validateIntegerDataset validates the dataset is configured for integer encryption.

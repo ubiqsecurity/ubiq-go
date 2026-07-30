@@ -347,7 +347,23 @@ if err != nil {
 fmt.Fprintf(os.Stdout, "current key number= %d \n", keyNumber)
 ```
 
-Together these can be used to detect data encrypted with an outdated key and re-encrypt it with the current one.
+To find out which key number an existing ciphertext was encrypted with, without decrypting it, use `GetKeyNumber`. It is available on both `StructuredEncryption` and `StructuredDecryption`. Only the dataset definition is needed (typically served from the local cache); no encryption key is fetched, nothing is decrypted, and no usage event is reported.
+
+```go
+keyNumber, err := dec.GetKeyNumber(datasetName, cipherText)
+if err != nil {
+    return err
+}
+fmt.Fprintf(os.Stdout, "cipher text was encrypted with key number= %d \n", keyNumber)
+```
+
+For datasets configured with a non-string data type, `StructuredDecryption` provides typed variants that take the ciphertext in its native type: `GetKeyNumberInt32`, `GetKeyNumberInt64`, `GetKeyNumberDate`, and `GetKeyNumberDateTime`.
+
+```go
+keyNumber, err := dec.GetKeyNumberInt64("integer64", cipherInteger)
+```
+
+Together these can be used to detect data encrypted with an outdated key and re-encrypt it with the current one, for example `dec.GetKeyNumber(datasetName, cipherText) != enc.GetCurrentKeyNumber(datasetName)`.
 
 ### Decrypt
 

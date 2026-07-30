@@ -3,6 +3,8 @@ package ubiq
 import (
 	"fmt"
 	"time"
+
+	"gitlab.com/ubiqsecurity/ubiq-go/v2/structured/pipeline/exec"
 )
 
 // CipherDateTime encrypts a time.Time value using format-preserving encryption.
@@ -115,6 +117,60 @@ func (sd *StructuredDecryption) DecipherDate(datasetName string, cipherDate time
 	}
 
 	return sC.decryptDate(dataset, cipherDate, tweak)
+}
+
+// GetKeyNumberDateTime returns the key number (key version) that the
+// given datetime ciphertext was encrypted with, without decrypting it.
+// The dataset must be configured with data_type="datetime".
+//
+// Only the dataset definition is required, which is typically served
+// from the local cache. No encryption key is fetched and no usage
+// event is reported.
+func (sd *StructuredDecryption) GetKeyNumberDateTime(datasetName string, cipherDateTime time.Time) (int, error) {
+	sC := (*structuredContext)(sd)
+
+	dataset, err := sC.fetchDataset(datasetName)
+	if err != nil {
+		return 0, err
+	}
+
+	if err := sC.validateDateTimeDataset(dataset); err != nil {
+		return 0, err
+	}
+
+	cipherText, err := dateTimeCipherText(dataset, cipherDateTime)
+	if err != nil {
+		return 0, err
+	}
+
+	return exec.DecodeKeyNumber(toPipelineDatasetInfo(dataset), cipherText)
+}
+
+// GetKeyNumberDate returns the key number (key version) that the given
+// date ciphertext was encrypted with, without decrypting it. The date
+// must be UTC and the dataset must be configured with data_type="date".
+//
+// Only the dataset definition is required, which is typically served
+// from the local cache. No encryption key is fetched and no usage
+// event is reported.
+func (sd *StructuredDecryption) GetKeyNumberDate(datasetName string, cipherDate time.Time) (int, error) {
+	sC := (*structuredContext)(sd)
+
+	dataset, err := sC.fetchDataset(datasetName)
+	if err != nil {
+		return 0, err
+	}
+
+	if err := sC.validateDateDataset(dataset); err != nil {
+		return 0, err
+	}
+
+	cipherText, err := dateCipherText(dataset, cipherDate)
+	if err != nil {
+		return 0, err
+	}
+
+	return exec.DecodeKeyNumber(toPipelineDatasetInfo(dataset), cipherText)
 }
 
 // validateDateTimeDataset validates the dataset is configured for datetime encryption.

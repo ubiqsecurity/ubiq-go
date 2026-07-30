@@ -981,6 +981,28 @@ func (fe *StructuredEncryption) GetCurrentKeyNumber(datasetName string) (int, er
 	return key.Num, nil
 }
 
+// getKeyNumber decodes the key number embedded in a ciphertext for the
+// named dataset without decrypting it. Only the dataset definition is
+// needed; no encryption key is fetched and no usage event is reported.
+func (sC *structuredContext) getKeyNumber(datasetName, ct string) (int, error) {
+	dataset, err := sC.fetchDataset(datasetName)
+	if err != nil {
+		return 0, err
+	}
+
+	return exec.DecodeKeyNumber(toPipelineDatasetInfo(dataset), ct)
+}
+
+// GetKeyNumber returns the key number (key version) that the given
+// ciphertext was encrypted with, without decrypting it.
+//
+// Only the dataset definition is required, which is typically served
+// from the local cache. No encryption key is fetched and no usage
+// event is reported.
+func (fe *StructuredEncryption) GetKeyNumber(datasetName, ct string) (int, error) {
+	return ((*structuredContext)(fe)).getKeyNumber(datasetName, ct)
+}
+
 func (fe *StructuredEncryption) Close() {
 	fe.tracking.Close()
 	fe.cache = nil
@@ -1052,6 +1074,16 @@ func (fd *StructuredDecryption) Cipher(datasetName, ct string, twk []byte) (
 		1, retKn)
 
 	return pt, nil
+}
+
+// GetKeyNumber returns the key number (key version) that the given
+// ciphertext was encrypted with, without decrypting it.
+//
+// Only the dataset definition is required, which is typically served
+// from the local cache. No encryption key is fetched and no usage
+// event is reported.
+func (fd *StructuredDecryption) GetKeyNumber(datasetName, ct string) (int, error) {
+	return ((*structuredContext)(fd)).getKeyNumber(datasetName, ct)
 }
 
 func (fd *StructuredDecryption) Close() {

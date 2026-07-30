@@ -774,3 +774,51 @@ func TestStructuredGetCurrentKeyNumber(t *testing.T) {
 			kn, encKn)
 	}
 }
+
+func TestStructuredGetKeyNumber(t *testing.T) {
+	const dataset = "ALPHANUM_SSN"
+	const pt = "123-45-6789"
+
+	initializeCreds()
+
+	enc, err := NewStructuredEncryption(credentials)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer enc.Close()
+
+	dec, err := NewStructuredDecryption(credentials)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer dec.Close()
+
+	ct, kn, err := enc.CipherAndKeyNumber(dataset, pt, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// both objects must decode the same key number from the ciphertext
+	decKn, err := dec.GetKeyNumber(dataset, ct)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if decKn != kn {
+		t.Fatalf("GetKeyNumber %d does not match encryption key number %d",
+			decKn, kn)
+	}
+
+	encKn, err := enc.GetKeyNumber(dataset, ct)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if encKn != kn {
+		t.Fatalf("GetKeyNumber %d does not match encryption key number %d",
+			encKn, kn)
+	}
+
+	// characters outside the output alphabet must error, not panic
+	if _, err = dec.GetKeyNumber(dataset, "€€€-€€-€€€€"); err == nil {
+		t.Fatal("expected error for invalid ciphertext characters")
+	}
+}
