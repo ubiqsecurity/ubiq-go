@@ -165,7 +165,11 @@ type ruleWithOperation struct {
 	operation pipeline.Operation
 }
 
-func buildPrePipeline(ds *pipeline.DatasetInfo) *pipeline.Pipeline {
+// buildTrimOperations returns the trim operations (prefix, suffix,
+// passthrough) in the order dictated by the dataset's passthrough rules.
+// This ordering is shared by encryption, decryption, and key number
+// decoding.
+func buildTrimOperations(ds *pipeline.DatasetInfo) []pipeline.Operation {
 	var ops []pipeline.Operation
 
 	// If PassthroughRules is defined, use priority-based sorting
@@ -221,7 +225,11 @@ func buildPrePipeline(ds *pipeline.DatasetInfo) *pipeline.Pipeline {
 		}
 	}
 
-	return pipeline.NewPipeline(ops...)
+	return ops
+}
+
+func buildPrePipeline(ds *pipeline.DatasetInfo) *pipeline.Pipeline {
+	return pipeline.NewPipeline(buildTrimOperations(ds)...)
 }
 
 func buildPostEncryptPipeline(ds *pipeline.DatasetInfo) *pipeline.Pipeline {
@@ -291,60 +299,7 @@ func buildPostEncryptPipeline(ds *pipeline.DatasetInfo) *pipeline.Pipeline {
 }
 
 func buildPreDecryptPipeline(ds *pipeline.DatasetInfo) *pipeline.Pipeline {
-	var ops []pipeline.Operation
-
-	// If PassthroughRules is defined, use priority-based sorting
-	if len(ds.PassthroughRules) > 0 {
-		var ruleOps []ruleWithOperation
-
-		for _, rule := range ds.PassthroughRules {
-			var op pipeline.Operation
-
-			switch rule.Type {
-			case "prefix":
-				if length := extractIntValue(rule.Value); length > 0 {
-					op = operations.NewTrimPrefixOperation(length)
-				}
-			case "suffix":
-				if length := extractIntValue(rule.Value); length > 0 {
-					op = operations.NewTrimSuffixOperation(length)
-				}
-			case "passthrough":
-				if ds.PassthroughCharacters != "" {
-					op = operations.NewTrimPassthroughOperation()
-				}
-			}
-
-			if op != nil {
-				ruleOps = append(ruleOps, ruleWithOperation{
-					priority:  rule.Priority,
-					ruleType:  rule.Type,
-					operation: op,
-				})
-			}
-		}
-
-		// Sort by ascending priority
-		sort.Slice(ruleOps, func(i, j int) bool {
-			return ruleOps[i].priority < ruleOps[j].priority
-		})
-
-		// Append sorted operations
-		for _, r := range ruleOps {
-			ops = append(ops, r.operation)
-		}
-	} else {
-		// Fallback: use fixed order for datasets without PassthroughRules
-		if prefixLen := getPrefixLength(ds); prefixLen > 0 {
-			ops = append(ops, operations.NewTrimPrefixOperation(prefixLen))
-		}
-		if suffixLen := getSuffixLength(ds); suffixLen > 0 {
-			ops = append(ops, operations.NewTrimSuffixOperation(suffixLen))
-		}
-		if ds.PassthroughCharacters != "" {
-			ops = append(ops, operations.NewTrimPassthroughOperation())
-		}
-	}
+	ops := buildTrimOperations(ds)
 
 	// Validate charset after trimming passthrough/prefix/suffix: the remaining
 	// characters must belong to the output alphabet before DecodeKeyNumber and

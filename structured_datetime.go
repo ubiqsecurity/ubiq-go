@@ -273,6 +273,40 @@ func (sC *structuredContext) encryptDateTime(dataset datasetInfo, plainDateTime 
 	return localEncryptedDateTime, nil
 }
 
+// dateTimeCipherText converts a cipher datetime back to the string form
+// produced by the string cipher: the seconds from the dataset's epoch
+// formatted in the output alphabet, left padded to min_input_length,
+// with the sign re-applied.
+func dateTimeCipherText(dataset datasetInfo, cipherDateTime time.Time) (string, error) {
+	// Parse epoch
+	epoch, err := parseEpoch(dataset.DataTypeConfig.Epoch)
+	if err != nil {
+		return "", err
+	}
+
+	// Convert datetime to seconds from epoch using Unix seconds to avoid time.Duration overflow
+	cipherSecondsFromEpoch := cipherDateTime.UTC().Unix() - epoch.Unix()
+
+	isNegative := cipherSecondsFromEpoch < 0
+	absSeconds := cipherSecondsFromEpoch
+	if isNegative {
+		absSeconds = -cipherSecondsFromEpoch
+	}
+
+	// Format in the dataset's output alphabet
+	cipherText := formatIntegerInAlphabet(absSeconds, dataset.OutputCharacterSet)
+
+	// Left pad to min_input_length
+	cipherText = padLeft(cipherText, dataset.InputLengthMin, dataset.OutputCharacterSet[0])
+
+	// Re-add negative sign if needed
+	if isNegative {
+		cipherText = "-" + cipherText
+	}
+
+	return cipherText, nil
+}
+
 // decryptDateTime decrypts a datetime using the pipeline.
 func (sC *structuredContext) decryptDateTime(dataset datasetInfo, cipherDateTime time.Time, tweak []byte) (time.Time, error) {
 	if err := sC.validateDateTimeDataset(dataset); err != nil {
@@ -293,24 +327,9 @@ func (sC *structuredContext) decryptDateTime(dataset datasetInfo, cipherDateTime
 		return time.Time{}, err
 	}
 
-	// Convert datetime to seconds from epoch using Unix seconds to avoid time.Duration overflow
-	cipherSecondsFromEpoch := utcCipherDateTime.Unix() - epoch.Unix()
-
-	isNegative := cipherSecondsFromEpoch < 0
-	absSeconds := cipherSecondsFromEpoch
-	if isNegative {
-		absSeconds = -cipherSecondsFromEpoch
-	}
-
-	// Format in the dataset's output alphabet
-	cipherText := formatIntegerInAlphabet(absSeconds, dataset.OutputCharacterSet)
-
-	// Left pad to min_input_length
-	cipherText = padLeft(cipherText, dataset.InputLengthMin, dataset.OutputCharacterSet[0])
-
-	// Re-add negative sign if needed
-	if isNegative {
-		cipherText = "-" + cipherText
+	cipherText, err := dateTimeCipherText(dataset, cipherDateTime)
+	if err != nil {
+		return time.Time{}, err
 	}
 
 	// Decrypt using the string decipher
@@ -417,23 +436,20 @@ func (sC *structuredContext) encryptDate(dataset datasetInfo, plainDate time.Tim
 	return encryptedDate, nil
 }
 
-// decryptDate decrypts a date using the pipeline.
-func (sC *structuredContext) decryptDate(dataset datasetInfo, cipherDate time.Time, tweak []byte) (time.Time, error) {
-	if err := sC.validateDateDataset(dataset); err != nil {
-		return time.Time{}, err
-	}
-
-	cfg := dataset.DataTypeConfig
-
+// dateCipherText converts a cipher date back to the string form produced
+// by the string cipher: the days from the dataset's epoch formatted in
+// the output alphabet, left padded to min_input_length, with the sign
+// re-applied. The date must be UTC.
+func dateCipherText(dataset datasetInfo, cipherDate time.Time) (string, error) {
 	// Must be UTC
 	if cipherDate.Location() != time.UTC {
-		return time.Time{}, fmt.Errorf("cipherDate must be UTC")
+		return "", fmt.Errorf("cipherDate must be UTC")
 	}
 
 	// Parse epoch
-	epoch, err := parseEpoch(cfg.Epoch)
+	epoch, err := parseEpoch(dataset.DataTypeConfig.Epoch)
 	if err != nil {
-		return time.Time{}, err
+		return "", err
 	}
 	epochDate := time.Date(epoch.Year(), epoch.Month(), epoch.Day(), 0, 0, 0, 0, time.UTC)
 
@@ -455,6 +471,29 @@ func (sC *structuredContext) decryptDate(dataset datasetInfo, cipherDate time.Ti
 	// Re-add negative sign if needed
 	if isNegative {
 		cipherText = "-" + cipherText
+	}
+
+	return cipherText, nil
+}
+
+// decryptDate decrypts a date using the pipeline.
+func (sC *structuredContext) decryptDate(dataset datasetInfo, cipherDate time.Time, tweak []byte) (time.Time, error) {
+	if err := sC.validateDateDataset(dataset); err != nil {
+		return time.Time{}, err
+	}
+
+	cfg := dataset.DataTypeConfig
+
+	// Parse epoch
+	epoch, err := parseEpoch(cfg.Epoch)
+	if err != nil {
+		return time.Time{}, err
+	}
+	epochDate := time.Date(epoch.Year(), epoch.Month(), epoch.Day(), 0, 0, 0, 0, time.UTC)
+
+	cipherText, err := dateCipherText(dataset, cipherDate)
+	if err != nil {
+		return time.Time{}, err
 	}
 
 	// Decrypt using the string decipher
