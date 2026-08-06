@@ -349,6 +349,8 @@ fmt.Fprintf(os.Stdout, "current key number= %d \n", keyNumber)
 
 To find out which key number an existing ciphertext was encrypted with, without decrypting it, use `GetKeyNumber`. It is available on both `StructuredEncryption` and `StructuredDecryption`. Only the dataset definition is needed (typically served from the local cache); no encryption key is fetched, nothing is decrypted, and no usage event is reported.
 
+> **Warning:** do not use `GetKeyNumber` to determine whether a value is Ubiq encrypted. Format preserving encryption has no authentication, so any input made of valid alphabet characters decodes to some key number; it cannot tell a real ciphertext from a random string.
+
 ```go
 keyNumber, err := dec.GetKeyNumber(datasetName, cipherText)
 if err != nil {

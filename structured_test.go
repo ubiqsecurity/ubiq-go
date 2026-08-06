@@ -6,7 +6,9 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -669,20 +671,70 @@ func TestEmptyStringDecryption(t *testing.T) {
 	}
 }
 
-// decode the key number embedded in a structured ciphertext by
-// stripping passthrough characters and decoding the first remaining
-// character against the dataset's output alphabet
-func decodeCiphertextKeyNumber(dataset datasetInfo, ct string) int {
-	var stripped []rune
-	for _, c := range ct {
-		if dataset.PassthroughAlphabet.PosOf(c) < 0 {
-			stripped = append(stripped, c)
+// decode the key number embedded in a structured ciphertext,
+// independently of the pipeline implementation: passthrough, prefix and
+// suffix rules are applied in ascending priority order (the same order
+// decryption trims), then the first remaining character is decoded
+// against the dataset's output alphabet
+func decodeCiphertextKeyNumber(dataset datasetInfo, ct string) (int, error) {
+	out := []rune(ct)
+
+	rules := make([]passthroughRule, len(dataset.PassthroughRules))
+	copy(rules, dataset.PassthroughRules)
+	if len(rules) == 0 && dataset.PassthroughAlphabet.Len() > 0 {
+		// legacy datasets: passthrough only, no rule list
+		rules = append(rules, passthroughRule{Type: "passthrough", Priority: 1})
+	}
+	sort.Slice(rules, func(i, j int) bool {
+		return rules[i].Priority < rules[j].Priority
+	})
+
+	ruleLength := func(v interface{}) int {
+		switch n := v.(type) {
+		case float64:
+			return int(n)
+		case int:
+			return n
+		}
+		return 0
+	}
+
+	for _, rule := range rules {
+		switch rule.Type {
+		case "passthrough":
+			var kept []rune
+			for _, c := range out {
+				if dataset.PassthroughAlphabet.PosOf(c) < 0 {
+					kept = append(kept, c)
+				}
+			}
+			out = kept
+		case "prefix":
+			if n := ruleLength(rule.Value); n > 0 {
+				if n > len(out) {
+					return 0, fmt.Errorf("prefix %d longer than ciphertext", n)
+				}
+				out = out[n:]
+			}
+		case "suffix":
+			if n := ruleLength(rule.Value); n > 0 {
+				if n > len(out) {
+					return 0, fmt.Errorf("suffix %d longer than ciphertext", n)
+				}
+				out = out[:len(out)-n]
+			}
+		default:
+			return 0, fmt.Errorf("unsupported rule type %q", rule.Type)
 		}
 	}
 
-	_, kn := decodeKeyNumber(stripped, &dataset.OutputAlphabet,
+	if len(out) == 0 || dataset.OutputAlphabet.PosOf(out[0]) < 0 {
+		return 0, fmt.Errorf("no decodable ciphertext character")
+	}
+
+	_, kn := decodeKeyNumber(out, &dataset.OutputAlphabet,
 		dataset.NumEncodingBits)
-	return kn
+	return kn, nil
 }
 
 func TestStructuredCipherAndKeyNumber(t *testing.T) {
@@ -722,7 +774,11 @@ func TestStructuredCipherAndKeyNumber(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if embedded := decodeCiphertextKeyNumber(dsInfo, ct); embedded != kn {
+	embedded, err := decodeCiphertextKeyNumber(dsInfo, ct)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if embedded != kn {
 		t.Fatalf("returned key number %d does not match embedded key number %d",
 			kn, embedded)
 	}
@@ -838,22 +894,62 @@ func TestStructuredGetKeyNumberWithRules(t *testing.T) {
 	}
 	defer dec.Close()
 
-	// generic_string and generic_string_32 use passthrough rules
-	// (prefix/suffix), exercising the rule-priority trim path
-	for _, dataset := range []string{"generic_string", "generic_string_32"} {
-		t.Run(dataset, func(t *testing.T) {
-			ct, kn, err := enc.CipherAndKeyNumber(dataset, "abcdefghij", nil)
+	// datasets with prefix/suffix/passthrough rules exercise the
+	// rule-priority trim path. The UTF8_STRING_COMPLEX_* pair exists in
+	// every environment (suf_pre_pass has non-monotonic priorities); the
+	// SSN_* variants are defined in prod only and skip elsewhere. The
+	// generic_string datasets have no rules and cover the input
+	// padding/encoding path.
+	const utf8Complex = "ÑÒÓķĸĹϺϻϼϽϾÔÕϿは世界abcdefghijklmnopqrstuvwxyzこんにちÊʑʒʓËÌÍÎÏðñòóôĵĶʔʕ"
+	cases := []struct {
+		dataset string
+		pt      string
+	}{
+		{"UTF8_STRING_COMPLEX_pre_pass", utf8Complex},
+		{"UTF8_STRING_COMPLEX_suf_pre_pass", utf8Complex},
+		// long enough that at least 6 digits remain encryptable after
+		// the prefix/suffix rules remove their characters
+		{"SSN_pre_pass", "123-456789-0123"},
+		{"SSN_pass_suf", "123-456789-0123"},
+		{"SSN_pre_suf_pass", "123-456789-0123"},
+		{"SSN_suf_pass_pre", "123-456789-0123"},
+		{"generic_string", "abcdefghij"},
+		{"generic_string_32", "abcdefghij"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.dataset, func(t *testing.T) {
+			ct, kn, err := enc.CipherAndKeyNumber(tc.dataset, tc.pt, nil)
 			if err != nil {
+				// the SSN_* rule datasets are not defined in every
+				// environment (e.g. DEV)
+				if strings.Contains(err.Error(), "Invalid Dataset name") {
+					t.Skipf("dataset %s not available in this environment", tc.dataset)
+				}
 				t.Fatal(err)
 			}
 
-			decKn, err := dec.GetKeyNumber(dataset, ct)
+			decKn, err := dec.GetKeyNumber(tc.dataset, ct)
 			if err != nil {
 				t.Fatal(err)
 			}
 			if decKn != kn {
 				t.Fatalf("GetKeyNumber %d does not match encryption key number %d",
 					decKn, kn)
+			}
+
+			// independent cross-check: decode the embedded key number
+			// without the pipeline
+			dsInfo, err := ((*structuredContext)(dec)).fetchDataset(tc.dataset)
+			if err != nil {
+				t.Fatal(err)
+			}
+			embedded, err := decodeCiphertextKeyNumber(dsInfo, ct)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if embedded != kn {
+				t.Fatalf("embedded key number %d does not match encryption key number %d",
+					embedded, kn)
 			}
 		})
 	}
@@ -865,4 +961,51 @@ func TestStructuredGetKeyNumberWithRules(t *testing.T) {
 			t.Fatal("expected error for typed dataset")
 		}
 	})
+}
+
+// every result of an encrypt-for-search is encrypted with the key
+// number matching its position in the returned array, and the last
+// entry uses the current key
+func TestStructuredKeyNumbersForSearch(t *testing.T) {
+	const dataset = "ALPHANUM_SSN"
+	const pt = "123-45-6789"
+
+	initializeCreds()
+
+	enc, err := NewStructuredEncryption(credentials)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer enc.Close()
+
+	dec, err := NewStructuredDecryption(credentials)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer dec.Close()
+
+	curr, err := enc.GetCurrentKeyNumber(dataset)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cts, err := enc.CipherForSearch(dataset, pt, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i, ct := range cts {
+		kn, err := dec.GetKeyNumber(dataset, ct)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if kn != i {
+			t.Fatalf("search result %d encrypted with key number %d", i, kn)
+		}
+	}
+
+	if last := len(cts) - 1; last != curr {
+		t.Fatalf("last search key number %d does not match current key number %d",
+			last, curr)
+	}
 }
