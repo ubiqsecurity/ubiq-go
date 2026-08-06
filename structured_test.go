@@ -896,23 +896,32 @@ func TestStructuredGetKeyNumberWithRules(t *testing.T) {
 
 	// datasets with prefix/suffix/passthrough rules exercise the
 	// rule-priority trim path. The UTF8_STRING_COMPLEX_* pair exists in
-	// every environment (suf_pre_pass has non-monotonic priorities); the
-	// SSN_* variants are defined in prod only and skip elsewhere. The
-	// generic_string datasets have no rules and cover the input
-	// padding/encoding path.
+	// every environment (suf_pre_pass has non-monotonic priorities). The
+	// SSN_* variants are named differently in prod and dev, so both sets
+	// are listed and each environment skips the ones it does not define,
+	// giving full rule coverage everywhere. The generic_string datasets
+	// have no rules and cover the input padding/encoding path.
 	const utf8Complex = "ÑÒÓķĸĹϺϻϼϽϾÔÕϿは世界abcdefghijklmnopqrstuvwxyzこんにちÊʑʒʓËÌÍÎÏðñòóôĵĶʔʕ"
+	// long enough that at least 6 digits remain encryptable after the
+	// prefix/suffix rules remove their characters
+	const ssnLong = "123-456789-0123"
 	cases := []struct {
 		dataset string
 		pt      string
 	}{
 		{"UTF8_STRING_COMPLEX_pre_pass", utf8Complex},
 		{"UTF8_STRING_COMPLEX_suf_pre_pass", utf8Complex},
-		// long enough that at least 6 digits remain encryptable after
-		// the prefix/suffix rules remove their characters
-		{"SSN_pre_pass", "123-456789-0123"},
-		{"SSN_pass_suf", "123-456789-0123"},
-		{"SSN_pre_suf_pass", "123-456789-0123"},
-		{"SSN_suf_pass_pre", "123-456789-0123"},
+		// prod
+		{"SSN_pre_pass", ssnLong},
+		{"SSN_pass_suf", ssnLong},
+		{"SSN_pre_suf_pass", ssnLong},
+		{"SSN_suf_pass_pre", ssnLong},
+		// dev
+		{"SSN_pass", ssnLong},
+		{"SSN_pass_pre", ssnLong},
+		{"SSN_pass_suf_pre", ssnLong},
+		{"SSN_pre_pass_suf", ssnLong},
+		{"SSN_suf_pre_pass", ssnLong},
 		{"generic_string", "abcdefghij"},
 		{"generic_string_32", "abcdefghij"},
 	}
