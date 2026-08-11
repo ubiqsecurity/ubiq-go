@@ -5,6 +5,8 @@ import (
 	"math"
 	"strconv"
 	"strings"
+
+	"gitlab.com/ubiqsecurity/ubiq-go/v2/structured/pipeline/exec"
 )
 
 // CipherInt64 encrypts an int64 value using format-preserving encryption.
@@ -124,6 +126,52 @@ func (sd *StructuredDecryption) DecipherInt32(datasetName string, cipherInteger 
 	return sC.decryptInt32(dataset, cipherInteger, tweak)
 }
 
+// GetKeyNumberInt64 returns the key number (key version) that the given
+// int64 ciphertext was encrypted with, without decrypting it.
+// The dataset must be configured with data_type="integer" and size=64.
+//
+// Only the dataset definition is required, which is typically served
+// from the local cache. No encryption key is fetched and no usage
+// event is reported.
+func (sd *StructuredDecryption) GetKeyNumberInt64(datasetName string, cipherInteger int64) (int, error) {
+	sC := (*structuredContext)(sd)
+
+	dataset, err := sC.fetchDataset(datasetName)
+	if err != nil {
+		return 0, err
+	}
+
+	if err := sC.validateIntegerDataset(dataset, 64); err != nil {
+		return 0, err
+	}
+
+	return exec.DecodeKeyNumber(toPipelineDatasetInfo(dataset),
+		integerCipherText(dataset, cipherInteger))
+}
+
+// GetKeyNumberInt32 returns the key number (key version) that the given
+// int32 ciphertext was encrypted with, without decrypting it.
+// The dataset must be configured with data_type="integer" and size=32.
+//
+// Only the dataset definition is required, which is typically served
+// from the local cache. No encryption key is fetched and no usage
+// event is reported.
+func (sd *StructuredDecryption) GetKeyNumberInt32(datasetName string, cipherInteger int32) (int, error) {
+	sC := (*structuredContext)(sd)
+
+	dataset, err := sC.fetchDataset(datasetName)
+	if err != nil {
+		return 0, err
+	}
+
+	if err := sC.validateIntegerDataset(dataset, 32); err != nil {
+		return 0, err
+	}
+
+	return exec.DecodeKeyNumber(toPipelineDatasetInfo(dataset),
+		integerCipherText(dataset, int64(cipherInteger)))
+}
+
 // validateIntegerDataset validates the dataset is configured for integer encryption.
 func (sC *structuredContext) validateIntegerDataset(dataset datasetInfo, expectedSize int64) error {
 	if dataset.DataType != "integer" {
@@ -209,12 +257,11 @@ func (sC *structuredContext) encryptInt32(dataset datasetInfo, plainInteger int3
 	return int32(cipherInteger), nil
 }
 
-// decryptInt64 decrypts an int64 using the pipeline.
-func (sC *structuredContext) decryptInt64(dataset datasetInfo, cipherInteger int64, tweak []byte) (int64, error) {
-	if err := sC.validateIntegerDataset(dataset, 64); err != nil {
-		return 0, err
-	}
-
+// integerCipherText converts a cipher integer back to the string form
+// produced by the string cipher: the absolute value formatted in the
+// dataset's output alphabet, left padded to min_input_length, with the
+// sign re-applied.
+func integerCipherText(dataset datasetInfo, cipherInteger int64) string {
 	isNegative := cipherInteger < 0
 	absValue := cipherInteger
 	if isNegative {
@@ -231,6 +278,17 @@ func (sC *structuredContext) decryptInt64(dataset datasetInfo, cipherInteger int
 	if isNegative {
 		cipherText = "-" + cipherText
 	}
+
+	return cipherText
+}
+
+// decryptInt64 decrypts an int64 using the pipeline.
+func (sC *structuredContext) decryptInt64(dataset datasetInfo, cipherInteger int64, tweak []byte) (int64, error) {
+	if err := sC.validateIntegerDataset(dataset, 64); err != nil {
+		return 0, err
+	}
+
+	cipherText := integerCipherText(dataset, cipherInteger)
 
 	// Decrypt using the string decipher
 	plainText, err := sC.decipherString(dataset, cipherText, tweak)
@@ -253,22 +311,7 @@ func (sC *structuredContext) decryptInt32(dataset datasetInfo, cipherInteger int
 		return 0, err
 	}
 
-	isNegative := cipherInteger < 0
-	absValue := int64(cipherInteger)
-	if isNegative {
-		absValue = -absValue
-	}
-
-	// Format in the dataset's output alphabet
-	cipherText := formatIntegerInAlphabet(absValue, dataset.OutputCharacterSet)
-
-	// Left pad to min_input_length
-	cipherText = padLeft(cipherText, dataset.InputLengthMin, dataset.OutputCharacterSet[0])
-
-	// Re-add negative sign if needed
-	if isNegative {
-		cipherText = "-" + cipherText
-	}
+	cipherText := integerCipherText(dataset, int64(cipherInteger))
 
 	// Decrypt using the string decipher
 	plainText, err := sC.decipherString(dataset, cipherText, tweak)

@@ -146,6 +146,38 @@ func Decrypt(
 	return ctx.CurrentValue, keyNumber, nil
 }
 
+// DecodeKeyNumber extracts the key number embedded in a ciphertext
+// without performing decryption. Only the dataset definition is needed:
+// the ciphertext is trimmed (prefix, suffix, passthrough), validated
+// against the output alphabet, and the key number is decoded from the
+// first remaining character.
+func DecodeKeyNumber(
+	dataset *pipeline.DatasetInfo,
+	ciphertext string,
+) (int, error) {
+	ctx := pipeline.NewOperationContext(dataset, ciphertext, false, nil)
+
+	// Same trim ordering as decryption, but stop after decoding the
+	// key number: ConvertRadix and FF1 are not needed.
+	pre := pipeline.NewPipeline(buildTrimOperations(dataset)...)
+	if _, err := pre.Invoke(ctx); err != nil {
+		return 0, fmt.Errorf("pre-decode failed: %w", err)
+	}
+
+	if _, err := operations.NewValidateCharsetOperation().Invoke(ctx); err != nil {
+		return 0, err
+	}
+
+	if _, err := operations.NewDecodeKeyNumberOperation().Invoke(ctx); err != nil {
+		return 0, err
+	}
+
+	if ctx.KeyNumber == nil {
+		return 0, fmt.Errorf("key number not decoded")
+	}
+	return *ctx.KeyNumber, nil
+}
+
 // parseEncoding converts an input_encoding string to an EncodingType.
 func parseEncoding(encoding string) operations.EncodingType {
 	switch encoding {
@@ -165,7 +197,11 @@ type ruleWithOperation struct {
 	operation pipeline.Operation
 }
 
-func buildPrePipeline(ds *pipeline.DatasetInfo) *pipeline.Pipeline {
+// buildTrimOperations returns the trim operations (prefix, suffix,
+// passthrough) in the order dictated by the dataset's passthrough rules.
+// This ordering is shared by encryption, decryption, and key number
+// decoding.
+func buildTrimOperations(ds *pipeline.DatasetInfo) []pipeline.Operation {
 	var ops []pipeline.Operation
 
 	// If PassthroughRules is defined, use priority-based sorting
@@ -221,7 +257,11 @@ func buildPrePipeline(ds *pipeline.DatasetInfo) *pipeline.Pipeline {
 		}
 	}
 
-	return pipeline.NewPipeline(ops...)
+	return ops
+}
+
+func buildPrePipeline(ds *pipeline.DatasetInfo) *pipeline.Pipeline {
+	return pipeline.NewPipeline(buildTrimOperations(ds)...)
 }
 
 func buildPostEncryptPipeline(ds *pipeline.DatasetInfo) *pipeline.Pipeline {
@@ -291,60 +331,7 @@ func buildPostEncryptPipeline(ds *pipeline.DatasetInfo) *pipeline.Pipeline {
 }
 
 func buildPreDecryptPipeline(ds *pipeline.DatasetInfo) *pipeline.Pipeline {
-	var ops []pipeline.Operation
-
-	// If PassthroughRules is defined, use priority-based sorting
-	if len(ds.PassthroughRules) > 0 {
-		var ruleOps []ruleWithOperation
-
-		for _, rule := range ds.PassthroughRules {
-			var op pipeline.Operation
-
-			switch rule.Type {
-			case "prefix":
-				if length := extractIntValue(rule.Value); length > 0 {
-					op = operations.NewTrimPrefixOperation(length)
-				}
-			case "suffix":
-				if length := extractIntValue(rule.Value); length > 0 {
-					op = operations.NewTrimSuffixOperation(length)
-				}
-			case "passthrough":
-				if ds.PassthroughCharacters != "" {
-					op = operations.NewTrimPassthroughOperation()
-				}
-			}
-
-			if op != nil {
-				ruleOps = append(ruleOps, ruleWithOperation{
-					priority:  rule.Priority,
-					ruleType:  rule.Type,
-					operation: op,
-				})
-			}
-		}
-
-		// Sort by ascending priority
-		sort.Slice(ruleOps, func(i, j int) bool {
-			return ruleOps[i].priority < ruleOps[j].priority
-		})
-
-		// Append sorted operations
-		for _, r := range ruleOps {
-			ops = append(ops, r.operation)
-		}
-	} else {
-		// Fallback: use fixed order for datasets without PassthroughRules
-		if prefixLen := getPrefixLength(ds); prefixLen > 0 {
-			ops = append(ops, operations.NewTrimPrefixOperation(prefixLen))
-		}
-		if suffixLen := getSuffixLength(ds); suffixLen > 0 {
-			ops = append(ops, operations.NewTrimSuffixOperation(suffixLen))
-		}
-		if ds.PassthroughCharacters != "" {
-			ops = append(ops, operations.NewTrimPassthroughOperation())
-		}
-	}
+	ops := buildTrimOperations(ds)
 
 	// Validate charset after trimming passthrough/prefix/suffix: the remaining
 	// characters must belong to the output alphabet before DecodeKeyNumber and

@@ -1,5 +1,10 @@
 # Changelog
 
+# 2.3.2 - 2026-08-06
+* Added CipherAndKeyNumber to return the key number along with the ciphertext for structured encryption
+* Added GetCurrentKeyNumber to return the current key number for a dataset, always fetched from the server
+* Added GetKeyNumber and typed variants (GetKeyNumberInt32, GetKeyNumberInt64, GetKeyNumberDate, GetKeyNumberDateTime) to read the key number embedded in a ciphertext without decrypting it
+
 # 2.3.1 - 2026-06-17
 * Fixed an out-of-charset panic by validating input against the dataset character set before FF1 encryption
 

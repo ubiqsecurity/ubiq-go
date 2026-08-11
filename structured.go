@@ -866,6 +866,16 @@ func NewStructuredEncryption(c Credentials) (*StructuredEncryption, error) {
 // @twk may be nil, in which case, the default will be used
 func (fe *StructuredEncryption) Cipher(datasetName, pt string, twk []byte) (
 	ct string, err error) {
+	ct, _, err = fe.CipherAndKeyNumber(datasetName, pt, twk)
+	return
+}
+
+// CipherAndKeyNumber encrypts a plaintext string like Cipher and also
+// returns the key number (key version) the ciphertext was encrypted with.
+//
+// @twk may be nil, in which case, the default will be used
+func (fe *StructuredEncryption) CipherAndKeyNumber(datasetName, pt string, twk []byte) (
+	ct string, keyNumber int, err error) {
 	dataset, err := ((*structuredContext)(fe)).fetchDataset(datasetName)
 	if err != nil {
 		return
@@ -891,7 +901,7 @@ func (fe *StructuredEncryption) Cipher(datasetName, pt string, twk []byte) (
 		trackingActionEncrypt,
 		1, kn)
 
-	return ct, nil
+	return ct, kn, nil
 }
 
 // CipherWithKeyNumber encrypts a plaintext string using a specific key number.
@@ -949,6 +959,153 @@ func (fe *StructuredEncryption) CipherForSearch(datasetName, pt string, twk []by
 	}
 
 	return
+}
+
+// fetchCurrentKeyNumber asks the server for the dataset's current key
+// and returns its key number. The cache read is always bypassed so a
+// server-side key rotation is visible immediately. The fetched key is
+// added to the cache if that key number is missing (stored unwrapped
+// or wrapped per the KeyCaching.Encrypt setting) and the current-key
+// (-1) mapping is overwritten, so a subsequent Cipher call encrypts
+// with the newest key.
+func (sC *structuredContext) fetchCurrentKeyNumber(name string) (int, error) {
+	if sC.config.Logging.Verbose {
+		fmt.Fprintf(os.Stdout, "EXPENSIVE --- Fetching Current Key %v From API\n", name)
+	}
+
+	query := url.Values{}
+	query.Set("ffs_name", name)
+	query.Set("papi", sC.papi)
+
+	isIdp, err := sC.creds.isIdp()
+	if err != nil {
+		return 0, err
+	}
+
+	if isIdp {
+		// IDP mode requires passing the idp cert to the server
+		sC.creds.renewIdpCert()
+		query.Set("payload_cert", sC.creds.idpBase64Cert)
+	}
+
+	rsp, err := sC.client.Get(sC.host + "/api/v0/fpe/key?" + query.Encode())
+	if err != nil {
+		return 0, err
+	}
+	defer rsp.Body.Close()
+
+	var obj struct {
+		EPK string `json:"encrypted_private_key"`
+		WDK string `json:"wrapped_data_key"`
+		Num string `json:"key_number"`
+	}
+
+	if rsp.StatusCode == http.StatusOK {
+		err = json.NewDecoder(rsp.Body).Decode(&obj)
+	} else {
+		errMsg, _ := io.ReadAll(rsp.Body)
+		err = fmt.Errorf("unexpected response: %s", string(errMsg))
+	}
+	if err != nil {
+		return 0, err
+	}
+
+	var key structuredKey
+	key.Num, err = strconv.Atoi(obj.Num)
+	if err != nil {
+		return 0, err
+	}
+	if isIdp {
+		// IDP mode has a local private key, need to override that key since nothing will be returned from server
+		key.EPK = sC.creds.idpEncryptedPrivateKey
+	} else {
+		key.EPK = obj.EPK
+	}
+	key.WDK = obj.WDK
+
+	if !sC.config.KeyCaching.Structured {
+		return key.Num, nil
+	}
+
+	// reuse the cached copy when this key version is already present,
+	// otherwise store the fetched key per the cache encryption setting
+	numberedKey := getStructuredCacheKey(sC.papi, name, key.Num)
+	cached, err := sC.cache.readStructuredKey(numberedKey)
+	if err == nil {
+		key = cached
+	} else if !errors.Is(err, ErrNotInCache) {
+		return 0, err
+	} else {
+		if !sC.config.KeyCaching.Encrypt {
+			// unencrypted cache stores the unwrapped key material
+			key.Key, err = unwrapDataKey(key.WDK, key.EPK, sC.srsa)
+			if err != nil {
+				return 0, err
+			}
+		}
+		if err := sC.cache.updateStructuredKey(numberedKey, key); err != nil {
+			return 0, err
+		}
+	}
+
+	// overwrite the current-key mapping (not add-if-missing: a stale
+	// -1 entry would keep Cipher on the previous key)
+	if err := sC.cache.updateStructuredKey(
+		getStructuredCacheKey(sC.papi, name, -1), key); err != nil {
+		return 0, err
+	}
+
+	return key.Num, nil
+}
+
+// GetCurrentKeyNumber returns the current key number (key version) for
+// the given dataset.
+//
+// The cache is always bypassed and the current key is fetched from the
+// server, so a server-side key rotation is visible immediately. The
+// fetched key is added to the local cache if missing and the
+// current-key mapping is updated, so a subsequent Cipher call on the
+// same dataset encrypts with the newest key.
+func (fe *StructuredEncryption) GetCurrentKeyNumber(datasetName string) (int, error) {
+	return ((*structuredContext)(fe)).fetchCurrentKeyNumber(datasetName)
+}
+
+// getKeyNumber decodes the key number embedded in a ciphertext for the
+// named dataset without decrypting it. Only the dataset definition is
+// needed; no encryption key is fetched and no usage event is reported.
+func (sC *structuredContext) getKeyNumber(datasetName, ct string) (int, error) {
+	dataset, err := sC.fetchDataset(datasetName)
+	if err != nil {
+		return 0, err
+	}
+
+	// A typed ciphertext must be converted back to its output-alphabet
+	// string form before the key number can be decoded; decoding the
+	// native string representation would silently yield a wrong result.
+	switch dataset.DataType {
+	case "integer", "date", "datetime":
+		return 0, fmt.Errorf(
+			"dataset '%s' has data type '%s': use the typed GetKeyNumber method for this data type",
+			dataset.Name, dataset.DataType)
+	}
+
+	return exec.DecodeKeyNumber(toPipelineDatasetInfo(dataset), ct)
+}
+
+// GetKeyNumber returns the key number (key version) that the given
+// ciphertext was encrypted with, without decrypting it.
+//
+// Only the dataset definition is required, which is typically served
+// from the local cache. No encryption key is fetched and no usage
+// event is reported.
+//
+// Datasets configured with a non-string data type (integer, date,
+// datetime) are rejected: use the typed GetKeyNumber variants on
+// StructuredDecryption for those. Note that the ciphertext is not
+// authenticated: any input made of in-alphabet characters decodes to
+// some key number.
+func (fe *StructuredEncryption) GetKeyNumber(datasetName, ct string) (int, error) {
+	return ((*structuredContext)(fe)).getKeyNumber(datasetName, ct)
 }
 
 func (fe *StructuredEncryption) Close() {
@@ -1022,6 +1179,22 @@ func (fd *StructuredDecryption) Cipher(datasetName, ct string, twk []byte) (
 		1, retKn)
 
 	return pt, nil
+}
+
+// GetKeyNumber returns the key number (key version) that the given
+// ciphertext was encrypted with, without decrypting it.
+//
+// Only the dataset definition is required, which is typically served
+// from the local cache. No encryption key is fetched and no usage
+// event is reported.
+//
+// Datasets configured with a non-string data type (integer, date,
+// datetime) are rejected: use the typed GetKeyNumber variants on
+// StructuredDecryption for those. Note that the ciphertext is not
+// authenticated: any input made of in-alphabet characters decodes to
+// some key number.
+func (fd *StructuredDecryption) GetKeyNumber(datasetName, ct string) (int, error) {
+	return ((*structuredContext)(fd)).getKeyNumber(datasetName, ct)
 }
 
 func (fd *StructuredDecryption) Close() {

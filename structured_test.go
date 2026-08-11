@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
+	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
-	"path/filepath"
 	"time"
 )
 
@@ -553,7 +555,7 @@ func TestLoadCacheTTLRefresh(t *testing.T) {
 	// This mirrors the Java test that validates TTL refresh behavior
 
 	initializeCreds()
-	
+
 	// Use a test-specific config with short TTL
 	config, err := NewConfiguration()
 	if err != nil {
@@ -562,11 +564,11 @@ func TestLoadCacheTTLRefresh(t *testing.T) {
 	config.KeyCaching.Structured = true
 	config.KeyCaching.TTLSeconds = 3 // 3 second TTL (matches Java test)
 	config.KeyCaching.Encrypt = false
-	
+
 	// Create new credentials with custom config
 	testCreds := credentials
 	testCreds.config = &config
-	
+
 	// Initialize cache with new TTL
 	testCreds.cache, err = NewCache(&config)
 	if err != nil {
@@ -666,5 +668,353 @@ func TestEmptyStringDecryption(t *testing.T) {
 		// If we got a different error (like dataset compatibility),
 		// that's fine - we just want to ensure no panic occurred
 		t.Logf("Got error (no panic): %v", err)
+	}
+}
+
+// decode the key number embedded in a structured ciphertext,
+// independently of the pipeline implementation: passthrough, prefix and
+// suffix rules are applied in ascending priority order (the same order
+// decryption trims), then the first remaining character is decoded
+// against the dataset's output alphabet
+func decodeCiphertextKeyNumber(dataset datasetInfo, ct string) (int, error) {
+	out := []rune(ct)
+
+	rules := make([]passthroughRule, len(dataset.PassthroughRules))
+	copy(rules, dataset.PassthroughRules)
+	if len(rules) == 0 && dataset.PassthroughAlphabet.Len() > 0 {
+		// legacy datasets: passthrough only, no rule list
+		rules = append(rules, passthroughRule{Type: "passthrough", Priority: 1})
+	}
+	sort.Slice(rules, func(i, j int) bool {
+		return rules[i].Priority < rules[j].Priority
+	})
+
+	ruleLength := func(v interface{}) int {
+		switch n := v.(type) {
+		case float64:
+			return int(n)
+		case int:
+			return n
+		}
+		return 0
+	}
+
+	for _, rule := range rules {
+		switch rule.Type {
+		case "passthrough":
+			var kept []rune
+			for _, c := range out {
+				if dataset.PassthroughAlphabet.PosOf(c) < 0 {
+					kept = append(kept, c)
+				}
+			}
+			out = kept
+		case "prefix":
+			if n := ruleLength(rule.Value); n > 0 {
+				if n > len(out) {
+					return 0, fmt.Errorf("prefix %d longer than ciphertext", n)
+				}
+				out = out[n:]
+			}
+		case "suffix":
+			if n := ruleLength(rule.Value); n > 0 {
+				if n > len(out) {
+					return 0, fmt.Errorf("suffix %d longer than ciphertext", n)
+				}
+				out = out[:len(out)-n]
+			}
+		default:
+			return 0, fmt.Errorf("unsupported rule type %q", rule.Type)
+		}
+	}
+
+	if len(out) == 0 || dataset.OutputAlphabet.PosOf(out[0]) < 0 {
+		return 0, fmt.Errorf("no decodable ciphertext character")
+	}
+
+	_, kn := decodeKeyNumber(out, &dataset.OutputAlphabet,
+		dataset.NumEncodingBits)
+	return kn, nil
+}
+
+func TestStructuredCipherAndKeyNumber(t *testing.T) {
+	const dataset = "ALPHANUM_SSN"
+	const pt = "123-45-6789"
+
+	initializeCreds()
+
+	enc, err := NewStructuredEncryption(credentials)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer enc.Close()
+
+	dec, err := NewStructuredDecryption(credentials)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer dec.Close()
+
+	ct, kn, err := enc.CipherAndKeyNumber(dataset, pt, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// the ciphertext must still decrypt back to the plaintext
+	rt, err := dec.Cipher(dataset, ct, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pt != rt {
+		t.Fatalf("bad recovered plaintext: \"%s\" vs. \"%s\"", pt, rt)
+	}
+
+	// the returned key number must match the one embedded in the ciphertext
+	dsInfo, err := ((*structuredContext)(enc)).fetchDataset(dataset)
+	if err != nil {
+		t.Fatal(err)
+	}
+	embedded, err := decodeCiphertextKeyNumber(dsInfo, ct)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if embedded != kn {
+		t.Fatalf("returned key number %d does not match embedded key number %d",
+			kn, embedded)
+	}
+
+	// encrypting with the returned key number must reproduce the ciphertext
+	ct2, err := enc.CipherWithKeyNumber(dataset, pt, nil, kn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ct != ct2 {
+		t.Fatalf("ciphertext mismatch for key number %d: \"%s\" vs. \"%s\"",
+			kn, ct, ct2)
+	}
+}
+
+func TestStructuredGetCurrentKeyNumber(t *testing.T) {
+	const dataset = "ALPHANUM_SSN"
+
+	initializeCreds()
+
+	enc, err := NewStructuredEncryption(credentials)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer enc.Close()
+
+	// always fetched from the server
+	kn, err := enc.GetCurrentKeyNumber(dataset)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// a second call also fetches from the server and must agree
+	kn2, err := enc.GetCurrentKeyNumber(dataset)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if kn != kn2 {
+		t.Fatalf("second key number %d does not match first result %d", kn2, kn)
+	}
+
+	// the current key number must match what Cipher uses right now
+	_, encKn, err := enc.CipherAndKeyNumber(dataset, "123-45-6789", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if kn != encKn {
+		t.Fatalf("GetCurrentKeyNumber %d does not match Cipher key number %d",
+			kn, encKn)
+	}
+}
+
+func TestStructuredGetKeyNumber(t *testing.T) {
+	const dataset = "ALPHANUM_SSN"
+	const pt = "123-45-6789"
+
+	initializeCreds()
+
+	enc, err := NewStructuredEncryption(credentials)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer enc.Close()
+
+	dec, err := NewStructuredDecryption(credentials)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer dec.Close()
+
+	ct, kn, err := enc.CipherAndKeyNumber(dataset, pt, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// both objects must decode the same key number from the ciphertext
+	decKn, err := dec.GetKeyNumber(dataset, ct)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if decKn != kn {
+		t.Fatalf("GetKeyNumber %d does not match encryption key number %d",
+			decKn, kn)
+	}
+
+	encKn, err := enc.GetKeyNumber(dataset, ct)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if encKn != kn {
+		t.Fatalf("GetKeyNumber %d does not match encryption key number %d",
+			encKn, kn)
+	}
+
+	// characters outside the output alphabet must error, not panic
+	if _, err = dec.GetKeyNumber(dataset, "€€€-€€-€€€€"); err == nil {
+		t.Fatal("expected error for invalid ciphertext characters")
+	}
+}
+
+func TestStructuredGetKeyNumberWithRules(t *testing.T) {
+	initializeCreds()
+
+	enc, err := NewStructuredEncryption(credentials)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer enc.Close()
+
+	dec, err := NewStructuredDecryption(credentials)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer dec.Close()
+
+	// datasets with prefix/suffix/passthrough rules exercise the
+	// rule-priority trim path. The UTF8_STRING_COMPLEX_* pair exists in
+	// every environment (suf_pre_pass has non-monotonic priorities). The
+	// SSN_* variants are named differently in prod and dev, so both sets
+	// are listed and each environment skips the ones it does not define,
+	// giving full rule coverage everywhere. The generic_string datasets
+	// have no rules and cover the input padding/encoding path.
+	const utf8Complex = "ÑÒÓķĸĹϺϻϼϽϾÔÕϿは世界abcdefghijklmnopqrstuvwxyzこんにちÊʑʒʓËÌÍÎÏðñòóôĵĶʔʕ"
+	// long enough that at least 6 digits remain encryptable after the
+	// prefix/suffix rules remove their characters
+	const ssnLong = "123-456789-0123"
+	cases := []struct {
+		dataset string
+		pt      string
+	}{
+		{"UTF8_STRING_COMPLEX_pre_pass", utf8Complex},
+		{"UTF8_STRING_COMPLEX_suf_pre_pass", utf8Complex},
+		// prod
+		{"SSN_pre_pass", ssnLong},
+		{"SSN_pass_suf", ssnLong},
+		{"SSN_pre_suf_pass", ssnLong},
+		{"SSN_suf_pass_pre", ssnLong},
+		// dev
+		{"SSN_pass", ssnLong},
+		{"SSN_pass_pre", ssnLong},
+		{"SSN_pass_suf_pre", ssnLong},
+		{"SSN_pre_pass_suf", ssnLong},
+		{"SSN_suf_pre_pass", ssnLong},
+		{"generic_string", "abcdefghij"},
+		{"generic_string_32", "abcdefghij"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.dataset, func(t *testing.T) {
+			ct, kn, err := enc.CipherAndKeyNumber(tc.dataset, tc.pt, nil)
+			if err != nil {
+				// the SSN_* rule datasets are not defined in every
+				// environment (e.g. DEV)
+				if strings.Contains(err.Error(), "Invalid Dataset name") {
+					t.Skipf("dataset %s not available in this environment", tc.dataset)
+				}
+				t.Fatal(err)
+			}
+
+			decKn, err := dec.GetKeyNumber(tc.dataset, ct)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if decKn != kn {
+				t.Fatalf("GetKeyNumber %d does not match encryption key number %d",
+					decKn, kn)
+			}
+
+			// independent cross-check: decode the embedded key number
+			// without the pipeline
+			dsInfo, err := ((*structuredContext)(dec)).fetchDataset(tc.dataset)
+			if err != nil {
+				t.Fatal(err)
+			}
+			embedded, err := decodeCiphertextKeyNumber(dsInfo, ct)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if embedded != kn {
+				t.Fatalf("embedded key number %d does not match encryption key number %d",
+					embedded, kn)
+			}
+		})
+	}
+
+	// datasets with a non-string data type must be rejected: decoding
+	// the native string representation would give a wrong key number
+	t.Run("typed_dataset_rejected", func(t *testing.T) {
+		if _, err := dec.GetKeyNumber("integer32", "12345"); err == nil {
+			t.Fatal("expected error for typed dataset")
+		}
+	})
+}
+
+// every result of an encrypt-for-search is encrypted with the key
+// number matching its position in the returned array, and the last
+// entry uses the current key
+func TestStructuredKeyNumbersForSearch(t *testing.T) {
+	const dataset = "ALPHANUM_SSN"
+	const pt = "123-45-6789"
+
+	initializeCreds()
+
+	enc, err := NewStructuredEncryption(credentials)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer enc.Close()
+
+	dec, err := NewStructuredDecryption(credentials)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer dec.Close()
+
+	curr, err := enc.GetCurrentKeyNumber(dataset)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cts, err := enc.CipherForSearch(dataset, pt, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i, ct := range cts {
+		kn, err := dec.GetKeyNumber(dataset, ct)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if kn != i {
+			t.Fatalf("search result %d encrypted with key number %d", i, kn)
+		}
+	}
+
+	if last := len(cts) - 1; last != curr {
+		t.Fatalf("last search key number %d does not match current key number %d",
+			last, curr)
 	}
 }

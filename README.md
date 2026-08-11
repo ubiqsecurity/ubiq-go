@@ -325,6 +325,48 @@ fmt.Fprintf(os.Stdout, "ENCRYPTED cipher= %v \n", cipherTextArr)
 // ENCRYPTED cipher= ["000-03-OJMp", "100-0B-dnKG", "200-12-NOx5", "300-0j-esgH"]
 ```
 
+### Key Numbers
+
+Every structured ciphertext embeds the number (version) of the key it was encrypted with. To get the key number along with the ciphertext, use `CipherAndKeyNumber`. It behaves exactly like `Cipher` with the key number added as a second return value.
+
+```go
+cipherText, keyNumber, err := enc.CipherAndKeyNumber(datasetName, plainText, nil)
+if err != nil {
+    return err
+}
+fmt.Fprintf(os.Stdout, "ENCRYPTED cipher= %s key number= %d \n", cipherText, keyNumber)
+```
+
+To find out the current key number for a dataset without encrypting anything, use `GetCurrentKeyNumber`. It always asks the server, so a server-side key rotation is visible immediately. The fetched key is also stored in the local cache, so a subsequent `Cipher` call on the same dataset encrypts with the newest key.
+
+```go
+keyNumber, err := enc.GetCurrentKeyNumber(datasetName)
+if err != nil {
+    return err
+}
+fmt.Fprintf(os.Stdout, "current key number= %d \n", keyNumber)
+```
+
+To find out which key number an existing ciphertext was encrypted with, without decrypting it, use `GetKeyNumber`. It is available on both `StructuredEncryption` and `StructuredDecryption`. Only the dataset definition is needed (typically served from the local cache); no encryption key is fetched, nothing is decrypted, and no usage event is reported.
+
+> **Warning:** do not use `GetKeyNumber` to determine whether a value is Ubiq encrypted. Format preserving encryption has no authentication, so any input made of valid alphabet characters decodes to some key number; it cannot tell a real ciphertext from a random string.
+
+```go
+keyNumber, err := dec.GetKeyNumber(datasetName, cipherText)
+if err != nil {
+    return err
+}
+fmt.Fprintf(os.Stdout, "cipher text was encrypted with key number= %d \n", keyNumber)
+```
+
+For datasets configured with a non-string data type, `StructuredDecryption` provides typed variants that take the ciphertext in its native type: `GetKeyNumberInt32`, `GetKeyNumberInt64`, `GetKeyNumberDate`, and `GetKeyNumberDateTime`.
+
+```go
+keyNumber, err := dec.GetKeyNumberInt64("integer64", cipherInteger)
+```
+
+Together these can be used to detect data encrypted with an outdated key and re-encrypt it with the current one, for example `dec.GetKeyNumber(datasetName, cipherText) != enc.GetCurrentKeyNumber(datasetName)`.
+
 ### Decrypt
 
 Pass credentials, the name of a structured dataset, and data into the decryption function.

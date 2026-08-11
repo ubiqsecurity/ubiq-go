@@ -750,3 +750,183 @@ func TestCipherDateNonUTC(t *testing.T) {
 	}
 	t.Logf("CipherDate(non-UTC) correctly returned: %v", err)
 }
+
+func TestGetKeyNumberTyped(t *testing.T) {
+	initializeCreds()
+
+	enc, err := NewStructuredEncryption(credentials)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer enc.Close()
+
+	dec, err := NewStructuredDecryption(credentials)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer dec.Close()
+
+	t.Run("int32", func(t *testing.T) {
+		ct, err := enc.CipherInt32("integer32", 151223, nil)
+		if err != nil {
+			t.Fatalf("CipherInt32: %v", err)
+		}
+		kn, err := dec.GetKeyNumberInt32("integer32", ct)
+		if err != nil {
+			t.Fatalf("GetKeyNumberInt32: %v", err)
+		}
+		curr, err := enc.GetCurrentKeyNumber("integer32")
+		if err != nil {
+			t.Fatalf("GetCurrentKeyNumber: %v", err)
+		}
+		if kn != curr {
+			t.Fatalf("key number %d does not match current key number %d", kn, curr)
+		}
+	})
+
+	t.Run("int64", func(t *testing.T) {
+		ct, err := enc.CipherInt64("integer64", 9876543210, nil)
+		if err != nil {
+			t.Fatalf("CipherInt64: %v", err)
+		}
+		kn, err := dec.GetKeyNumberInt64("integer64", ct)
+		if err != nil {
+			t.Fatalf("GetKeyNumberInt64: %v", err)
+		}
+		curr, err := enc.GetCurrentKeyNumber("integer64")
+		if err != nil {
+			t.Fatalf("GetCurrentKeyNumber: %v", err)
+		}
+		if kn != curr {
+			t.Fatalf("key number %d does not match current key number %d", kn, curr)
+		}
+	})
+
+	t.Run("date", func(t *testing.T) {
+		pt := time.Date(2001, 12, 24, 0, 0, 0, 0, time.UTC)
+		ct, err := enc.CipherDate("date", pt, nil)
+		if err != nil {
+			t.Fatalf("CipherDate: %v", err)
+		}
+		kn, err := dec.GetKeyNumberDate("date", ct)
+		if err != nil {
+			t.Fatalf("GetKeyNumberDate: %v", err)
+		}
+		curr, err := enc.GetCurrentKeyNumber("date")
+		if err != nil {
+			t.Fatalf("GetCurrentKeyNumber: %v", err)
+		}
+		if kn != curr {
+			t.Fatalf("key number %d does not match current key number %d", kn, curr)
+		}
+	})
+
+	t.Run("datetime", func(t *testing.T) {
+		pt := time.Date(2001, 12, 24, 13, 37, 42, 0, time.UTC)
+		ct, err := enc.CipherDateTime("datetime", pt, nil)
+		if err != nil {
+			t.Fatalf("CipherDateTime: %v", err)
+		}
+		kn, err := dec.GetKeyNumberDateTime("datetime", ct)
+		if err != nil {
+			t.Fatalf("GetKeyNumberDateTime: %v", err)
+		}
+		curr, err := enc.GetCurrentKeyNumber("datetime")
+		if err != nil {
+			t.Fatalf("GetCurrentKeyNumber: %v", err)
+		}
+		if kn != curr {
+			t.Fatalf("key number %d does not match current key number %d", kn, curr)
+		}
+	})
+
+	t.Run("wrong_data_type", func(t *testing.T) {
+		// int32 method against a 64-bit dataset must error
+		if _, err := dec.GetKeyNumberInt32("integer64", 123); err == nil {
+			t.Fatal("expected error for mismatched dataset data type")
+		}
+	})
+}
+
+// typed variant of TestStructuredKeyNumbersForSearch: for every data
+// type, each encrypt-for-search result is encrypted with the key number
+// matching its position in the array, and the last entry uses the
+// current key
+func TestTypedKeyNumbersForSearch(t *testing.T) {
+	initializeCreds()
+
+	enc, err := NewStructuredEncryption(credentials)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer enc.Close()
+
+	dec, err := NewStructuredDecryption(credentials)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer dec.Close()
+
+	check := func(t *testing.T, dataset string, count int,
+		keyNumberAt func(i int) (int, error)) {
+		curr, err := enc.GetCurrentKeyNumber(dataset)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := 0; i < count; i++ {
+			kn, err := keyNumberAt(i)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if kn != i {
+				t.Fatalf("search result %d encrypted with key number %d", i, kn)
+			}
+		}
+		if last := count - 1; last != curr {
+			t.Fatalf("last search key number %d does not match current key number %d",
+				last, curr)
+		}
+	}
+
+	t.Run("int32", func(t *testing.T) {
+		cts, err := enc.CipherInt32ForSearch("integer32", 151223, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		check(t, "integer32", len(cts), func(i int) (int, error) {
+			return dec.GetKeyNumberInt32("integer32", cts[i])
+		})
+	})
+
+	t.Run("int64", func(t *testing.T) {
+		cts, err := enc.CipherInt64ForSearch("integer64", 9876543210, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		check(t, "integer64", len(cts), func(i int) (int, error) {
+			return dec.GetKeyNumberInt64("integer64", cts[i])
+		})
+	})
+
+	t.Run("date", func(t *testing.T) {
+		pt := time.Date(2001, 12, 24, 0, 0, 0, 0, time.UTC)
+		cts, err := enc.CipherDateForSearch("date", pt, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		check(t, "date", len(cts), func(i int) (int, error) {
+			return dec.GetKeyNumberDate("date", cts[i])
+		})
+	})
+
+	t.Run("datetime", func(t *testing.T) {
+		pt := time.Date(2001, 12, 24, 13, 37, 42, 0, time.UTC)
+		cts, err := enc.CipherDateTimeForSearch("datetime", pt, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		check(t, "datetime", len(cts), func(i int) (int, error) {
+			return dec.GetKeyNumberDateTime("datetime", cts[i])
+		})
+	})
+}
